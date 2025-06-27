@@ -428,8 +428,7 @@
             try {
                 database.ref('minutas').on('value', (snapshot) => {
                     const firebaseMinutas = snapshot.val() || {};
-                    // Mesclar com dados demo
-                    minutas = { ...minutas, ...firebaseMinutas };
+                    minutas = firebaseMinutas;
                     if (currentView === 'dashboard') renderDashboard();
                     if (currentView === 'historico') renderHistorico();
                 });
