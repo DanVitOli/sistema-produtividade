@@ -22,11 +22,17 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .realtime-indicator {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
+        .status-pendente { background-color: #fef3c7; color: #92400e; }
+        .status-assinada { background-color: #d1fae5; color: #065f46; }
+        .status-excluida { background-color: #fee2e2; color: #991b1b; }
+        .status-correcao { background-color: #dbeafe; color: #1e40af; }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
         }
         .pulse {
             animation: pulse 2s infinite;
@@ -36,18 +42,15 @@
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
-        .status-badge {
-            display: inline-flex;
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
             align-items: center;
-            font-size: 0.75rem;
-            font-weight: 500;
-            padding: 0.25rem 0.5rem;
-            border-radius: 9999px;
+            justify-content: center;
+            z-index: 50;
         }
-        .status-pendente { background-color: #fef3c7; color: #92400e; }
-        .status-assinada { background-color: #d1fae5; color: #065f46; }
-        .status-excluida { background-color: #fee2e2; color: #991b1b; }
-        .status-correcao { background-color: #dbeafe; color: #1e40af; }
         @media print {
             .no-print { display: none !important; }
             body { background: white !important; }
@@ -56,10 +59,9 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Indicador de Conexão -->
-    <div id="connection-status" class="realtime-indicator no-print">
-        <div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
-            <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
-            Conectado
+    <div id="connection-status" class="fixed top-4 right-4 z-50 no-print">
+        <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+            Carregando...
         </div>
     </div>
 
@@ -117,16 +119,10 @@
             <div id="navigation" class="flex flex-wrap gap-2"></div>
         </div>
 
-        <!-- Loading -->
-        <div id="loading" class="text-center py-12 no-print">
-            <div class="loading-spinner"></div>
-            <p class="text-gray-600 mt-4">Carregando dados...</p>
-        </div>
-
         <!-- Dashboard -->
         <div id="dashboard-view" class="hidden space-y-6"></div>
 
-        <!-- Registro -->
+        <!-- Registro de Minuta -->
         <div id="registro-view" class="hidden">
             <div class="bg-white rounded-lg shadow-md p-6">
                 <div class="flex items-center mb-6">
@@ -134,30 +130,32 @@
                     <h2 class="text-xl font-semibold text-gray-800">Registrar Nova Minuta</h2>
                 </div>
                 
-                <div id="registro-form" class="space-y-4">
+                <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
                         <input type="text" id="numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 1234567-89.2024.8.12.3456">
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta</label>
-                        <select id="tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Selecione o tipo</option>
-                            <option value="Despacho">Despacho</option>
-                            <option value="Decisão">Decisão</option>
-                            <option value="Sentença">Sentença</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                        <select id="categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Selecione a categoria</option>
-                            <option value="meta1">Meta 1 CNJ</option>
-                            <option value="sem_movimento">Sem movimentação 100+ dias</option>
-                            <option value="outros">Pedidos/Atos/Urgentes</option>
-                        </select>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta *</label>
+                            <select id="tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Selecione o tipo</option>
+                                <option value="Despacho">Despacho</option>
+                                <option value="Decisão">Decisão</option>
+                                <option value="Sentença">Sentença</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+                            <select id="categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Selecione a categoria</option>
+                                <option value="meta1">Meta 1 CNJ (2/dia)</option>
+                                <option value="sem_movimento">Sem movimentação 100+ dias (5/dia)</option>
+                                <option value="outros">Pedidos/Atos/Urgentes (3/dia)</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <div>
@@ -165,7 +163,8 @@
                         <textarea id="observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Comentários sobre a minuta (opcional)"></textarea>
                     </div>
                     
-                    <button onclick="registrarMinuta()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                    <button onclick="registrarMinuta()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                        <i data-lucide="save" class="h-5 w-5 mr-2 inline"></i>
                         Registrar Minuta
                     </button>
                 </div>
@@ -180,78 +179,9 @@
                         <i data-lucide="clock" class="h-6 w-6 text-gray-600 mr-2"></i>
                         <h2 class="text-xl font-semibold text-gray-800">Histórico de Minutas</h2>
                     </div>
-                    <div class="flex gap-2">
-                        <select id="filtro-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm no-print">
-                            <option value="">Todos os assessores</option>
-                            <option value="gilbert">Gilbert Juliano</option>
-                            <option value="laise">Laíse Vital</option>
-                        </select>
-                        <select id="filtro-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm no-print">
-                            <option value="">Todos os status</option>
-                            <option value="pendente">Pendente</option>
-                            <option value="assinada">Assinada</option>
-                            <option value="excluida">Excluída</option>
-                            <option value="correcao">Precisa Correção</option>
-                        </select>
-                    </div>
+                    <div id="historico-filters" class="flex gap-2 no-print"></div>
                 </div>
                 <div id="historico-content"></div>
-            </div>
-        </div>
-
-        <!-- Modal de Edição -->
-        <div id="modal-edicao" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print" onclick="event.target === this && fecharModalEdicao()">
-            <div class="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Editar Minuta</h3>
-                    <button onclick="fecharModalEdicao()" class="text-gray-500 hover:text-gray-700">
-                        <i data-lucide="x" class="h-5 w-5"></i>
-                    </button>
-                </div>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo</label>
-                        <input type="text" id="edit-numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta</label>
-                        <select id="edit-tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="Despacho">Despacho</option>
-                            <option value="Decisão">Decisão</option>
-                            <option value="Sentença">Sentença</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                        <select id="edit-categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="meta1">Meta 1 CNJ</option>
-                            <option value="sem_movimento">Sem movimentação 100+ dias</option>
-                            <option value="outros">Pedidos/Atos/Urgentes</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-                        <textarea id="edit-observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                    </div>
-                    
-                    <div class="flex gap-2 pt-4">
-                        <button onclick="salvarEdicao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors" title="Ctrl+Enter">
-                            Salvar Alterações
-                        </button>
-                        <button onclick="fecharModalEdicao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors" title="ESC">
-                            Cancelar
-                        </button>
-                    </div>
-                    
-                    <div class="text-xs text-gray-500 text-center mt-2">
-                        <span class="mr-4">💡 <strong>Ctrl+Enter:</strong> Salvar</span>
-                        <span><strong>ESC:</strong> Cancelar</span>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -265,16 +195,12 @@
                     </div>
                     <div class="flex gap-2 no-print">
                         <button onclick="gerarRelatorio('semanal')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm">
+                            <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
                             Relatório Semanal
                         </button>
                         <button onclick="gerarRelatorio('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
+                            <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
                             Relatório Mensal
-                        </button>
-                        <button onclick="debugDados()" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors text-sm">
-                            Debug Dados
-                        </button>
-                        <button onclick="limparDadosInconsistentes()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors text-sm">
-                            Limpar Dados
                         </button>
                         <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
                             <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
@@ -287,8 +213,66 @@
         </div>
     </div>
 
+    <!-- Modal de Edição -->
+    <div id="modal-edicao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalEdicao()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Editar Minuta</h3>
+                <button onclick="fecharModalEdicao()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
+                    <input type="text" id="edit-numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta *</label>
+                    <select id="edit-tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Despacho">Despacho</option>
+                        <option value="Decisão">Decisão</option>
+                        <option value="Sentença">Sentença</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+                    <select id="edit-categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="meta1">Meta 1 CNJ</option>
+                        <option value="sem_movimento">Sem movimentação 100+ dias</option>
+                        <option value="outros">Pedidos/Atos/Urgentes</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                    <textarea id="edit-observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                
+                <div class="flex gap-2 pt-4">
+                    <button onclick="salvarEdicao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                        <i data-lucide="save" class="h-4 w-4 mr-1 inline"></i>
+                        Salvar
+                    </button>
+                    <button onclick="fecharModalEdicao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+                
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Salvar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Configuração do Firebase
+        // ==================== CONFIGURAÇÃO ====================
+        
         const firebaseConfig = {
             apiKey: "AIzaSyCzuoRgbvKQSjOFssde-qUEtNDqGNJML7E",
             authDomain: "produtividade-gabinete.firebaseapp.com",
@@ -299,27 +283,11 @@
             appId: "1:370364917935:web:a6205cc718748abcbdcc5a"
         };
 
-        // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        lucide.createIcons();
-
-        // Credenciais de acesso
+        // Credenciais seguras
         const credenciais = {
             'juiz': { senha: 'Juiz@2024!', nome: 'Juiz', tipo: 'juiz' },
             'gilbert': { senha: 'Gilbert@2024!', nome: 'Gilbert Juliano', tipo: 'assessor', assessorId: 'gilbert' },
             'laise': { senha: 'Laise@2024!', nome: 'Laíse Vital', tipo: 'assessor', assessorId: 'laise' }
-        };
-
-        // Estado da aplicação
-        let currentUser = null;
-        let currentView = 'dashboard';
-        let minutas = {};
-        let minutaEditando = null;
-
-        let assessores = {
-            gilbert: { nome: 'Gilbert Juliano', ativo: true },
-            laise: { nome: 'Laíse Vital', ativo: true }
         };
 
         const categorias = {
@@ -335,86 +303,104 @@
             'correcao': { nome: 'Precisa Correção', cor: 'status-correcao' }
         };
 
-        // Utilitários
+        // ==================== ESTADO GLOBAL ====================
+        
+        let firebase, database;
+        let currentUser = null;
+        let currentView = 'dashboard';
+        let minutas = {};
+        let minutaEditando = null;
+        let assessores = {
+            gilbert: { nome: 'Gilbert Juliano', ativo: true },
+            laise: { nome: 'Laíse Vital', ativo: true }
+        };
+
+        // ==================== UTILITÁRIOS ====================
+        
         function isDiaUtil(data) {
             const dia = data.getDay();
-            return dia >= 1 && dia <= 5;
+            return dia >= 1 && dia <= 5; // Segunda a Sexta
         }
 
         function getHojeString() {
             return new Date().toISOString().split('T')[0];
         }
 
+        function log(message, data = null) {
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`, data || '');
+        }
+
+        function showNotification(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500',
+                warning: 'bg-yellow-500'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 left-1/2 transform -translate-x-1/2 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all duration-300`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.transform = 'translate(-50%, -100px)';
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // ==================== CÁLCULOS DE PRODUTIVIDADE ====================
+        
         function getMinutasHoje(assessorId) {
-            try {
-                const hoje = getHojeString();
-                console.log(`Buscando minutas para ${assessorId} em ${hoje}`);
+            const hoje = getHojeString();
+            return Object.values(minutas).filter(m => {
+                if (!m || !m.data || m.data !== hoje) return false;
                 
-                const minutasHoje = Object.values(minutas).filter(m => {
-                    if (!m || !m.data) return false;
-                    
-                    // Verificar data
-                    const dataMatch = m.data === hoje;
-                    if (!dataMatch) return false;
-                    
-                    // Verificar assessor com compatibilidade total
-                    let assessorMatch = false;
-                    
-                    // Correspondência direta
-                    if (m.assessorId === assessorId) assessorMatch = true;
-                    
-                    // Compatibilidade Gilbert
-                    if (assessorId === 'gilbert') {
-                        if (m.assessorId === 'assessor1') assessorMatch = true;
-                        if (m.assessorNome && m.assessorNome.includes('Gilbert')) assessorMatch = true;
-                    }
-                    
-                    // Compatibilidade Laíse
-                    if (assessorId === 'laise') {
-                        if (m.assessorId === 'assessor2') assessorMatch = true;
-                        if (m.assessorNome && m.assessorNome.includes('Laíse')) assessorMatch = true;
-                    }
-                    
-                    console.log(`Minuta ${m.numeroProcesso}: assessorId=${m.assessorId}, assessorNome=${m.assessorNome}, match=${assessorMatch}`);
-                    
-                    return assessorMatch;
-                });
-                
-                console.log(`Encontradas ${minutasHoje.length} minutas para ${assessorId}`);
-                return minutasHoje;
-            } catch (error) {
-                console.error('Erro em getMinutasHoje:', error);
-                return [];
-            }
+                // Compatibilidade total entre dados antigos e novos
+                return m.assessorId === assessorId || 
+                       (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                       (assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+            });
         }
 
         function getProgressoCategoria(assessorId, categoria) {
             const minutasHoje = getMinutasHoje(assessorId);
             const count = minutasHoje.filter(m => m.categoria === categoria).length;
             const meta = categorias[categoria].meta;
-            return { atual: count, meta, percentual: Math.min((count / meta) * 100, 100) };
+            return { 
+                atual: count, 
+                meta, 
+                percentual: Math.min((count / meta) * 100, 100) 
+            };
         }
 
         function getProgressoTotal(assessorId) {
             const minutasHoje = getMinutasHoje(assessorId);
             const total = minutasHoje.length;
             const meta = 10;
-            return { atual: total, meta, percentual: Math.min((total / meta) * 100, 100) };
+            return { 
+                atual: total, 
+                meta, 
+                percentual: Math.min((total / meta) * 100, 100) 
+            };
         }
 
-        // Autenticação
+        // ==================== AUTENTICAÇÃO ====================
+        
         function fazerLogin() {
             const usuario = document.getElementById('login-usuario').value;
             const senha = document.getElementById('login-senha').value;
 
             if (!usuario || !senha) {
-                alert('Por favor, selecione o usuário e digite a senha.');
+                showNotification('Por favor, selecione o usuário e digite a senha.', 'warning');
                 return;
             }
 
             const cred = credenciais[usuario];
             if (!cred || cred.senha !== senha) {
-                alert('Usuário ou senha incorretos.');
+                showNotification('Usuário ou senha incorretos.', 'error');
                 return;
             }
 
@@ -426,6 +412,8 @@
                 assessorId: cred.assessorId
             };
 
+            log('Login realizado', currentUser.nome);
+            
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
             
@@ -433,6 +421,7 @@
         }
 
         function logout() {
+            log('Logout realizado', currentUser?.nome);
             currentUser = null;
             document.getElementById('main-app').classList.add('hidden');
             document.getElementById('login-screen').classList.remove('hidden');
@@ -440,23 +429,37 @@
             document.getElementById('login-senha').value = '';
         }
 
-        // Inicialização da aplicação
+        // ==================== INICIALIZAÇÃO ====================
+        
         function initializeApp() {
-            setupUserInfo();
-            setupNavigation();
-            setupFirebaseListeners();
-            showView('dashboard');
+            try {
+                // Inicializar Firebase
+                firebase = window.firebase;
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                
+                setupUserInfo();
+                setupNavigation();
+                setupFirebaseListeners();
+                showView('dashboard');
+                
+                log('Aplicação inicializada com sucesso');
+                
+            } catch (error) {
+                log('Erro na inicialização', error);
+                showNotification('Erro ao inicializar aplicação', 'error');
+            }
         }
 
         function setupUserInfo() {
-            document.getElementById('user-info').textContent = 
-                `Logado como: ${currentUser.nome}`;
+            document.getElementById('user-info').textContent = `Logado como: ${currentUser.nome}`;
         }
 
         function setupNavigation() {
             const nav = document.getElementById('navigation');
             let buttons = '';
 
+            // Dashboard sempre disponível
             buttons += `
                 <button onclick="showView('dashboard')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
                     <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2"></i>
@@ -464,6 +467,7 @@
                 </button>
             `;
 
+            // Registro apenas para assessores
             if (!currentUser.isJuiz) {
                 buttons += `
                     <button onclick="showView('registro')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
@@ -473,6 +477,7 @@
                 `;
             }
 
+            // Histórico sempre disponível
             buttons += `
                 <button onclick="showView('historico')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
                     <i data-lucide="clock" class="h-4 w-4 mr-2"></i>
@@ -480,6 +485,7 @@
                 </button>
             `;
 
+            // Relatórios apenas para juiz
             if (currentUser.isJuiz) {
                 buttons += `
                     <button onclick="showView('relatorios')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
@@ -495,23 +501,20 @@
 
         function showView(view) {
             try {
-                console.log(`Mudando para view: ${view}`);
+                log(`Navegando para: ${view}`);
                 
                 // Esconder todas as views
                 document.querySelectorAll('[id$="-view"]').forEach(el => {
                     if (el) el.classList.add('hidden');
                 });
-                
-                const loadingEl = document.getElementById('loading');
-                if (loadingEl) loadingEl.classList.add('hidden');
-                
+
                 // Atualizar navegação
                 document.querySelectorAll('.nav-btn').forEach(btn => {
                     if (btn) {
                         btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
                     }
                 });
-                
+
                 // Destacar botão ativo
                 const activeBtn = event?.target?.closest('button');
                 if (activeBtn) {
@@ -519,142 +522,83 @@
                 }
 
                 currentView = view;
-                
+
                 // Mostrar view solicitada
-                if (view === 'dashboard') {
-                    renderDashboard();
-                } else if (view === 'registro') {
-                    const registroEl = document.getElementById('registro-view');
-                    if (registroEl) registroEl.classList.remove('hidden');
-                } else if (view === 'historico') {
-                    setupHistoricoFilters();
-                    renderHistorico();
-                } else if (view === 'relatorios') {
-                    const relatoriosEl = document.getElementById('relatorios-view');
-                    if (relatoriosEl) relatoriosEl.classList.remove('hidden');
+                switch(view) {
+                    case 'dashboard':
+                        renderDashboard();
+                        break;
+                    case 'registro':
+                        document.getElementById('registro-view')?.classList.remove('hidden');
+                        break;
+                    case 'historico':
+                        setupHistoricoFilters();
+                        renderHistorico();
+                        break;
+                    case 'relatorios':
+                        document.getElementById('relatorios-view')?.classList.remove('hidden');
+                        break;
                 }
-                
-                console.log(`✅ View ${view} carregada com sucesso`);
+
+                log(`View ${view} carregada`);
                 
             } catch (error) {
-                console.error(`❌ Erro ao carregar view ${view}:`, error);
-                
-                // Fallback - tentar mostrar dashboard
-                if (view !== 'dashboard') {
-                    console.log('Tentando fallback para dashboard...');
-                    setTimeout(() => showView('dashboard'), 100);
-                } else {
-                    // Se nem dashboard funcionar, mostrar erro
-                    const errorDiv = document.createElement('div');
-                    errorDiv.innerHTML = `
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                            <h3 class="text-lg font-semibold text-red-800 mb-2">Erro de Navegação</h3>
-                            <p class="text-red-700 mb-4">Ocorreu um erro ao carregar a página. Recarregue o navegador.</p>
-                            <button onclick="window.location.reload()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
-                                Recarregar Página
-                            </button>
-                        </div>
-                    `;
-                    
-                    const dashboardEl = document.getElementById('dashboard-view');
-                    if (dashboardEl) {
-                        dashboardEl.innerHTML = errorDiv.innerHTML;
-                        dashboardEl.classList.remove('hidden');
-                    }
-                }
+                log(`Erro ao carregar view ${view}`, error);
+                showNotification(`Erro ao carregar ${view}`, 'error');
             }
         }
 
-        // Firebase
+        // ==================== FIREBASE ====================
+        
         function setupFirebaseListeners() {
-            console.log("🔥 Configurando listeners do Firebase...");
-            
             try {
-                document.getElementById('loading').classList.add('hidden');
-                
-                // Listener para minutas em tempo real
+                // Listener para minutas
                 database.ref('minutas').on('value', (snapshot) => {
-                    try {
-                        const firebaseMinutas = snapshot.val() || {};
-                        console.log("📊 Dados recebidos do Firebase:", firebaseMinutas);
-                        
-                        minutas = firebaseMinutas;
-                        
-                        // Atualizar interface apenas se estiver nas views corretas
-                        if (currentView === 'dashboard') {
-                            console.log("Atualizando dashboard...");
-                            renderDashboard();
-                        }
-                        if (currentView === 'historico') {
-                            console.log("Atualizando histórico...");
-                            renderHistorico();
-                        }
-                        
-                        console.log(`✅ ${Object.keys(minutas).length} minutas carregadas`);
-                        
-                    } catch (error) {
-                        console.error("Erro ao processar dados do Firebase:", error);
-                    }
+                    minutas = snapshot.val() || {};
+                    log(`Minutas carregadas: ${Object.keys(minutas).length}`);
+                    
+                    if (currentView === 'dashboard') renderDashboard();
+                    if (currentView === 'historico') renderHistorico();
                 });
 
                 // Listener para assessores
                 database.ref('assessores').on('value', (snapshot) => {
-                    try {
-                        const assessoresFirebase = snapshot.val();
-                        if (assessoresFirebase) {
-                            assessores = { ...assessores, ...assessoresFirebase };
-                            console.log("👥 Assessores atualizados:", assessores);
-                        }
-                    } catch (error) {
-                        console.error("Erro ao carregar assessores:", error);
+                    const assessoresFirebase = snapshot.val();
+                    if (assessoresFirebase) {
+                        assessores = { ...assessores, ...assessoresFirebase };
+                        log('Assessores atualizados');
                     }
                 });
 
-                // Configurar dados iniciais se não existirem
+                // Configurar dados iniciais
                 database.ref('assessores').once('value', (snapshot) => {
                     if (!snapshot.exists()) {
-                        database.ref('assessores').set({
-                            gilbert: { nome: 'Gilbert Juliano', ativo: true },
-                            laise: { nome: 'Laíse Vital', ativo: true }
-                        });
-                        console.log("✅ Dados iniciais dos assessores criados");
+                        database.ref('assessores').set(assessores);
+                        log('Dados iniciais dos assessores criados');
                     }
                 });
 
                 // Status de conexão
                 database.ref('.info/connected').on('value', (snapshot) => {
-                    try {
-                        const connected = snapshot.val();
-                        const statusDiv = document.getElementById('connection-status');
-                        
-                        if (statusDiv) {
-                            if (connected) {
-                                statusDiv.innerHTML = `
-                                    <div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
-                                        <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
-                                        Online
-                                    </div>
-                                `;
-                                console.log("🟢 Firebase conectado");
-                            } else {
-                                statusDiv.innerHTML = `
-                                    <div class="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
-                                        <div class="w-2 h-2 bg-white rounded-full mr-2"></div>
-                                        Offline
-                                    </div>
-                                `;
-                                console.log("🟡 Firebase desconectado - usando dados locais");
-                            }
-                        }
-                    } catch (error) {
-                        console.error("Erro no status de conexão:", error);
+                    const connected = snapshot.val();
+                    const statusDiv = document.getElementById('connection-status');
+                    
+                    if (statusDiv) {
+                        statusDiv.innerHTML = connected ? 
+                            `<div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                                <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
+                                Online
+                            </div>` :
+                            `<div class="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                                Offline
+                            </div>`;
                     }
                 });
 
-                console.log("✅ Firebase configurado com sucesso");
-
+                log('Firebase configurado com sucesso');
+                
             } catch (error) {
-                console.warn("⚠️ Firebase não configurado - usando modo local", error);
+                log('Erro no Firebase - modo local ativado', error);
                 
                 const statusDiv = document.getElementById('connection-status');
                 if (statusDiv) {
@@ -665,24 +609,18 @@
                     `;
                 }
             }
-            
-            // Garantir que o dashboard seja renderizado
-            setTimeout(() => {
-                if (currentView === 'dashboard') {
-                    console.log("Renderizando dashboard inicial...");
-                    renderDashboard();
-                }
-            }, 500);
         }
 
+        // ==================== REGISTRO DE MINUTAS ====================
+        
         function registrarMinuta() {
-            const numeroProcesso = document.getElementById('numero-processo').value;
+            const numeroProcesso = document.getElementById('numero-processo').value.trim();
             const tipoMinuta = document.getElementById('tipo-minuta').value;
             const categoria = document.getElementById('categoria-minuta').value;
-            const observacoes = document.getElementById('observacoes-minuta').value;
+            const observacoes = document.getElementById('observacoes-minuta').value.trim();
 
             if (!numeroProcesso || !tipoMinuta || !categoria) {
-                alert('Por favor, preencha os campos obrigatórios.');
+                showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
                 return;
             }
 
@@ -692,28 +630,27 @@
                 numeroProcesso,
                 tipoMinuta,
                 categoria,
-                observacoes: observacoes || '',
+                observacoes,
                 status: 'pendente',
                 data: getHojeString(),
-                timestamp: new Date().toLocaleTimeString(),
+                timestamp: new Date().toLocaleTimeString('pt-BR'),
                 createdAt: Date.now()
             };
 
             try {
-                const minutaComTimestamp = {
+                // Salvar no Firebase
+                database.ref('minutas').push({
                     ...novaMinuta,
                     createdAt: firebase.database.ServerValue.TIMESTAMP
-                };
+                }).then(() => {
+                    limparFormularioRegistro();
+                    showNotification('Minuta registrada com sucesso!', 'success');
+                    showView('dashboard');
+                    log('Minuta registrada no Firebase', numeroProcesso);
+                }).catch(() => {
+                    salvarMinutaLocal(novaMinuta);
+                });
                 
-                database.ref('minutas').push(minutaComTimestamp)
-                    .then(() => {
-                        limparFormularioRegistro();
-                        alert('Minuta registrada com sucesso!');
-                        showView('dashboard');
-                    })
-                    .catch((error) => {
-                        salvarMinutaLocal(novaMinuta);
-                    });
             } catch (error) {
                 salvarMinutaLocal(novaMinuta);
             }
@@ -724,8 +661,9 @@
             minutas[id] = minuta;
             
             limparFormularioRegistro();
-            alert('Minuta registrada localmente!');
+            showNotification('Minuta registrada localmente!', 'warning');
             showView('dashboard');
+            log('Minuta salva localmente', minuta.numeroProcesso);
         }
 
         function limparFormularioRegistro() {
@@ -735,46 +673,30 @@
             document.getElementById('observacoes-minuta').value = '';
         }
 
-        function atualizarStatus(minutaId, novoStatus) {
-            if (!currentUser.isJuiz) return;
-
-            try {
-                database.ref(`minutas/${minutaId}/status`).set(novoStatus)
-                    .then(() => {
-                        minutas[minutaId].status = novoStatus;
-                        renderHistorico();
-                    });
-            } catch (error) {
-                minutas[minutaId].status = novoStatus;
-                renderHistorico();
-            }
-        }
-
+        // ==================== EDIÇÃO/EXCLUSÃO ====================
+        
         function editarMinuta(minutaId) {
-            if (currentUser.isJuiz) return;
-
             const minuta = minutas[minutaId];
-            if (!minuta) return;
+            if (!minuta || currentUser.isJuiz) return;
 
-            // Verificar se a minuta pertence ao assessor atual
+            // Verificar propriedade
             const isOwner = minuta.assessorId === currentUser.assessorId || 
-                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome === 'Gilbert Juliano')) ||
-                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome === 'Laíse Vital'));
+                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome?.includes('Gilbert'))) ||
+                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome?.includes('Laíse')));
 
             if (!isOwner) {
-                alert('Você só pode editar suas próprias minutas.');
+                showNotification('Você só pode editar suas próprias minutas.', 'error');
                 return;
             }
 
             minutaEditando = { id: minutaId, ...minuta };
 
-            // Preencher formulário de edição
+            // Preencher formulário
             document.getElementById('edit-numero-processo').value = minuta.numeroProcesso || '';
             document.getElementById('edit-tipo-minuta').value = minuta.tipoMinuta || '';
             document.getElementById('edit-categoria-minuta').value = minuta.categoria || '';
             document.getElementById('edit-observacoes-minuta').value = minuta.observacoes || '';
 
-            // Mostrar modal
             document.getElementById('modal-edicao').classList.remove('hidden');
             lucide.createIcons();
         }
@@ -787,13 +709,13 @@
         function salvarEdicao() {
             if (!minutaEditando) return;
 
-            const numeroProcesso = document.getElementById('edit-numero-processo').value;
+            const numeroProcesso = document.getElementById('edit-numero-processo').value.trim();
             const tipoMinuta = document.getElementById('edit-tipo-minuta').value;
             const categoria = document.getElementById('edit-categoria-minuta').value;
-            const observacoes = document.getElementById('edit-observacoes-minuta').value;
+            const observacoes = document.getElementById('edit-observacoes-minuta').value.trim();
 
             if (!numeroProcesso || !tipoMinuta || !categoria) {
-                alert('Por favor, preencha os campos obrigatórios.');
+                showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
                 return;
             }
 
@@ -813,37 +735,36 @@
                         fecharModalEdicao();
                         renderHistorico();
                         renderDashboard();
-                        alert('Minuta atualizada com sucesso!');
+                        showNotification('Minuta atualizada com sucesso!', 'success');
+                        log('Minuta editada no Firebase', numeroProcesso);
                     })
                     .catch(() => {
                         minutas[minutaEditando.id] = minutaAtualizada;
                         fecharModalEdicao();
                         renderHistorico();
                         renderDashboard();
-                        alert('Minuta atualizada localmente!');
+                        showNotification('Minuta atualizada localmente!', 'warning');
                     });
             } catch (error) {
                 minutas[minutaEditando.id] = minutaAtualizada;
                 fecharModalEdicao();
                 renderHistorico();
                 renderDashboard();
-                alert('Minuta atualizada localmente!');
+                showNotification('Minuta atualizada localmente!', 'warning');
             }
         }
 
         function excluirMinuta(minutaId) {
-            if (currentUser.isJuiz) return;
-
             const minuta = minutas[minutaId];
-            if (!minuta) return;
+            if (!minuta || currentUser.isJuiz) return;
 
-            // Verificar se a minuta pertence ao assessor atual
+            // Verificar propriedade
             const isOwner = minuta.assessorId === currentUser.assessorId || 
-                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome === 'Gilbert Juliano')) ||
-                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome === 'Laíse Vital'));
+                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome?.includes('Gilbert'))) ||
+                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome?.includes('Laíse')));
 
             if (!isOwner) {
-                alert('Você só pode excluir suas próprias minutas.');
+                showNotification('Você só pode excluir suas próprias minutas.', 'error');
                 return;
             }
 
@@ -857,38 +778,53 @@
                         delete minutas[minutaId];
                         renderHistorico();
                         renderDashboard();
-                        alert('Minuta excluída com sucesso!');
+                        showNotification('Minuta excluída com sucesso!', 'success');
+                        log('Minuta excluída do Firebase', minuta.numeroProcesso);
                     })
                     .catch(() => {
                         delete minutas[minutaId];
                         renderHistorico();
                         renderDashboard();
-                        alert('Minuta excluída localmente!');
+                        showNotification('Minuta excluída localmente!', 'warning');
                     });
             } catch (error) {
                 delete minutas[minutaId];
                 renderHistorico();
                 renderDashboard();
-                alert('Minuta excluída localmente!');
+                showNotification('Minuta excluída localmente!', 'warning');
             }
         }
 
-        // Renderização
+        function atualizarStatus(minutaId, novoStatus) {
+            if (!currentUser.isJuiz) return;
+
+            try {
+                database.ref(`minutas/${minutaId}/status`).set(novoStatus)
+                    .then(() => {
+                        minutas[minutaId].status = novoStatus;
+                        renderHistorico();
+                        showNotification(`Status atualizado para: ${statusOptions[novoStatus].nome}`, 'success');
+                        log('Status atualizado', `${minutaId} -> ${novoStatus}`);
+                    });
+            } catch (error) {
+                minutas[minutaId].status = novoStatus;
+                renderHistorico();
+                showNotification('Status atualizado localmente!', 'warning');
+            }
+        }
+
+        // ==================== RENDERIZAÇÃO ====================
+        
         function renderDashboard() {
             try {
-                console.log("🎨 Renderizando dashboard...", { currentUser, minutas });
-                
                 const dashboard = document.getElementById('dashboard-view');
-                if (!dashboard) {
-                    console.error('Elemento dashboard-view não encontrado');
-                    return;
-                }
-                
+                if (!dashboard) return;
+
                 const hoje = new Date();
-                let dashboardContent = '';
-                
+                let content = '';
+
                 if (!isDiaUtil(hoje)) {
-                    dashboardContent = `
+                    content = `
                         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                             <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
                             <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
@@ -897,11 +833,11 @@
                         ${renderAssessoresCards()}
                     `;
                 } else {
-                    const totalMinutasHoje = Object.values(minutas).filter(m => m && m.data === getHojeString()).length;
+                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString()).length;
                     const metaTotal = 20;
 
-                    dashboardContent = `
-                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
+                    content = `
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
@@ -923,96 +859,57 @@
                         ${renderAssessoresCards()}
                     `;
                 }
-                
-                dashboard.innerHTML = dashboardContent;
+
+                dashboard.innerHTML = content;
                 dashboard.classList.remove('hidden');
                 
-                // Recriar ícones com tratamento de erro
-                setTimeout(() => {
-                    try {
-                        lucide.createIcons();
-                    } catch (iconError) {
-                        console.warn('Erro ao criar ícones:', iconError);
-                    }
-                }, 100);
-                
-                console.log("✅ Dashboard renderizado com sucesso");
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Dashboard renderizado');
                 
             } catch (error) {
-                console.error("❌ Erro ao renderizar dashboard:", error);
-                
-                // Fallback em caso de erro
-                const dashboard = document.getElementById('dashboard-view');
-                if (dashboard) {
-                    dashboard.innerHTML = `
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                            <h3 class="text-lg font-semibold text-red-800 mb-2">Erro no Dashboard</h3>
-                            <p class="text-red-700">Ocorreu um erro ao carregar o dashboard. Recarregue a página.</p>
-                            <button onclick="window.location.reload()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
-                                Recarregar Página
-                            </button>
-                        </div>
-                    `;
-                    dashboard.classList.remove('hidden');
-                }
+                log('Erro ao renderizar dashboard', error);
+                showNotification('Erro ao carregar dashboard', 'error');
             }
         }
 
         function renderAssessoresCards() {
-            try {
-                if (!currentUser) {
-                    console.error('currentUser não definido');
-                    return '<div class="text-center text-red-500">Erro: usuário não identificado</div>';
-                }
-                
-                if (currentUser.isJuiz) {
-                    return `
-                        <div class="grid md:grid-cols-2 gap-6">
-                            ${renderAssessorCard('gilbert')}
-                            ${renderAssessorCard('laise')}
-                        </div>
-                    `;
-                } else {
-                    return `
-                        <div class="max-w-md mx-auto">
-                            ${renderAssessorCard(currentUser.assessorId)}
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Erro em renderAssessoresCards:', error);
-                return '<div class="text-center text-red-500">Erro ao carregar cards dos assessores</div>';
+            if (!currentUser) return '';
+
+            if (currentUser.isJuiz) {
+                return `
+                    <div class="grid md:grid-cols-2 gap-6">
+                        ${renderAssessorCard('gilbert')}
+                        ${renderAssessorCard('laise')}
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="max-w-md mx-auto">
+                        ${renderAssessorCard(currentUser.assessorId)}
+                    </div>
+                `;
             }
         }
 
         function renderAssessorCard(assessorId) {
             try {
-                console.log(`Renderizando card para assessor: ${assessorId}`);
-                
                 const assessor = assessores[assessorId];
-                if (!assessor) {
-                    console.error(`Assessor ${assessorId} não encontrado`);
-                    return '<div class="text-red-500">Assessor não encontrado</div>';
-                }
-                
+                if (!assessor) return `<div class="text-red-500">Assessor ${assessorId} não encontrado</div>`;
+
                 const progressoTotal = getProgressoTotal(assessorId);
                 const minutasHoje = getMinutasHoje(assessorId);
-                
-                console.log(`Assessor ${assessorId}: ${minutasHoje.length} minutas hoje`);
-                
+
                 let categoriasHtml = '';
                 Object.entries(categorias).forEach(([key, cat]) => {
                     const progresso = getProgressoCategoria(assessorId, key);
-                    console.log(`${assessorId} - ${key}: ${progresso.atual}/${progresso.meta}`);
-                    
                     categoriasHtml += `
-                        <div>
+                        <div class="mb-3">
                             <div class="flex justify-between text-sm text-gray-600 mb-1">
                                 <span>${cat.nome}</span>
-                                <span>${progresso.atual}/${progresso.meta}</span>
+                                <span class="font-medium">${progresso.atual}/${progresso.meta}</span>
                             </div>
-                            <div class="w-full bg-gray-200 rounded-full h-3">
-                                <div class="${cat.cor} h-3 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
                             </div>
                         </div>
                     `;
@@ -1024,19 +921,18 @@
                     ultimasMinutasHtml = `
                         <div class="mt-4 pt-4 border-t border-gray-200">
                             <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
-                            <div class="space-y-1 max-h-32 overflow-y-auto">
+                            <div class="space-y-2 max-h-32 overflow-y-auto">
                                 ${ultimasMinutas.map(minuta => `
                                     <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''}">
                                         <div class="font-medium flex items-center gap-1">
                                             ${minuta.numeroProcesso || 'Sem número'}
-                                            ${minuta.editadaEm ? '<span class="text-orange-600" title="Minuta editada">✏️</span>' : ''}
+                                            ${minuta.editadaEm ? '<span class="text-orange-600" title="Editada">✏️</span>' : ''}
                                         </div>
                                         <div class="flex justify-between items-center">
-                                            <span>${minuta.tipoMinuta || 'Sem tipo'} - ${categorias[minuta.categoria]?.nome || 'Sem categoria'}</span>
+                                            <span class="text-xs">${minuta.tipoMinuta} - ${categorias[minuta.categoria]?.nome}</span>
                                             <span class="status-badge ${statusOptions[minuta.status]?.cor || 'status-pendente'}">${statusOptions[minuta.status]?.nome || 'Pendente'}</span>
                                         </div>
-                                        <div class="text-gray-500">${minuta.timestamp || ''}</div>
-                                        ${minuta.editadaEm ? `<div class="text-xs text-orange-600">Editada: ${minuta.editadaEm}</div>` : ''}
+                                        <div class="text-gray-500 text-xs">${minuta.timestamp}</div>
                                     </div>
                                 `).join('')}
                             </div>
@@ -1058,423 +954,334 @@
                         <div class="mb-4">
                             <div class="flex justify-between text-sm text-gray-600 mb-1">
                                 <span>Progresso Diário</span>
-                                <span>${Math.round(progressoTotal.percentual)}%</span>
+                                <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-3">
                                 <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
                             </div>
                         </div>
                         
-                        <div class="space-y-3">
+                        <div>
                             ${categoriasHtml}
                         </div>
                         
                         ${ultimasMinutasHtml}
                     </div>
                 `;
+                
             } catch (error) {
-                console.error(`Erro ao renderizar card do assessor ${assessorId}:`, error);
-                return `
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-6">
-                        <h3 class="text-red-800 font-semibold">Erro no Card</h3>
-                        <p class="text-red-600 text-sm">Erro ao carregar dados do assessor ${assessorId}</p>
-                    </div>
-                `;
+                log(`Erro ao renderizar card ${assessorId}`, error);
+                return `<div class="bg-red-50 p-4 rounded-lg text-red-800">Erro ao carregar ${assessorId}</div>`;
             }
         }
 
         function setupHistoricoFilters() {
-            const filtroAssessor = document.getElementById('filtro-assessor');
-            const filtroStatus = document.getElementById('filtro-status');
+            const filtersDiv = document.getElementById('historico-filters');
             
             if (currentUser.isJuiz) {
-                filtroAssessor.style.display = 'block';
-                filtroStatus.style.display = 'block';
+                filtersDiv.innerHTML = `
+                    <select id="filtro-assessor" onchange="renderHistorico()" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
+                        <option value="">Todos os assessores</option>
+                        <option value="gilbert">Gilbert Juliano</option>
+                        <option value="laise">Laíse Vital</option>
+                    </select>
+                    <select id="filtro-status" onchange="renderHistorico()" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
+                        <option value="">Todos os status</option>
+                        <option value="pendente">Pendente</option>
+                        <option value="assinada">Assinada</option>
+                        <option value="excluida">Excluída</option>
+                        <option value="correcao">Precisa Correção</option>
+                    </select>
+                `;
             } else {
-                filtroAssessor.style.display = 'none';
-                filtroStatus.style.display = 'none';
+                filtersDiv.innerHTML = '';
             }
-
-            filtroAssessor.onchange = renderHistorico;
-            filtroStatus.onchange = renderHistorico;
         }
 
         function renderHistorico() {
-            const historico = document.getElementById('historico-view');
-            const minutasArray = Object.entries(minutas).map(([key, minuta]) => ({
-                ...minuta,
-                id: key
-            })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-            
-            let minutasFiltradas = minutasArray;
+            try {
+                const historico = document.getElementById('historico-view');
+                if (!historico) return;
 
-            // Filtros
-            if (currentUser.isJuiz) {
-                const filtroAssessor = document.getElementById('filtro-assessor').value;
-                const filtroStatus = document.getElementById('filtro-status').value;
-                
-                if (filtroAssessor) {
+                const minutasArray = Object.entries(minutas).map(([key, minuta]) => ({
+                    ...minuta,
+                    id: key
+                })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+                let minutasFiltradas = minutasArray;
+
+                // Aplicar filtros
+                if (currentUser.isJuiz) {
+                    const filtroAssessor = document.getElementById('filtro-assessor')?.value;
+                    const filtroStatus = document.getElementById('filtro-status')?.value;
+                    
+                    if (filtroAssessor) {
+                        minutasFiltradas = minutasFiltradas.filter(m => {
+                            return m.assessorId === filtroAssessor || 
+                                   (filtroAssessor === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome?.includes('Gilbert'))) ||
+                                   (filtroAssessor === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome?.includes('Laíse')));
+                        });
+                    }
+                    if (filtroStatus) {
+                        minutasFiltradas = minutasFiltradas.filter(m => m.status === filtroStatus);
+                    }
+                } else {
                     minutasFiltradas = minutasFiltradas.filter(m => {
-                        // Compatibilidade com dados antigos e novos
-                        return m.assessorId === filtroAssessor || 
-                               (filtroAssessor === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
-                               (filtroAssessor === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
+                        return m.assessorId === currentUser.assessorId || 
+                               (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome?.includes('Gilbert'))) ||
+                               (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome?.includes('Laíse')));
                     });
                 }
-                if (filtroStatus) {
-                    minutasFiltradas = minutasFiltradas.filter(m => m.status === filtroStatus);
-                }
-            } else {
-                minutasFiltradas = minutasFiltradas.filter(m => {
-                    // Compatibilidade para assessores
-                    return m.assessorId === currentUser.assessorId || 
-                           (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
-                           (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
-                });
-            }
-            
-            let content = '';
-            if (minutasFiltradas.length === 0) {
-                content = `
-                    <div class="text-center text-gray-500 py-8">
-                        <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
-                        <p>Nenhuma minuta encontrada.</p>
-                    </div>
-                `;
-            } else {
-                content = `
-                    <div class="space-y-3">
-                        ${minutasFiltradas.map(minuta => {
-                            const categoria = categorias[minuta.categoria];
-                            const status = statusOptions[minuta.status];
-                            
-                            return `
-                                <div class="border border-gray-200 rounded-lg p-4">
-                                    <div class="flex items-start justify-between">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2 mb-2">
-                                                <span class="font-medium text-gray-800">${minuta.assessorNome || assessores[minuta.assessorId]?.nome}</span>
-                                                <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor} text-white">
-                                                    ${categoria.nome}
-                                                </span>
-                                                <span class="status-badge ${status.cor}">${status.nome}</span>
-                                                ${minuta.editadaEm ? '<span class="text-xs text-orange-600">(Editada)</span>' : ''}
-                                            </div>
-                                            <div class="text-sm text-gray-600 mb-2">
-                                                <div><strong>Processo:</strong> ${minuta.numeroProcesso}</div>
-                                                <div><strong>Tipo:</strong> ${minuta.tipoMinuta}</div>
-                                                ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
-                                                ${minuta.editadaEm ? `<div class="text-xs text-gray-500"><strong>Editada em:</strong> ${minuta.editadaEm}</div>` : ''}
-                                            </div>
-                                            ${currentUser.isJuiz ? `
-                                                <div class="flex gap-2 mt-2">
-                                                    <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">Assinada</button>
-                                                    <button onclick="atualizarStatus('${minuta.id}', 'correcao')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200">Correção</button>
-                                                    <button onclick="atualizarStatus('${minuta.id}', 'excluida')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200">Excluir</button>
+
+                let content = '';
+                if (minutasFiltradas.length === 0) {
+                    content = `
+                        <div class="text-center text-gray-500 py-12">
+                            <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                            <p>Nenhuma minuta encontrada.</p>
+                        </div>
+                    `;
+                } else {
+                    content = `
+                        <div class="space-y-3">
+                            ${minutasFiltradas.map(minuta => {
+                                const categoria = categorias[minuta.categoria];
+                                const status = statusOptions[minuta.status || 'pendente'];
+                                
+                                return `
+                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                        <div class="flex items-start justify-between">
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-2 mb-2">
+                                                    <span class="font-medium text-gray-800">${minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor'}</span>
+                                                    <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria?.cor || 'bg-gray-500'} text-white">
+                                                        ${categoria?.nome || 'Categoria'}
+                                                    </span>
+                                                    <span class="status-badge ${status.cor}">${status.nome}</span>
+                                                    ${minuta.editadaEm ? '<span class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full">Editada</span>' : ''}
                                                 </div>
-                                            ` : `
-                                                <div class="flex gap-2 mt-2">
-                                                    <button onclick="editarMinuta('${minuta.id}')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 flex items-center">
-                                                        <i data-lucide="edit-2" class="h-3 w-3 mr-1"></i>Editar
-                                                    </button>
-                                                    <button onclick="excluirMinuta('${minuta.id}')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200 flex items-center">
-                                                        <i data-lucide="trash-2" class="h-3 w-3 mr-1"></i>Excluir
-                                                    </button>
+                                                <div class="text-sm text-gray-600 mb-2">
+                                                    <div><strong>Processo:</strong> ${minuta.numeroProcesso || 'Não informado'}</div>
+                                                    <div><strong>Tipo:</strong> ${minuta.tipoMinuta || 'Não informado'}</div>
+                                                    ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
+                                                    ${minuta.editadaEm ? `<div class="text-xs text-orange-600"><strong>Editada em:</strong> ${minuta.editadaEm}</div>` : ''}
                                                 </div>
-                                            `}
-                                        </div>
-                                        <div class="text-xs text-gray-500 text-right">
-                                            <div>${new Date(minuta.data).toLocaleDateString('pt-BR')}</div>
-                                            <div>${minuta.timestamp}</div>
+                                                ${currentUser.isJuiz ? `
+                                                    <div class="flex gap-2 mt-2">
+                                                        <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors">
+                                                            <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>Assinada
+                                                        </button>
+                                                        <button onclick="atualizarStatus('${minuta.id}', 'correcao')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors">
+                                                            <i data-lucide="edit" class="h-3 w-3 mr-1 inline"></i>Correção
+                                                        </button>
+                                                        <button onclick="atualizarStatus('${minuta.id}', 'excluida')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200 transition-colors">
+                                                            <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>Excluir
+                                                        </button>
+                                                    </div>
+                                                ` : `
+                                                    <div class="flex gap-2 mt-2">
+                                                        <button onclick="editarMinuta('${minuta.id}')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors">
+                                                            <i data-lucide="edit-2" class="h-3 w-3 mr-1 inline"></i>Editar
+                                                        </button>
+                                                        <button onclick="excluirMinuta('${minuta.id}')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200 transition-colors">
+                                                            <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>Excluir
+                                                        </button>
+                                                    </div>
+                                                `}
+                                            </div>
+                                            <div class="text-xs text-gray-500 text-right">
+                                                <div>${new Date(minuta.data || Date.now()).toLocaleDateString('pt-BR')}</div>
+                                                <div>${minuta.timestamp || ''}</div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                `;
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                document.getElementById('historico-content').innerHTML = content;
+                historico.classList.remove('hidden');
+                
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Histórico renderizado');
+                
+            } catch (error) {
+                log('Erro ao renderizar histórico', error);
+                showNotification('Erro ao carregar histórico', 'error');
             }
-            
-            document.getElementById('historico-content').innerHTML = content;
-            historico.classList.remove('hidden');
-            lucide.createIcons();
         }
 
         function gerarRelatorio(tipo) {
-            const hoje = new Date();
-            let dataInicio, dataFim, titulo;
-            
-            if (tipo === 'semanal') {
-                const inicioSemana = new Date(hoje.setDate(hoje.getDate() - hoje.getDay() + 1));
-                const fimSemana = new Date(hoje.setDate(hoje.getDate() - hoje.getDay() + 7));
-                dataInicio = inicioSemana.toISOString().split('T')[0];
-                dataFim = fimSemana.toISOString().split('T')[0];
-                titulo = `Relatório Semanal (${inicioSemana.toLocaleDateString('pt-BR')} - ${fimSemana.toLocaleDateString('pt-BR')})`;
-            } else {
-                const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-                const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-                dataInicio = inicioMes.toISOString().split('T')[0];
-                dataFim = fimMes.toISOString().split('T')[0];
-                titulo = `Relatório Mensal (${inicioMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})`;
-            }
-
-            const minutasPeriodo = Object.values(minutas).filter(m => 
-                m.data >= dataInicio && m.data <= dataFim
-            );
-
-            const estatisticas = {};
-            ['gilbert', 'laise'].forEach(assessorId => {
-                const minutasAssessor = minutasPeriodo.filter(m => {
-                    // Compatibilidade com dados antigos e novos
-                    return m.assessorId === assessorId || 
-                           (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
-                           (assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
-                });
+            try {
+                const hoje = new Date();
+                let dataInicio, dataFim, titulo;
                 
-                estatisticas[assessorId] = {
-                    nome: assessores[assessorId].nome,
-                    total: minutasAssessor.length,
-                    porCategoria: {
-                        meta1: minutasAssessor.filter(m => m.categoria === 'meta1').length,
-                        sem_movimento: minutasAssessor.filter(m => m.categoria === 'sem_movimento').length,
-                        outros: minutasAssessor.filter(m => m.categoria === 'outros').length
-                    },
-                    porStatus: {
-                        assinada: minutasAssessor.filter(m => m.status === 'assinada').length,
-                        pendente: minutasAssessor.filter(m => m.status === 'pendente').length,
-                        correcao: minutasAssessor.filter(m => m.status === 'correcao').length,
-                        excluida: minutasAssessor.filter(m => m.status === 'excluida').length
-                    }
-                };
-            });
-
-            const relatorioHtml = `
-                <div class="space-y-6">
-                    <div class="text-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">${titulo}</h2>
-                        <p class="text-gray-600">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
-                    </div>
+                if (tipo === 'semanal') {
+                    const inicioSemana = new Date(hoje);
+                    inicioSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+                    const fimSemana = new Date(inicioSemana);
+                    fimSemana.setDate(inicioSemana.getDate() + 6);
                     
-                    <div class="grid md:grid-cols-2 gap-6">
-                        ${Object.entries(estatisticas).map(([assessorId, stats]) => `
-                            <div class="bg-gray-50 rounded-lg p-6">
-                                <h3 class="text-lg font-semibold text-gray-800 mb-4">${stats.nome}</h3>
-                                <div class="space-y-3">
-                                    <div class="flex justify-between">
-                                        <span>Total de Minutas:</span>
-                                        <span class="font-semibold">${stats.total}</span>
-                                    </div>
-                                    <div class="border-t pt-2">
-                                        <h4 class="font-medium text-gray-700 mb-2">Por Categoria:</h4>
-                                        <div class="space-y-1 text-sm">
-                                            <div class="flex justify-between">
-                                                <span>Meta 1 CNJ:</span>
-                                                <span>${stats.porCategoria.meta1}</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>Sem movimentação 100+ dias:</span>
-                                                <span>${stats.porCategoria.sem_movimento}</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>Pedidos/Atos/Urgentes:</span>
-                                                <span>${stats.porCategoria.outros}</span>
+                    dataInicio = inicioSemana.toISOString().split('T')[0];
+                    dataFim = fimSemana.toISOString().split('T')[0];
+                    titulo = `Relatório Semanal (${inicioSemana.toLocaleDateString('pt-BR')} - ${fimSemana.toLocaleDateString('pt-BR')})`;
+                } else {
+                    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+                    const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+                    
+                    dataInicio = inicioMes.toISOString().split('T')[0];
+                    dataFim = fimMes.toISOString().split('T')[0];
+                    titulo = `Relatório Mensal (${inicioMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})`;
+                }
+
+                const minutasPeriodo = Object.values(minutas).filter(m => 
+                    m?.data && m.data >= dataInicio && m.data <= dataFim
+                );
+
+                const estatisticas = {};
+                ['gilbert', 'laise'].forEach(assessorId => {
+                    const minutasAssessor = minutasPeriodo.filter(m => {
+                        return m.assessorId === assessorId || 
+                               (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome?.includes('Gilbert'))) ||
+                               (assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome?.includes('Laíse')));
+                    });
+                    
+                    estatisticas[assessorId] = {
+                        nome: assessores[assessorId].nome,
+                        total: minutasAssessor.length,
+                        porCategoria: {
+                            meta1: minutasAssessor.filter(m => m.categoria === 'meta1').length,
+                            sem_movimento: minutasAssessor.filter(m => m.categoria === 'sem_movimento').length,
+                            outros: minutasAssessor.filter(m => m.categoria === 'outros').length
+                        },
+                        porStatus: {
+                            assinada: minutasAssessor.filter(m => m.status === 'assinada').length,
+                            pendente: minutasAssessor.filter(m => (m.status || 'pendente') === 'pendente').length,
+                            correcao: minutasAssessor.filter(m => m.status === 'correcao').length,
+                            excluida: minutasAssessor.filter(m => m.status === 'excluida').length
+                        }
+                    };
+                });
+
+                const relatorioHtml = `
+                    <div class="space-y-6">
+                        <div class="text-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">${titulo}</h2>
+                            <p class="text-gray-600">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+                        </div>
+                        
+                        <div class="grid md:grid-cols-2 gap-6">
+                            ${Object.entries(estatisticas).map(([assessorId, stats]) => `
+                                <div class="bg-gray-50 rounded-lg p-6">
+                                    <h3 class="text-lg font-semibold text-gray-800 mb-4">${stats.nome}</h3>
+                                    <div class="space-y-4">
+                                        <div class="flex justify-between items-center">
+                                            <span class="font-medium">Total de Minutas:</span>
+                                            <span class="text-2xl font-bold text-blue-600">${stats.total}</span>
+                                        </div>
+                                        
+                                        <div class="border-t pt-3">
+                                            <h4 class="font-medium text-gray-700 mb-2">Por Categoria:</h4>
+                                            <div class="space-y-2 text-sm">
+                                                <div class="flex justify-between">
+                                                    <span>Meta 1 CNJ:</span>
+                                                    <span class="font-medium">${stats.porCategoria.meta1}</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span>Sem movimentação 100+ dias:</span>
+                                                    <span class="font-medium">${stats.porCategoria.sem_movimento}</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span>Pedidos/Atos/Urgentes:</span>
+                                                    <span class="font-medium">${stats.porCategoria.outros}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="border-t pt-2">
-                                        <h4 class="font-medium text-gray-700 mb-2">Por Status:</h4>
-                                        <div class="space-y-1 text-sm">
-                                            <div class="flex justify-between">
-                                                <span>Assinadas:</span>
-                                                <span class="text-green-600 font-medium">${stats.porStatus.assinada}</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>Pendentes:</span>
-                                                <span class="text-yellow-600 font-medium">${stats.porStatus.pendente}</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>Precisam Correção:</span>
-                                                <span class="text-blue-600 font-medium">${stats.porStatus.correcao}</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>Excluídas:</span>
-                                                <span class="text-red-600 font-medium">${stats.porStatus.excluida}</span>
+                                        
+                                        <div class="border-t pt-3">
+                                            <h4 class="font-medium text-gray-700 mb-2">Por Status:</h4>
+                                            <div class="space-y-2 text-sm">
+                                                <div class="flex justify-between">
+                                                    <span>Assinadas:</span>
+                                                    <span class="font-medium text-green-600">${stats.porStatus.assinada}</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span>Pendentes:</span>
+                                                    <span class="font-medium text-yellow-600">${stats.porStatus.pendente}</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span>Precisam Correção:</span>
+                                                    <span class="font-medium text-blue-600">${stats.porStatus.correcao}</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span>Excluídas:</span>
+                                                    <span class="font-medium text-red-600">${stats.porStatus.excluida}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    
-                    <div class="bg-blue-50 rounded-lg p-6">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumo Geral</h3>
-                        <div class="grid md:grid-cols-3 gap-4 text-center">
-                            <div>
-                                <div class="text-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
-                                <div class="text-sm text-gray-600">Total de Minutas</div>
-                            </div>
-                            <div>
-                                <div class="text-2xl font-bold text-green-600">${minutasPeriodo.filter(m => m.status === 'assinada').length}</div>
-                                <div class="text-sm text-gray-600">Minutas Assinadas</div>
-                            </div>
-                            <div>
-                                <div class="text-2xl font-bold text-yellow-600">${minutasPeriodo.filter(m => m.status === 'pendente').length}</div>
-                                <div class="text-sm text-gray-600">Minutas Pendentes</div>
+                            `).join('')}
+                        </div>
+                        
+                        <div class="bg-blue-50 rounded-lg p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumo Geral</h3>
+                            <div class="grid md:grid-cols-4 gap-4 text-center">
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
+                                    <div class="text-sm text-gray-600">Total de Minutas</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-green-600">${minutasPeriodo.filter(m => m.status === 'assinada').length}</div>
+                                    <div class="text-sm text-gray-600">Minutas Assinadas</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-yellow-600">${minutasPeriodo.filter(m => (m.status || 'pendente') === 'pendente').length}</div>
+                                    <div class="text-sm text-gray-600">Minutas Pendentes</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-red-600">${minutasPeriodo.filter(m => m.status === 'correcao').length}</div>
+                                    <div class="text-sm text-gray-600">Precisam Correção</div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
 
-            document.getElementById('relatorio-content').innerHTML = relatorioHtml;
-        }
-
-        function debugDados() {
-            if (!currentUser.isJuiz) return;
-            
-            console.log("=== DEBUG DE DADOS ===");
-            console.log("Minutas no sistema:", minutas);
-            console.log("Assessores:", assessores);
-            console.log("Data hoje:", getHojeString());
-            
-            // Analisar minutas por assessor
-            const analise = {
-                total: Object.keys(minutas).length,
-                hoje: Object.values(minutas).filter(m => m.data === getHojeString()).length,
-                gilbert: {
-                    total: getMinutasHoje('gilbert').length,
-                    ids: Object.entries(minutas)
-                        .filter(([id, m]) => {
-                            const match = m.assessorId === 'gilbert' || 
-                                         m.assessorId === 'assessor1' || 
-                                         (m.assessorNome && m.assessorNome.includes('Gilbert'));
-                            return match && m.data === getHojeString();
-                        })
-                        .map(([id, m]) => ({id, assessorId: m.assessorId, assessorNome: m.assessorNome}))
-                },
-                laise: {
-                    total: getMinutasHoje('laise').length,
-                    ids: Object.entries(minutas)
-                        .filter(([id, m]) => {
-                            const match = m.assessorId === 'laise' || 
-                                         m.assessorId === 'assessor2' || 
-                                         (m.assessorNome && m.assessorNome.includes('Laíse'));
-                            return match && m.data === getHojeString();
-                        })
-                        .map(([id, m]) => ({id, assessorId: m.assessorId, assessorNome: m.assessorNome}))
-                }
-            };
-            
-            console.log("Análise:", analise);
-            
-            alert(`
-DEBUG DE DADOS:
-- Total de minutas: ${analise.total}
-- Minutas hoje: ${analise.hoje}
-- Gilbert hoje: ${analise.gilbert.total}
-- Laíse hoje: ${analise.laise.total}
-
-Detalhes no console (F12)
-            `);
-        }
-
-        function limparDadosInconsistentes() {
-            if (!currentUser.isJuiz) return;
-            
-            const problemasEncontrados = [];
-            
-            // Verificar problemas
-            Object.entries(minutas).forEach(([id, minuta]) => {
-                if (id.startsWith('demo')) {
-                    problemasEncontrados.push(`${id}: Dados de demonstração`);
-                }
-                if (!minuta.assessorNome && (minuta.assessorId === 'assessor1' || minuta.assessorId === 'assessor2')) {
-                    problemasEncontrados.push(`${id}: IDs antigos sem nome`);
-                }
-                if (!minuta.status) {
-                    problemasEncontrados.push(`${id}: Sem status definido`);
-                }
-            });
-            
-            if (problemasEncontrados.length === 0) {
-                alert('Nenhum problema encontrado nos dados!');
-                return;
-            }
-            
-            const confirmacao = confirm(`
-Problemas encontrados:
-${problemasEncontrados.join('\n')}
-
-Deseja corrigir automaticamente? Esta ação não pode ser desfeita.
-            `);
-            
-            if (confirmacao) {
-                try {
-                    let corrigidos = 0;
-                    
-                    Object.entries(minutas).forEach(([id, minuta]) => {
-                        let needsUpdate = false;
-                        const minutaAtualizada = {...minuta};
-                        
-                        // Corrigir IDs antigos
-                        if (minuta.assessorId === 'assessor1') {
-                            minutaAtualizada.assessorId = 'gilbert';
-                            minutaAtualizada.assessorNome = 'Gilbert Juliano';
-                            needsUpdate = true;
-                        }
-                        if (minuta.assessorId === 'assessor2') {
-                            minutaAtualizada.assessorId = 'laise';
-                            minutaAtualizada.assessorNome = 'Laíse Vital';
-                            needsUpdate = true;
-                        }
-                        
-                        // Adicionar status se não existir
-                        if (!minuta.status) {
-                            minutaAtualizada.status = 'pendente';
-                            needsUpdate = true;
-                        }
-                        
-                        if (needsUpdate) {
-                            database.ref(`minutas/${id}`).set(minutaAtualizada);
-                            minutas[id] = minutaAtualizada;
-                            corrigidos++;
-                        }
-                        
-                        // Remover dados demo
-                        if (id.startsWith('demo')) {
-                            database.ref(`minutas/${id}`).remove();
-                            delete minutas[id];
-                            corrigidos++;
-                        }
-                    });
-                    
-                    alert(`${corrigidos} problemas corrigidos!`);
-                    renderDashboard();
-                    
-                } catch (error) {
-                    console.error('Erro ao corrigir dados:', error);
-                    alert('Erro ao corrigir dados. Verifique o console.');
-                }
-            }
-        }
-
-        // Inicializar aplicação
-        document.addEventListener('DOMContentLoaded', function() {
-            lucide.createIcons();
-            
-            // Atalhos de teclado
-            document.addEventListener('keydown', function(e) {
-                // ESC para fechar modal
-                if (e.key === 'Escape' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
-                    fecharModalEdicao();
-                }
+                document.getElementById('relatorio-content').innerHTML = relatorioHtml;
+                log(`Relatório ${tipo} gerado`);
                 
-                // Ctrl+Enter para salvar edição
-                if (e.ctrlKey && e.key === 'Enter' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
-                    salvarEdicao();
-                }
-            });
+            } catch (error) {
+                log(`Erro ao gerar relatório ${tipo}`, error);
+                showNotification('Erro ao gerar relatório', 'error');
+            }
+        }
+
+        // ==================== EVENTOS ====================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                lucide.createIcons();
+                log('Aplicação carregada');
+                
+                // Atalhos de teclado
+                document.addEventListener('keydown', function(e) {
+                    // ESC para fechar modal
+                    if (e.key === 'Escape' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
+                        fecharModalEdicao();
+                    }
+                    
+                    // Ctrl+Enter para salvar edição
+                    if (e.ctrlKey && e.key === 'Enter' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
+                        salvarEdicao();
+                    }
+                });
+                
+            } catch (error) {
+                log('Erro na inicialização da página', error);
+            }
         });
     </script>
 </body>
