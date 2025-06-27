@@ -36,11 +36,27 @@
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+        }
+        .status-pendente { background-color: #fef3c7; color: #92400e; }
+        .status-assinada { background-color: #d1fae5; color: #065f46; }
+        .status-excluida { background-color: #fee2e2; color: #991b1b; }
+        .status-correcao { background-color: #dbeafe; color: #1e40af; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Indicador de Conexão -->
-    <div id="connection-status" class="realtime-indicator">
+    <div id="connection-status" class="realtime-indicator no-print">
         <div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
             <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
             Conectado
@@ -55,24 +71,38 @@
                     <i data-lucide="scale" class="h-8 w-8 text-blue-600"></i>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-800 mb-2">Sistema de Produtividade Judicial</h1>
-                <p class="text-gray-600">Selecione seu perfil para acessar o sistema</p>
+                <p class="text-gray-600">Digite suas credenciais para acessar</p>
             </div>
             
-            <div class="space-y-3">
-                <button onclick="login('juiz')" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium flex items-center justify-center">
-                    <i data-lucide="user-check" class="h-5 w-5 mr-2"></i>
-                    Acesso do Juiz
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
+                    <select id="login-usuario" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Selecione o usuário</option>
+                        <option value="juiz">Juiz</option>
+                        <option value="gilbert">Gilbert Juliano</option>
+                        <option value="laise">Laíse Vital</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                    <input type="password" id="login-senha" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Digite sua senha">
+                </div>
+                
+                <button onclick="fazerLogin()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                    <i data-lucide="log-in" class="h-5 w-5 mr-2 inline"></i>
+                    Entrar
                 </button>
                 
-                <button onclick="login('assessor1')" class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition-colors font-medium flex items-center justify-center">
-                    <i data-lucide="user" class="h-5 w-5 mr-2"></i>
-                    Assessor 1
-                </button>
-                
-                <button onclick="login('assessor2')" class="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 transition-colors font-medium flex items-center justify-center">
-                    <i data-lucide="user" class="h-5 w-5 mr-2"></i>
-                    Assessor 2
-                </button>
+                <div class="mt-6 p-4 bg-gray-50 rounded-md">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">Credenciais de Acesso:</h3>
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <div><strong>Juiz:</strong> senha123</div>
+                        <div><strong>Gilbert Juliano:</strong> gilbert123</div>
+                        <div><strong>Laíse Vital:</strong> laise123</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -80,7 +110,7 @@
     <!-- Aplicação Principal -->
     <div id="main-app" class="hidden p-4 max-w-6xl mx-auto">
         <!-- Header -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6 no-print">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800">Sistema de Produtividade Judicial</h1>
@@ -97,7 +127,7 @@
         </div>
 
         <!-- Loading -->
-        <div id="loading" class="text-center py-12">
+        <div id="loading" class="text-center py-12 no-print">
             <div class="loading-spinner"></div>
             <p class="text-gray-600 mt-4">Carregando dados...</p>
         </div>
@@ -139,6 +169,11 @@
                         </select>
                     </div>
                     
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                        <textarea id="observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Comentários sobre a minuta (opcional)"></textarea>
+                    </div>
+                    
                     <button onclick="registrarMinuta()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
                         Registrar Minuta
                     </button>
@@ -149,17 +184,58 @@
         <!-- Histórico -->
         <div id="historico-view" class="hidden">
             <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center mb-6">
-                    <i data-lucide="clock" class="h-6 w-6 text-gray-600 mr-2"></i>
-                    <h2 class="text-xl font-semibold text-gray-800">Histórico de Minutas</h2>
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center">
+                        <i data-lucide="clock" class="h-6 w-6 text-gray-600 mr-2"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">Histórico de Minutas</h2>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="filtro-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm no-print">
+                            <option value="">Todos os assessores</option>
+                            <option value="gilbert">Gilbert Juliano</option>
+                            <option value="laise">Laíse Vital</option>
+                        </select>
+                        <select id="filtro-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm no-print">
+                            <option value="">Todos os status</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="assinada">Assinada</option>
+                            <option value="excluida">Excluída</option>
+                            <option value="correcao">Precisa Correção</option>
+                        </select>
+                    </div>
                 </div>
                 <div id="historico-content"></div>
+            </div>
+        </div>
+
+        <!-- Relatórios -->
+        <div id="relatorios-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center">
+                        <i data-lucide="bar-chart" class="h-6 w-6 text-gray-600 mr-2"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">Relatórios de Produtividade</h2>
+                    </div>
+                    <div class="flex gap-2 no-print">
+                        <button onclick="gerarRelatorio('semanal')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm">
+                            Relatório Semanal
+                        </button>
+                        <button onclick="gerarRelatorio('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
+                            Relatório Mensal
+                        </button>
+                        <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
+                            <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
+                            Imprimir
+                        </button>
+                    </div>
+                </div>
+                <div id="relatorio-content"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Configuração do Firebase - PRODUÇÃO
+        // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCzuoRgbvKQSjOFssde-qUEtNDqGNJML7E",
             authDomain: "produtividade-gabinete.firebaseapp.com",
@@ -170,14 +246,77 @@
             appId: "1:370364917935:web:a6205cc718748abcbdcc5a"
         };
 
-        console.log("🔥 Firebase configurado com sucesso!");
-
         // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-
-        // Inicializar ícones Lucide
         lucide.createIcons();
+
+        // Credenciais de acesso
+        const credenciais = {
+            'juiz': { senha: 'senha123', nome: 'Juiz', tipo: 'juiz' },
+            'gilbert': { senha: 'gilbert123', nome: 'Gilbert Juliano', tipo: 'assessor', assessorId: 'gilbert' },
+            'laise': { senha: 'laise123', nome: 'Laíse Vital', tipo: 'assessor', assessorId: 'laise' }
+        };
+
+        // Estado da aplicação
+        let currentUser = null;
+        let currentView = 'dashboard';
+        let minutas = {
+            demo1: {
+                assessorId: 'gilbert',
+                assessorNome: 'Gilbert Juliano',
+                numeroProcesso: '1234567-89.2024.8.12.3456',
+                tipoMinuta: 'Sentença',
+                categoria: 'meta1',
+                observacoes: 'Processo complexo, análise detalhada',
+                status: 'assinada',
+                data: getHojeString(),
+                timestamp: '09:30:00',
+                createdAt: Date.now() - 3600000
+            },
+            demo2: {
+                assessorId: 'gilbert',
+                assessorNome: 'Gilbert Juliano',
+                numeroProcesso: '2345678-90.2024.8.12.3457',
+                tipoMinuta: 'Despacho',
+                categoria: 'sem_movimento',
+                observacoes: '',
+                status: 'pendente',
+                data: getHojeString(),
+                timestamp: '10:15:00',
+                createdAt: Date.now() - 1800000
+            },
+            demo3: {
+                assessorId: 'laise',
+                assessorNome: 'Laíse Vital',
+                numeroProcesso: '3456789-01.2024.8.12.3458',
+                tipoMinuta: 'Decisão',
+                categoria: 'outros',
+                observacoes: 'Urgente - prazo vencendo',
+                status: 'correcao',
+                data: getHojeString(),
+                timestamp: '11:00:00',
+                createdAt: Date.now() - 900000
+            }
+        };
+
+        let assessores = {
+            gilbert: { nome: 'Gilbert Juliano', ativo: true },
+            laise: { nome: 'Laíse Vital', ativo: true }
+        };
+
+        const categorias = {
+            'meta1': { nome: 'Meta 1 CNJ', cor: 'bg-red-500', meta: 2 },
+            'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
+            'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 }
+        };
+
+        const statusOptions = {
+            'pendente': { nome: 'Pendente', cor: 'status-pendente' },
+            'assinada': { nome: 'Assinada', cor: 'status-assinada' },
+            'excluida': { nome: 'Excluída', cor: 'status-excluida' },
+            'correcao': { nome: 'Precisa Correção', cor: 'status-correcao' }
+        };
 
         // Utilitários
         function isDiaUtil(data) {
@@ -188,50 +327,6 @@
         function getHojeString() {
             return new Date().toISOString().split('T')[0];
         }
-
-        // Estado da aplicação
-        let currentUser = null;
-        let currentView = 'dashboard';
-        let minutas = {
-            // Dados de demonstração
-            demo1: {
-                assessorId: 'assessor1',
-                numeroProcesso: '1234567-89.2024.8.12.3456',
-                tipoMinuta: 'Sentença',
-                categoria: 'meta1',
-                data: getHojeString(),
-                timestamp: '09:30:00',
-                createdAt: Date.now() - 3600000
-            },
-            demo2: {
-                assessorId: 'assessor1',
-                numeroProcesso: '2345678-90.2024.8.12.3457',
-                tipoMinuta: 'Despacho',
-                categoria: 'sem_movimento',
-                data: getHojeString(),
-                timestamp: '10:15:00',
-                createdAt: Date.now() - 1800000
-            },
-            demo3: {
-                assessorId: 'assessor2',
-                numeroProcesso: '3456789-01.2024.8.12.3458',
-                tipoMinuta: 'Decisão',
-                categoria: 'outros',
-                data: getHojeString(),
-                timestamp: '11:00:00',
-                createdAt: Date.now() - 900000
-            }
-        };
-        let assessores = {
-            assessor1: { nome: 'Assessor 1', ativo: true },
-            assessor2: { nome: 'Assessor 2', ativo: true }
-        };
-
-        const categorias = {
-            'meta1': { nome: 'Meta 1 CNJ', cor: 'bg-red-500', meta: 2 },
-            'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
-            'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 }
-        };
 
         function getMinutasHoje(assessorId) {
             return Object.values(minutas).filter(m => 
@@ -255,14 +350,29 @@
         }
 
         // Autenticação
-        function login(userType) {
+        function fazerLogin() {
+            const usuario = document.getElementById('login-usuario').value;
+            const senha = document.getElementById('login-senha').value;
+
+            if (!usuario || !senha) {
+                alert('Por favor, selecione o usuário e digite a senha.');
+                return;
+            }
+
+            const cred = credenciais[usuario];
+            if (!cred || cred.senha !== senha) {
+                alert('Usuário ou senha incorretos.');
+                return;
+            }
+
             currentUser = {
-                type: userType,
-                isJuiz: userType === 'juiz',
-                assessorId: userType.startsWith('assessor') ? userType : null,
-                nome: userType === 'juiz' ? 'Juiz' : assessores[userType]?.nome || userType
+                usuario: usuario,
+                nome: cred.nome,
+                tipo: cred.tipo,
+                isJuiz: cred.tipo === 'juiz',
+                assessorId: cred.assessorId
             };
-            
+
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
             
@@ -273,6 +383,8 @@
             currentUser = null;
             document.getElementById('main-app').classList.add('hidden');
             document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('login-usuario').value = '';
+            document.getElementById('login-senha').value = '';
         }
 
         // Inicialização da aplicação
@@ -292,7 +404,6 @@
             const nav = document.getElementById('navigation');
             let buttons = '';
 
-            // Dashboard sempre disponível
             buttons += `
                 <button onclick="showView('dashboard')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
                     <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2"></i>
@@ -300,7 +411,6 @@
                 </button>
             `;
 
-            // Registro apenas para assessores
             if (!currentUser.isJuiz) {
                 buttons += `
                     <button onclick="showView('registro')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
@@ -310,7 +420,6 @@
                 `;
             }
 
-            // Histórico sempre disponível
             buttons += `
                 <button onclick="showView('historico')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
                     <i data-lucide="clock" class="h-4 w-4 mr-2"></i>
@@ -318,21 +427,27 @@
                 </button>
             `;
 
+            if (currentUser.isJuiz) {
+                buttons += `
+                    <button onclick="showView('relatorios')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <i data-lucide="bar-chart" class="h-4 w-4 mr-2"></i>
+                        Relatórios
+                    </button>
+                `;
+            }
+
             nav.innerHTML = buttons;
             lucide.createIcons();
         }
 
         function showView(view) {
-            // Esconder todas as views
             document.querySelectorAll('[id$="-view"]').forEach(el => el.classList.add('hidden'));
             document.getElementById('loading').classList.add('hidden');
             
-            // Atualizar navegação
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
             });
             
-            // Destacar botão ativo
             const activeBtn = event?.target.closest('button');
             if (activeBtn) {
                 activeBtn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white';
@@ -340,56 +455,47 @@
 
             currentView = view;
             
-            // Mostrar view solicitada
             if (view === 'dashboard') {
                 renderDashboard();
             } else if (view === 'registro') {
                 document.getElementById('registro-view').classList.remove('hidden');
             } else if (view === 'historico') {
+                setupHistoricoFilters();
                 renderHistorico();
+            } else if (view === 'relatorios') {
+                document.getElementById('relatorios-view').classList.remove('hidden');
             }
         }
 
         // Firebase
         function setupFirebaseListeners() {
-            console.log("🔥 Configurando listeners do Firebase...");
-            
-            // Para garantir que funcione mesmo sem Firebase inicialmente
             document.getElementById('loading').classList.add('hidden');
             
-            // Tentar conectar ao Firebase
             try {
-                // Listener para minutas em tempo real
                 database.ref('minutas').on('value', (snapshot) => {
-                    minutas = snapshot.val() || {};
-                    console.log(`📊 ${Object.keys(minutas).length} minutas carregadas do Firebase`);
-                    
-                    // Atualizar interface
+                    const firebaseMinutas = snapshot.val() || {};
+                    // Mesclar com dados demo
+                    minutas = { ...minutas, ...firebaseMinutas };
                     if (currentView === 'dashboard') renderDashboard();
                     if (currentView === 'historico') renderHistorico();
                 });
 
-                // Listener para assessores
                 database.ref('assessores').on('value', (snapshot) => {
                     const assessoresFirebase = snapshot.val();
                     if (assessoresFirebase) {
-                        assessores = assessoresFirebase;
-                        console.log("👥 Assessores carregados do Firebase");
+                        assessores = { ...assessores, ...assessoresFirebase };
                     }
                 });
 
-                // Configurar dados iniciais se não existirem
                 database.ref('assessores').once('value', (snapshot) => {
                     if (!snapshot.exists()) {
                         database.ref('assessores').set({
-                            assessor1: { nome: 'Assessor 1', ativo: true },
-                            assessor2: { nome: 'Assessor 2', ativo: true }
+                            gilbert: { nome: 'Gilbert Juliano', ativo: true },
+                            laise: { nome: 'Laíse Vital', ativo: true }
                         });
-                        console.log("✅ Dados iniciais dos assessores criados");
                     }
                 });
 
-                // Status de conexão
                 database.ref('.info/connected').on('value', (snapshot) => {
                     const connected = snapshot.val();
                     const statusDiv = document.getElementById('connection-status');
@@ -401,7 +507,6 @@
                                 Online
                             </div>
                         `;
-                        console.log("🟢 Firebase conectado");
                     } else {
                         statusDiv.innerHTML = `
                             <div class="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
@@ -409,12 +514,10 @@
                                 Offline
                             </div>
                         `;
-                        console.log("🟡 Firebase desconectado - usando dados locais");
                     }
                 });
 
             } catch (error) {
-                console.warn("⚠️ Firebase não configurado - usando modo local", error);
                 document.getElementById('connection-status').innerHTML = `
                     <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                         Modo Local
@@ -422,7 +525,6 @@
                 `;
             }
             
-            // Garantir que o dashboard seja renderizado
             renderDashboard();
         }
 
@@ -430,23 +532,26 @@
             const numeroProcesso = document.getElementById('numero-processo').value;
             const tipoMinuta = document.getElementById('tipo-minuta').value;
             const categoria = document.getElementById('categoria-minuta').value;
+            const observacoes = document.getElementById('observacoes-minuta').value;
 
             if (!numeroProcesso || !tipoMinuta || !categoria) {
-                alert('Por favor, preencha todos os campos.');
+                alert('Por favor, preencha os campos obrigatórios.');
                 return;
             }
 
             const novaMinuta = {
                 assessorId: currentUser.assessorId,
+                assessorNome: currentUser.nome,
                 numeroProcesso,
                 tipoMinuta,
                 categoria,
+                observacoes: observacoes || '',
+                status: 'pendente',
                 data: getHojeString(),
                 timestamp: new Date().toLocaleTimeString(),
                 createdAt: Date.now()
             };
 
-            // Tentar salvar no Firebase, se não conseguir salvar localmente
             try {
                 const minutaComTimestamp = {
                     ...novaMinuta,
@@ -455,61 +560,51 @@
                 
                 database.ref('minutas').push(minutaComTimestamp)
                     .then(() => {
-                        console.log("✅ Minuta salva no Firebase");
                         limparFormularioRegistro();
                         alert('Minuta registrada com sucesso!');
                         showView('dashboard');
                     })
                     .catch((error) => {
-                        console.warn("⚠️ Erro no Firebase, salvando localmente:", error);
                         salvarMinutaLocal(novaMinuta);
                     });
             } catch (error) {
-                console.warn("⚠️ Firebase não disponível, salvando localmente:", error);
                 salvarMinutaLocal(novaMinuta);
             }
         }
 
         function salvarMinutaLocal(minuta) {
-            // Salvar localmente quando Firebase não estiver disponível
             const id = 'local_' + Date.now();
             minutas[id] = minuta;
             
             limparFormularioRegistro();
             alert('Minuta registrada localmente!');
             showView('dashboard');
-            
-            // Tentar sincronizar com Firebase depois
-            sincronizarComFirebase();
         }
 
         function limparFormularioRegistro() {
             document.getElementById('numero-processo').value = '';
             document.getElementById('tipo-minuta').value = '';
             document.getElementById('categoria-minuta').value = '';
+            document.getElementById('observacoes-minuta').value = '';
         }
 
-        function sincronizarComFirebase() {
-            // Tentar enviar minutas locais para Firebase
-            Object.entries(minutas).forEach(([id, minuta]) => {
-                if (id.startsWith('local_')) {
-                    try {
-                        database.ref('minutas').push(minuta)
-                            .then(() => {
-                                delete minutas[id]; // Remove da memória local
-                                console.log(`✅ Minuta ${id} sincronizada com Firebase`);
-                            });
-                    } catch (error) {
-                        console.log("Aguardando conexão para sincronizar...");
-                    }
-                }
-            });
+        function atualizarStatus(minutaId, novoStatus) {
+            if (!currentUser.isJuiz) return;
+
+            try {
+                database.ref(`minutas/${minutaId}/status`).set(novoStatus)
+                    .then(() => {
+                        minutas[minutaId].status = novoStatus;
+                        renderHistorico();
+                    });
+            } catch (error) {
+                minutas[minutaId].status = novoStatus;
+                renderHistorico();
+            }
         }
 
         // Renderização
         function renderDashboard() {
-            console.log("🎨 Renderizando dashboard...", { currentUser, minutas });
-            
             const dashboard = document.getElementById('dashboard-view');
             const hoje = new Date();
             
@@ -524,7 +619,7 @@
                 `;
             } else {
                 const totalMinutasHoje = Object.values(minutas).filter(m => m.data === getHojeString()).length;
-                const metaTotal = 20; // 2 assessores x 10 minutas
+                const metaTotal = 20;
 
                 dashboard.innerHTML = `
                     <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
@@ -552,20 +647,17 @@
             
             dashboard.classList.remove('hidden');
             lucide.createIcons();
-            console.log("✅ Dashboard renderizado com sucesso");
         }
 
         function renderAssessoresCards() {
             if (currentUser.isJuiz) {
-                // Juiz vê ambos assessores
                 return `
                     <div class="grid md:grid-cols-2 gap-6">
-                        ${renderAssessorCard('assessor1')}
-                        ${renderAssessorCard('assessor2')}
+                        ${renderAssessorCard('gilbert')}
+                        ${renderAssessorCard('laise')}
                     </div>
                 `;
             } else {
-                // Assessor vê apenas seus próprios dados
                 return `
                     <div class="max-w-md mx-auto">
                         ${renderAssessorCard(currentUser.assessorId)}
@@ -605,7 +697,10 @@
                             ${ultimasMinutas.map(minuta => `
                                 <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded">
                                     <div class="font-medium">${minuta.numeroProcesso}</div>
-                                    <div>${minuta.tipoMinuta} - ${categorias[minuta.categoria].nome}</div>
+                                    <div class="flex justify-between items-center">
+                                        <span>${minuta.tipoMinuta} - ${categorias[minuta.categoria].nome}</span>
+                                        <span class="status-badge ${statusOptions[minuta.status].cor}">${statusOptions[minuta.status].nome}</span>
+                                    </div>
                                     <div class="text-gray-500">${minuta.timestamp}</div>
                                 </div>
                             `).join('')}
@@ -644,6 +739,22 @@
             `;
         }
 
+        function setupHistoricoFilters() {
+            const filtroAssessor = document.getElementById('filtro-assessor');
+            const filtroStatus = document.getElementById('filtro-status');
+            
+            if (currentUser.isJuiz) {
+                filtroAssessor.style.display = 'block';
+                filtroStatus.style.display = 'block';
+            } else {
+                filtroAssessor.style.display = 'none';
+                filtroStatus.style.display = 'none';
+            }
+
+            filtroAssessor.onchange = renderHistorico;
+            filtroStatus.onchange = renderHistorico;
+        }
+
         function renderHistorico() {
             const historico = document.getElementById('historico-view');
             const minutasArray = Object.entries(minutas).map(([key, minuta]) => ({
@@ -651,40 +762,61 @@
                 id: key
             })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
             
+            let minutasFiltradas = minutasArray;
+
+            // Filtros
+            if (currentUser.isJuiz) {
+                const filtroAssessor = document.getElementById('filtro-assessor').value;
+                const filtroStatus = document.getElementById('filtro-status').value;
+                
+                if (filtroAssessor) {
+                    minutasFiltradas = minutasFiltradas.filter(m => m.assessorId === filtroAssessor);
+                }
+                if (filtroStatus) {
+                    minutasFiltradas = minutasFiltradas.filter(m => m.status === filtroStatus);
+                }
+            } else {
+                minutasFiltradas = minutasFiltradas.filter(m => m.assessorId === currentUser.assessorId);
+            }
+            
             let content = '';
-            if (minutasArray.length === 0) {
+            if (minutasFiltradas.length === 0) {
                 content = `
                     <div class="text-center text-gray-500 py-8">
                         <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
-                        <p>Nenhuma minuta registrada ainda.</p>
+                        <p>Nenhuma minuta encontrada.</p>
                     </div>
                 `;
             } else {
-                // Filtrar minutas se for assessor
-                const minutasFiltradas = currentUser.isJuiz ? 
-                    minutasArray : 
-                    minutasArray.filter(m => m.assessorId === currentUser.assessorId);
-                
                 content = `
-                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                    <div class="space-y-3">
                         ${minutasFiltradas.map(minuta => {
-                            const assessor = assessores[minuta.assessorId];
                             const categoria = categorias[minuta.categoria];
+                            const status = statusOptions[minuta.status];
                             
                             return `
                                 <div class="border border-gray-200 rounded-lg p-4">
                                     <div class="flex items-start justify-between">
                                         <div class="flex-1">
                                             <div class="flex items-center gap-2 mb-2">
-                                                <span class="font-medium text-gray-800">${assessor?.nome}</span>
+                                                <span class="font-medium text-gray-800">${minuta.assessorNome || assessores[minuta.assessorId]?.nome}</span>
                                                 <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor} text-white">
                                                     ${categoria.nome}
                                                 </span>
+                                                <span class="status-badge ${status.cor}">${status.nome}</span>
                                             </div>
-                                            <div class="text-sm text-gray-600">
+                                            <div class="text-sm text-gray-600 mb-2">
                                                 <div><strong>Processo:</strong> ${minuta.numeroProcesso}</div>
                                                 <div><strong>Tipo:</strong> ${minuta.tipoMinuta}</div>
+                                                ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
                                             </div>
+                                            ${currentUser.isJuiz ? `
+                                                <div class="flex gap-2 mt-2">
+                                                    <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">Assinada</button>
+                                                    <button onclick="atualizarStatus('${minuta.id}', 'correcao')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200">Correção</button>
+                                                    <button onclick="atualizarStatus('${minuta.id}', 'excluida')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200">Excluir</button>
+                                                </div>
+                                            ` : ''}
                                         </div>
                                         <div class="text-xs text-gray-500 text-right">
                                             <div>${new Date(minuta.data).toLocaleDateString('pt-BR')}</div>
@@ -701,6 +833,130 @@
             document.getElementById('historico-content').innerHTML = content;
             historico.classList.remove('hidden');
             lucide.createIcons();
+        }
+
+        function gerarRelatorio(tipo) {
+            const hoje = new Date();
+            let dataInicio, dataFim, titulo;
+            
+            if (tipo === 'semanal') {
+                const inicioSemana = new Date(hoje.setDate(hoje.getDate() - hoje.getDay() + 1));
+                const fimSemana = new Date(hoje.setDate(hoje.getDate() - hoje.getDay() + 7));
+                dataInicio = inicioSemana.toISOString().split('T')[0];
+                dataFim = fimSemana.toISOString().split('T')[0];
+                titulo = `Relatório Semanal (${inicioSemana.toLocaleDateString('pt-BR')} - ${fimSemana.toLocaleDateString('pt-BR')})`;
+            } else {
+                const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+                const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+                dataInicio = inicioMes.toISOString().split('T')[0];
+                dataFim = fimMes.toISOString().split('T')[0];
+                titulo = `Relatório Mensal (${inicioMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})`;
+            }
+
+            const minutasPeriodo = Object.values(minutas).filter(m => 
+                m.data >= dataInicio && m.data <= dataFim
+            );
+
+            const estatisticas = {};
+            ['gilbert', 'laise'].forEach(assessorId => {
+                const minutasAssessor = minutasPeriodo.filter(m => m.assessorId === assessorId);
+                estatisticas[assessorId] = {
+                    nome: assessores[assessorId].nome,
+                    total: minutasAssessor.length,
+                    porCategoria: {
+                        meta1: minutasAssessor.filter(m => m.categoria === 'meta1').length,
+                        sem_movimento: minutasAssessor.filter(m => m.categoria === 'sem_movimento').length,
+                        outros: minutasAssessor.filter(m => m.categoria === 'outros').length
+                    },
+                    porStatus: {
+                        assinada: minutasAssessor.filter(m => m.status === 'assinada').length,
+                        pendente: minutasAssessor.filter(m => m.status === 'pendente').length,
+                        correcao: minutasAssessor.filter(m => m.status === 'correcao').length,
+                        excluida: minutasAssessor.filter(m => m.status === 'excluida').length
+                    }
+                };
+            });
+
+            const relatorioHtml = `
+                <div class="space-y-6">
+                    <div class="text-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">${titulo}</h2>
+                        <p class="text-gray-600">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-6">
+                        ${Object.entries(estatisticas).map(([assessorId, stats]) => `
+                            <div class="bg-gray-50 rounded-lg p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">${stats.nome}</h3>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span>Total de Minutas:</span>
+                                        <span class="font-semibold">${stats.total}</span>
+                                    </div>
+                                    <div class="border-t pt-2">
+                                        <h4 class="font-medium text-gray-700 mb-2">Por Categoria:</h4>
+                                        <div class="space-y-1 text-sm">
+                                            <div class="flex justify-between">
+                                                <span>Meta 1 CNJ:</span>
+                                                <span>${stats.porCategoria.meta1}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>Sem movimentação 100+ dias:</span>
+                                                <span>${stats.porCategoria.sem_movimento}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>Pedidos/Atos/Urgentes:</span>
+                                                <span>${stats.porCategoria.outros}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="border-t pt-2">
+                                        <h4 class="font-medium text-gray-700 mb-2">Por Status:</h4>
+                                        <div class="space-y-1 text-sm">
+                                            <div class="flex justify-between">
+                                                <span>Assinadas:</span>
+                                                <span class="text-green-600 font-medium">${stats.porStatus.assinada}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>Pendentes:</span>
+                                                <span class="text-yellow-600 font-medium">${stats.porStatus.pendente}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>Precisam Correção:</span>
+                                                <span class="text-blue-600 font-medium">${stats.porStatus.correcao}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>Excluídas:</span>
+                                                <span class="text-red-600 font-medium">${stats.porStatus.excluida}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="bg-blue-50 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumo Geral</h3>
+                        <div class="grid md:grid-cols-3 gap-4 text-center">
+                            <div>
+                                <div class="text-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
+                                <div class="text-sm text-gray-600">Total de Minutas</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-green-600">${minutasPeriodo.filter(m => m.status === 'assinada').length}</div>
+                                <div class="text-sm text-gray-600">Minutas Assinadas</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-yellow-600">${minutasPeriodo.filter(m => m.status === 'pendente').length}</div>
+                                <div class="text-sm text-gray-600">Minutas Pendentes</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('relatorio-content').innerHTML = relatorioHtml;
         }
 
         // Inicializar aplicação
