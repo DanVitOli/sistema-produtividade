@@ -199,6 +199,62 @@
             </div>
         </div>
 
+        <!-- Modal de Edição -->
+        <div id="modal-edicao" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print" onclick="event.target === this && fecharModalEdicao()">
+            <div class="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Editar Minuta</h3>
+                    <button onclick="fecharModalEdicao()" class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo</label>
+                        <input type="text" id="edit-numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta</label>
+                        <select id="edit-tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Despacho">Despacho</option>
+                            <option value="Decisão">Decisão</option>
+                            <option value="Sentença">Sentença</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                        <select id="edit-categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="meta1">Meta 1 CNJ</option>
+                            <option value="sem_movimento">Sem movimentação 100+ dias</option>
+                            <option value="outros">Pedidos/Atos/Urgentes</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                        <textarea id="edit-observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    
+                    <div class="flex gap-2 pt-4">
+                        <button onclick="salvarEdicao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors" title="Ctrl+Enter">
+                            Salvar Alterações
+                        </button>
+                        <button onclick="fecharModalEdicao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors" title="ESC">
+                            Cancelar
+                        </button>
+                    </div>
+                    
+                    <div class="text-xs text-gray-500 text-center mt-2">
+                        <span class="mr-4">💡 <strong>Ctrl+Enter:</strong> Salvar</span>
+                        <span><strong>ESC:</strong> Cancelar</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Relatórios -->
         <div id="relatorios-view" class="hidden">
             <div class="bg-white rounded-lg shadow-md p-6">
@@ -213,6 +269,9 @@
                         </button>
                         <button onclick="gerarRelatorio('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
                             Relatório Mensal
+                        </button>
+                        <button onclick="limparDadosInconsistentes()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors text-sm">
+                            Limpar Dados
                         </button>
                         <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
                             <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
@@ -253,6 +312,7 @@
         let currentUser = null;
         let currentView = 'dashboard';
         let minutas = {};
+        let minutaEditando = null;
 
         let assessores = {
             gilbert: { nome: 'Gilbert Juliano', ativo: true },
@@ -283,10 +343,14 @@
         }
 
         function getMinutasHoje(assessorId) {
-            return Object.values(minutas).filter(m => 
-                m.assessorId === assessorId && 
-                m.data === getHojeString()
-            );
+            return Object.values(minutas).filter(m => {
+                // Compatibilidade com dados antigos e novos
+                const assessorMatch = m.assessorId === assessorId || 
+                                    (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
+                                    (assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
+                
+                return assessorMatch && m.data === getHojeString();
+            });
         }
 
         function getProgressoCategoria(assessorId, categoria) {
@@ -556,6 +620,129 @@
             }
         }
 
+        function editarMinuta(minutaId) {
+            if (currentUser.isJuiz) return;
+
+            const minuta = minutas[minutaId];
+            if (!minuta) return;
+
+            // Verificar se a minuta pertence ao assessor atual
+            const isOwner = minuta.assessorId === currentUser.assessorId || 
+                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome === 'Gilbert Juliano')) ||
+                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome === 'Laíse Vital'));
+
+            if (!isOwner) {
+                alert('Você só pode editar suas próprias minutas.');
+                return;
+            }
+
+            minutaEditando = { id: minutaId, ...minuta };
+
+            // Preencher formulário de edição
+            document.getElementById('edit-numero-processo').value = minuta.numeroProcesso || '';
+            document.getElementById('edit-tipo-minuta').value = minuta.tipoMinuta || '';
+            document.getElementById('edit-categoria-minuta').value = minuta.categoria || '';
+            document.getElementById('edit-observacoes-minuta').value = minuta.observacoes || '';
+
+            // Mostrar modal
+            document.getElementById('modal-edicao').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function fecharModalEdicao() {
+            document.getElementById('modal-edicao').classList.add('hidden');
+            minutaEditando = null;
+        }
+
+        function salvarEdicao() {
+            if (!minutaEditando) return;
+
+            const numeroProcesso = document.getElementById('edit-numero-processo').value;
+            const tipoMinuta = document.getElementById('edit-tipo-minuta').value;
+            const categoria = document.getElementById('edit-categoria-minuta').value;
+            const observacoes = document.getElementById('edit-observacoes-minuta').value;
+
+            if (!numeroProcesso || !tipoMinuta || !categoria) {
+                alert('Por favor, preencha os campos obrigatórios.');
+                return;
+            }
+
+            const minutaAtualizada = {
+                ...minutaEditando,
+                numeroProcesso,
+                tipoMinuta,
+                categoria,
+                observacoes,
+                editadaEm: new Date().toLocaleString('pt-BR')
+            };
+
+            try {
+                database.ref(`minutas/${minutaEditando.id}`).set(minutaAtualizada)
+                    .then(() => {
+                        minutas[minutaEditando.id] = minutaAtualizada;
+                        fecharModalEdicao();
+                        renderHistorico();
+                        renderDashboard();
+                        alert('Minuta atualizada com sucesso!');
+                    })
+                    .catch(() => {
+                        minutas[minutaEditando.id] = minutaAtualizada;
+                        fecharModalEdicao();
+                        renderHistorico();
+                        renderDashboard();
+                        alert('Minuta atualizada localmente!');
+                    });
+            } catch (error) {
+                minutas[minutaEditando.id] = minutaAtualizada;
+                fecharModalEdicao();
+                renderHistorico();
+                renderDashboard();
+                alert('Minuta atualizada localmente!');
+            }
+        }
+
+        function excluirMinuta(minutaId) {
+            if (currentUser.isJuiz) return;
+
+            const minuta = minutas[minutaId];
+            if (!minuta) return;
+
+            // Verificar se a minuta pertence ao assessor atual
+            const isOwner = minuta.assessorId === currentUser.assessorId || 
+                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome === 'Gilbert Juliano')) ||
+                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome === 'Laíse Vital'));
+
+            if (!isOwner) {
+                alert('Você só pode excluir suas próprias minutas.');
+                return;
+            }
+
+            if (!confirm('Tem certeza que deseja excluir esta minuta? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+
+            try {
+                database.ref(`minutas/${minutaId}`).remove()
+                    .then(() => {
+                        delete minutas[minutaId];
+                        renderHistorico();
+                        renderDashboard();
+                        alert('Minuta excluída com sucesso!');
+                    })
+                    .catch(() => {
+                        delete minutas[minutaId];
+                        renderHistorico();
+                        renderDashboard();
+                        alert('Minuta excluída localmente!');
+                    });
+            } catch (error) {
+                delete minutas[minutaId];
+                renderHistorico();
+                renderDashboard();
+                alert('Minuta excluída localmente!');
+            }
+        }
+
         // Renderização
         function renderDashboard() {
             const dashboard = document.getElementById('dashboard-view');
@@ -648,13 +835,17 @@
                         <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
                         <div class="space-y-1 max-h-32 overflow-y-auto">
                             ${ultimasMinutas.map(minuta => `
-                                <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                                    <div class="font-medium">${minuta.numeroProcesso}</div>
+                                <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''}">
+                                    <div class="font-medium flex items-center gap-1">
+                                        ${minuta.numeroProcesso}
+                                        ${minuta.editadaEm ? '<span class="text-orange-600" title="Minuta editada">✏️</span>' : ''}
+                                    </div>
                                     <div class="flex justify-between items-center">
                                         <span>${minuta.tipoMinuta} - ${categorias[minuta.categoria].nome}</span>
                                         <span class="status-badge ${statusOptions[minuta.status].cor}">${statusOptions[minuta.status].nome}</span>
                                     </div>
                                     <div class="text-gray-500">${minuta.timestamp}</div>
+                                    ${minuta.editadaEm ? `<div class="text-xs text-orange-600">Editada: ${minuta.editadaEm}</div>` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -723,13 +914,23 @@
                 const filtroStatus = document.getElementById('filtro-status').value;
                 
                 if (filtroAssessor) {
-                    minutasFiltradas = minutasFiltradas.filter(m => m.assessorId === filtroAssessor);
+                    minutasFiltradas = minutasFiltradas.filter(m => {
+                        // Compatibilidade com dados antigos e novos
+                        return m.assessorId === filtroAssessor || 
+                               (filtroAssessor === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
+                               (filtroAssessor === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
+                    });
                 }
                 if (filtroStatus) {
                     minutasFiltradas = minutasFiltradas.filter(m => m.status === filtroStatus);
                 }
             } else {
-                minutasFiltradas = minutasFiltradas.filter(m => m.assessorId === currentUser.assessorId);
+                minutasFiltradas = minutasFiltradas.filter(m => {
+                    // Compatibilidade para assessores
+                    return m.assessorId === currentUser.assessorId || 
+                           (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
+                           (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
+                });
             }
             
             let content = '';
@@ -757,11 +958,13 @@
                                                     ${categoria.nome}
                                                 </span>
                                                 <span class="status-badge ${status.cor}">${status.nome}</span>
+                                                ${minuta.editadaEm ? '<span class="text-xs text-orange-600">(Editada)</span>' : ''}
                                             </div>
                                             <div class="text-sm text-gray-600 mb-2">
                                                 <div><strong>Processo:</strong> ${minuta.numeroProcesso}</div>
                                                 <div><strong>Tipo:</strong> ${minuta.tipoMinuta}</div>
                                                 ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
+                                                ${minuta.editadaEm ? `<div class="text-xs text-gray-500"><strong>Editada em:</strong> ${minuta.editadaEm}</div>` : ''}
                                             </div>
                                             ${currentUser.isJuiz ? `
                                                 <div class="flex gap-2 mt-2">
@@ -769,7 +972,16 @@
                                                     <button onclick="atualizarStatus('${minuta.id}', 'correcao')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200">Correção</button>
                                                     <button onclick="atualizarStatus('${minuta.id}', 'excluida')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200">Excluir</button>
                                                 </div>
-                                            ` : ''}
+                                            ` : `
+                                                <div class="flex gap-2 mt-2">
+                                                    <button onclick="editarMinuta('${minuta.id}')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 flex items-center">
+                                                        <i data-lucide="edit-2" class="h-3 w-3 mr-1"></i>Editar
+                                                    </button>
+                                                    <button onclick="excluirMinuta('${minuta.id}')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200 flex items-center">
+                                                        <i data-lucide="trash-2" class="h-3 w-3 mr-1"></i>Excluir
+                                                    </button>
+                                                </div>
+                                            `}
                                         </div>
                                         <div class="text-xs text-gray-500 text-right">
                                             <div>${new Date(minuta.data).toLocaleDateString('pt-BR')}</div>
@@ -812,7 +1024,13 @@
 
             const estatisticas = {};
             ['gilbert', 'laise'].forEach(assessorId => {
-                const minutasAssessor = minutasPeriodo.filter(m => m.assessorId === assessorId);
+                const minutasAssessor = minutasPeriodo.filter(m => {
+                    // Compatibilidade com dados antigos e novos
+                    return m.assessorId === assessorId || 
+                           (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
+                           (assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
+                });
+                
                 estatisticas[assessorId] = {
                     nome: assessores[assessorId].nome,
                     total: minutasAssessor.length,
@@ -912,9 +1130,40 @@
             document.getElementById('relatorio-content').innerHTML = relatorioHtml;
         }
 
+        function limparDadosInconsistentes() {
+            if (!currentUser.isJuiz) return;
+            
+            if (confirm('Deseja limpar dados inconsistentes? Esta ação não pode ser desfeita.')) {
+                try {
+                    // Remover dados demo e inconsistentes
+                    Object.keys(minutas).forEach(id => {
+                        if (id.startsWith('demo') || !minutas[id].assessorNome) {
+                            database.ref(`minutas/${id}`).remove();
+                        }
+                    });
+                    alert('Dados inconsistentes removidos!');
+                } catch (error) {
+                    console.error('Erro ao limpar dados:', error);
+                }
+            }
+        }
+
         // Inicializar aplicação
         document.addEventListener('DOMContentLoaded', function() {
             lucide.createIcons();
+            
+            // Atalhos de teclado
+            document.addEventListener('keydown', function(e) {
+                // ESC para fechar modal
+                if (e.key === 'Escape' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
+                    fecharModalEdicao();
+                }
+                
+                // Ctrl+Enter para salvar edição
+                if (e.ctrlKey && e.key === 'Enter' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
+                    salvarEdicao();
+                }
+            });
         });
     </script>
 </body>
