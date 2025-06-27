@@ -270,6 +270,9 @@
                         <button onclick="gerarRelatorio('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
                             Relatório Mensal
                         </button>
+                        <button onclick="debugDados()" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors text-sm">
+                            Debug Dados
+                        </button>
                         <button onclick="limparDadosInconsistentes()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors text-sm">
                             Limpar Dados
                         </button>
@@ -343,14 +346,46 @@
         }
 
         function getMinutasHoje(assessorId) {
-            return Object.values(minutas).filter(m => {
-                // Compatibilidade com dados antigos e novos
-                const assessorMatch = m.assessorId === assessorId || 
-                                    (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome === 'Gilbert Juliano')) ||
-                                    (assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome === 'Laíse Vital'));
+            try {
+                const hoje = getHojeString();
+                console.log(`Buscando minutas para ${assessorId} em ${hoje}`);
                 
-                return assessorMatch && m.data === getHojeString();
-            });
+                const minutasHoje = Object.values(minutas).filter(m => {
+                    if (!m || !m.data) return false;
+                    
+                    // Verificar data
+                    const dataMatch = m.data === hoje;
+                    if (!dataMatch) return false;
+                    
+                    // Verificar assessor com compatibilidade total
+                    let assessorMatch = false;
+                    
+                    // Correspondência direta
+                    if (m.assessorId === assessorId) assessorMatch = true;
+                    
+                    // Compatibilidade Gilbert
+                    if (assessorId === 'gilbert') {
+                        if (m.assessorId === 'assessor1') assessorMatch = true;
+                        if (m.assessorNome && m.assessorNome.includes('Gilbert')) assessorMatch = true;
+                    }
+                    
+                    // Compatibilidade Laíse
+                    if (assessorId === 'laise') {
+                        if (m.assessorId === 'assessor2') assessorMatch = true;
+                        if (m.assessorNome && m.assessorNome.includes('Laíse')) assessorMatch = true;
+                    }
+                    
+                    console.log(`Minuta ${m.numeroProcesso}: assessorId=${m.assessorId}, assessorNome=${m.assessorNome}, match=${assessorMatch}`);
+                    
+                    return assessorMatch;
+                });
+                
+                console.log(`Encontradas ${minutasHoje.length} minutas para ${assessorId}`);
+                return minutasHoje;
+            } catch (error) {
+                console.error('Erro em getMinutasHoje:', error);
+                return [];
+            }
         }
 
         function getProgressoCategoria(assessorId, categoria) {
@@ -459,90 +494,185 @@
         }
 
         function showView(view) {
-            document.querySelectorAll('[id$="-view"]').forEach(el => el.classList.add('hidden'));
-            document.getElementById('loading').classList.add('hidden');
-            
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
-            });
-            
-            const activeBtn = event?.target.closest('button');
-            if (activeBtn) {
-                activeBtn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white';
-            }
+            try {
+                console.log(`Mudando para view: ${view}`);
+                
+                // Esconder todas as views
+                document.querySelectorAll('[id$="-view"]').forEach(el => {
+                    if (el) el.classList.add('hidden');
+                });
+                
+                const loadingEl = document.getElementById('loading');
+                if (loadingEl) loadingEl.classList.add('hidden');
+                
+                // Atualizar navegação
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    if (btn) {
+                        btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
+                    }
+                });
+                
+                // Destacar botão ativo
+                const activeBtn = event?.target?.closest('button');
+                if (activeBtn) {
+                    activeBtn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white';
+                }
 
-            currentView = view;
-            
-            if (view === 'dashboard') {
-                renderDashboard();
-            } else if (view === 'registro') {
-                document.getElementById('registro-view').classList.remove('hidden');
-            } else if (view === 'historico') {
-                setupHistoricoFilters();
-                renderHistorico();
-            } else if (view === 'relatorios') {
-                document.getElementById('relatorios-view').classList.remove('hidden');
+                currentView = view;
+                
+                // Mostrar view solicitada
+                if (view === 'dashboard') {
+                    renderDashboard();
+                } else if (view === 'registro') {
+                    const registroEl = document.getElementById('registro-view');
+                    if (registroEl) registroEl.classList.remove('hidden');
+                } else if (view === 'historico') {
+                    setupHistoricoFilters();
+                    renderHistorico();
+                } else if (view === 'relatorios') {
+                    const relatoriosEl = document.getElementById('relatorios-view');
+                    if (relatoriosEl) relatoriosEl.classList.remove('hidden');
+                }
+                
+                console.log(`✅ View ${view} carregada com sucesso`);
+                
+            } catch (error) {
+                console.error(`❌ Erro ao carregar view ${view}:`, error);
+                
+                // Fallback - tentar mostrar dashboard
+                if (view !== 'dashboard') {
+                    console.log('Tentando fallback para dashboard...');
+                    setTimeout(() => showView('dashboard'), 100);
+                } else {
+                    // Se nem dashboard funcionar, mostrar erro
+                    const errorDiv = document.createElement('div');
+                    errorDiv.innerHTML = `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                            <h3 class="text-lg font-semibold text-red-800 mb-2">Erro de Navegação</h3>
+                            <p class="text-red-700 mb-4">Ocorreu um erro ao carregar a página. Recarregue o navegador.</p>
+                            <button onclick="window.location.reload()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                                Recarregar Página
+                            </button>
+                        </div>
+                    `;
+                    
+                    const dashboardEl = document.getElementById('dashboard-view');
+                    if (dashboardEl) {
+                        dashboardEl.innerHTML = errorDiv.innerHTML;
+                        dashboardEl.classList.remove('hidden');
+                    }
+                }
             }
         }
 
         // Firebase
         function setupFirebaseListeners() {
-            document.getElementById('loading').classList.add('hidden');
+            console.log("🔥 Configurando listeners do Firebase...");
             
             try {
+                document.getElementById('loading').classList.add('hidden');
+                
+                // Listener para minutas em tempo real
                 database.ref('minutas').on('value', (snapshot) => {
-                    const firebaseMinutas = snapshot.val() || {};
-                    minutas = firebaseMinutas;
-                    if (currentView === 'dashboard') renderDashboard();
-                    if (currentView === 'historico') renderHistorico();
-                });
-
-                database.ref('assessores').on('value', (snapshot) => {
-                    const assessoresFirebase = snapshot.val();
-                    if (assessoresFirebase) {
-                        assessores = { ...assessores, ...assessoresFirebase };
+                    try {
+                        const firebaseMinutas = snapshot.val() || {};
+                        console.log("📊 Dados recebidos do Firebase:", firebaseMinutas);
+                        
+                        minutas = firebaseMinutas;
+                        
+                        // Atualizar interface apenas se estiver nas views corretas
+                        if (currentView === 'dashboard') {
+                            console.log("Atualizando dashboard...");
+                            renderDashboard();
+                        }
+                        if (currentView === 'historico') {
+                            console.log("Atualizando histórico...");
+                            renderHistorico();
+                        }
+                        
+                        console.log(`✅ ${Object.keys(minutas).length} minutas carregadas`);
+                        
+                    } catch (error) {
+                        console.error("Erro ao processar dados do Firebase:", error);
                     }
                 });
 
+                // Listener para assessores
+                database.ref('assessores').on('value', (snapshot) => {
+                    try {
+                        const assessoresFirebase = snapshot.val();
+                        if (assessoresFirebase) {
+                            assessores = { ...assessores, ...assessoresFirebase };
+                            console.log("👥 Assessores atualizados:", assessores);
+                        }
+                    } catch (error) {
+                        console.error("Erro ao carregar assessores:", error);
+                    }
+                });
+
+                // Configurar dados iniciais se não existirem
                 database.ref('assessores').once('value', (snapshot) => {
                     if (!snapshot.exists()) {
                         database.ref('assessores').set({
                             gilbert: { nome: 'Gilbert Juliano', ativo: true },
                             laise: { nome: 'Laíse Vital', ativo: true }
                         });
+                        console.log("✅ Dados iniciais dos assessores criados");
                     }
                 });
 
+                // Status de conexão
                 database.ref('.info/connected').on('value', (snapshot) => {
-                    const connected = snapshot.val();
-                    const statusDiv = document.getElementById('connection-status');
-                    
-                    if (connected) {
-                        statusDiv.innerHTML = `
-                            <div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
-                                <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
-                                Online
-                            </div>
-                        `;
-                    } else {
-                        statusDiv.innerHTML = `
-                            <div class="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
-                                <div class="w-2 h-2 bg-white rounded-full mr-2"></div>
-                                Offline
-                            </div>
-                        `;
+                    try {
+                        const connected = snapshot.val();
+                        const statusDiv = document.getElementById('connection-status');
+                        
+                        if (statusDiv) {
+                            if (connected) {
+                                statusDiv.innerHTML = `
+                                    <div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                                        <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
+                                        Online
+                                    </div>
+                                `;
+                                console.log("🟢 Firebase conectado");
+                            } else {
+                                statusDiv.innerHTML = `
+                                    <div class="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                                        <div class="w-2 h-2 bg-white rounded-full mr-2"></div>
+                                        Offline
+                                    </div>
+                                `;
+                                console.log("🟡 Firebase desconectado - usando dados locais");
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Erro no status de conexão:", error);
                     }
                 });
+
+                console.log("✅ Firebase configurado com sucesso");
 
             } catch (error) {
-                document.getElementById('connection-status').innerHTML = `
-                    <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                        Modo Local
-                    </div>
-                `;
+                console.warn("⚠️ Firebase não configurado - usando modo local", error);
+                
+                const statusDiv = document.getElementById('connection-status');
+                if (statusDiv) {
+                    statusDiv.innerHTML = `
+                        <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                            Modo Local
+                        </div>
+                    `;
+                }
             }
             
-            renderDashboard();
+            // Garantir que o dashboard seja renderizado
+            setTimeout(() => {
+                if (currentView === 'dashboard') {
+                    console.log("Renderizando dashboard inicial...");
+                    renderDashboard();
+                }
+            }, 500);
         }
 
         function registrarMinuta() {
@@ -745,142 +875,212 @@
 
         // Renderização
         function renderDashboard() {
-            const dashboard = document.getElementById('dashboard-view');
-            const hoje = new Date();
-            
-            if (!isDiaUtil(hoje)) {
-                dashboard.innerHTML = `
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-                        <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
-                        <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
-                        <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
-                    </div>
-                    ${renderAssessoresCards()}
-                `;
-            } else {
-                const totalMinutasHoje = Object.values(minutas).filter(m => m.data === getHojeString()).length;
-                const metaTotal = 20;
+            try {
+                console.log("🎨 Renderizando dashboard...", { currentUser, minutas });
+                
+                const dashboard = document.getElementById('dashboard-view');
+                if (!dashboard) {
+                    console.error('Elemento dashboard-view não encontrado');
+                    return;
+                }
+                
+                const hoje = new Date();
+                let dashboardContent = '';
+                
+                if (!isDiaUtil(hoje)) {
+                    dashboardContent = `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
+                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
+                            <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
+                        </div>
+                        ${renderAssessoresCards()}
+                    `;
+                } else {
+                    const totalMinutasHoje = Object.values(minutas).filter(m => m && m.data === getHojeString()).length;
+                    const metaTotal = 20;
 
-                dashboard.innerHTML = `
-                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
-                                <p class="text-blue-100">
-                                    ${hoje.toLocaleDateString('pt-BR', { 
-                                        weekday: 'long', 
-                                        year: 'numeric', 
-                                        month: 'long', 
-                                        day: 'numeric' 
-                                    })}
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-3xl font-bold">${totalMinutasHoje}/${metaTotal}</div>
-                                <div class="text-blue-100">minutas produzidas</div>
+                    dashboardContent = `
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
+                                    <p class="text-blue-100">
+                                        ${hoje.toLocaleDateString('pt-BR', { 
+                                            weekday: 'long', 
+                                            year: 'numeric', 
+                                            month: 'long', 
+                                            day: 'numeric' 
+                                        })}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-3xl font-bold">${totalMinutasHoje}/${metaTotal}</div>
+                                    <div class="text-blue-100">minutas produzidas</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    ${renderAssessoresCards()}
-                `;
+                        ${renderAssessoresCards()}
+                    `;
+                }
+                
+                dashboard.innerHTML = dashboardContent;
+                dashboard.classList.remove('hidden');
+                
+                // Recriar ícones com tratamento de erro
+                setTimeout(() => {
+                    try {
+                        lucide.createIcons();
+                    } catch (iconError) {
+                        console.warn('Erro ao criar ícones:', iconError);
+                    }
+                }, 100);
+                
+                console.log("✅ Dashboard renderizado com sucesso");
+                
+            } catch (error) {
+                console.error("❌ Erro ao renderizar dashboard:", error);
+                
+                // Fallback em caso de erro
+                const dashboard = document.getElementById('dashboard-view');
+                if (dashboard) {
+                    dashboard.innerHTML = `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                            <h3 class="text-lg font-semibold text-red-800 mb-2">Erro no Dashboard</h3>
+                            <p class="text-red-700">Ocorreu um erro ao carregar o dashboard. Recarregue a página.</p>
+                            <button onclick="window.location.reload()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                                Recarregar Página
+                            </button>
+                        </div>
+                    `;
+                    dashboard.classList.remove('hidden');
+                }
             }
-            
-            dashboard.classList.remove('hidden');
-            lucide.createIcons();
         }
 
         function renderAssessoresCards() {
-            if (currentUser.isJuiz) {
-                return `
-                    <div class="grid md:grid-cols-2 gap-6">
-                        ${renderAssessorCard('gilbert')}
-                        ${renderAssessorCard('laise')}
-                    </div>
-                `;
-            } else {
-                return `
-                    <div class="max-w-md mx-auto">
-                        ${renderAssessorCard(currentUser.assessorId)}
-                    </div>
-                `;
+            try {
+                if (!currentUser) {
+                    console.error('currentUser não definido');
+                    return '<div class="text-center text-red-500">Erro: usuário não identificado</div>';
+                }
+                
+                if (currentUser.isJuiz) {
+                    return `
+                        <div class="grid md:grid-cols-2 gap-6">
+                            ${renderAssessorCard('gilbert')}
+                            ${renderAssessorCard('laise')}
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="max-w-md mx-auto">
+                            ${renderAssessorCard(currentUser.assessorId)}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro em renderAssessoresCards:', error);
+                return '<div class="text-center text-red-500">Erro ao carregar cards dos assessores</div>';
             }
         }
 
         function renderAssessorCard(assessorId) {
-            const assessor = assessores[assessorId];
-            const progressoTotal = getProgressoTotal(assessorId);
-            const minutasHoje = getMinutasHoje(assessorId);
-            
-            let categoriasHtml = '';
-            Object.entries(categorias).forEach(([key, cat]) => {
-                const progresso = getProgressoCategoria(assessorId, key);
-                categoriasHtml += `
-                    <div>
-                        <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>${cat.nome}</span>
-                            <span>${progresso.atual}/${progresso.meta}</span>
+            try {
+                console.log(`Renderizando card para assessor: ${assessorId}`);
+                
+                const assessor = assessores[assessorId];
+                if (!assessor) {
+                    console.error(`Assessor ${assessorId} não encontrado`);
+                    return '<div class="text-red-500">Assessor não encontrado</div>';
+                }
+                
+                const progressoTotal = getProgressoTotal(assessorId);
+                const minutasHoje = getMinutasHoje(assessorId);
+                
+                console.log(`Assessor ${assessorId}: ${minutasHoje.length} minutas hoje`);
+                
+                let categoriasHtml = '';
+                Object.entries(categorias).forEach(([key, cat]) => {
+                    const progresso = getProgressoCategoria(assessorId, key);
+                    console.log(`${assessorId} - ${key}: ${progresso.atual}/${progresso.meta}`);
+                    
+                    categoriasHtml += `
+                        <div>
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>${cat.nome}</span>
+                                <span>${progresso.atual}/${progresso.meta}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div class="${cat.cor} h-3 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
+                            </div>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-3">
-                            <div class="${cat.cor} h-3 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
+                    `;
+                });
+
+                let ultimasMinutasHtml = '';
+                if (minutasHoje.length > 0) {
+                    const ultimasMinutas = minutasHoje.slice(-3).reverse();
+                    ultimasMinutasHtml = `
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
+                            <div class="space-y-1 max-h-32 overflow-y-auto">
+                                ${ultimasMinutas.map(minuta => `
+                                    <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''}">
+                                        <div class="font-medium flex items-center gap-1">
+                                            ${minuta.numeroProcesso || 'Sem número'}
+                                            ${minuta.editadaEm ? '<span class="text-orange-600" title="Minuta editada">✏️</span>' : ''}
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span>${minuta.tipoMinuta || 'Sem tipo'} - ${categorias[minuta.categoria]?.nome || 'Sem categoria'}</span>
+                                            <span class="status-badge ${statusOptions[minuta.status]?.cor || 'status-pendente'}">${statusOptions[minuta.status]?.nome || 'Pendente'}</span>
+                                        </div>
+                                        <div class="text-gray-500">${minuta.timestamp || ''}</div>
+                                        ${minuta.editadaEm ? `<div class="text-xs text-orange-600">Editada: ${minuta.editadaEm}</div>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
+                    `;
+                }
+
+                return `
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
+                            <div class="px-3 py-1 rounded-full text-sm font-medium ${
+                                progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                            }">
+                                ${progressoTotal.atual}/10 minutas
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Progresso Diário</span>
+                                <span>${Math.round(progressoTotal.percentual)}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            ${categoriasHtml}
+                        </div>
+                        
+                        ${ultimasMinutasHtml}
                     </div>
                 `;
-            });
-
-            let ultimasMinutasHtml = '';
-            if (minutasHoje.length > 0) {
-                const ultimasMinutas = minutasHoje.slice(-3).reverse();
-                ultimasMinutasHtml = `
-                    <div class="mt-4 pt-4 border-t border-gray-200">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
-                        <div class="space-y-1 max-h-32 overflow-y-auto">
-                            ${ultimasMinutas.map(minuta => `
-                                <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''}">
-                                    <div class="font-medium flex items-center gap-1">
-                                        ${minuta.numeroProcesso}
-                                        ${minuta.editadaEm ? '<span class="text-orange-600" title="Minuta editada">✏️</span>' : ''}
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <span>${minuta.tipoMinuta} - ${categorias[minuta.categoria].nome}</span>
-                                        <span class="status-badge ${statusOptions[minuta.status].cor}">${statusOptions[minuta.status].nome}</span>
-                                    </div>
-                                    <div class="text-gray-500">${minuta.timestamp}</div>
-                                    ${minuta.editadaEm ? `<div class="text-xs text-orange-600">Editada: ${minuta.editadaEm}</div>` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
+            } catch (error) {
+                console.error(`Erro ao renderizar card do assessor ${assessorId}:`, error);
+                return `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+                        <h3 class="text-red-800 font-semibold">Erro no Card</h3>
+                        <p class="text-red-600 text-sm">Erro ao carregar dados do assessor ${assessorId}</p>
                     </div>
                 `;
             }
-
-            return `
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
-                        <div class="px-3 py-1 rounded-full text-sm font-medium ${
-                            progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }">
-                            ${progressoTotal.atual}/10 minutas
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Progresso Diário</span>
-                            <span>${Math.round(progressoTotal.percentual)}%</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-3">
-                            <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-3">
-                        ${categoriasHtml}
-                    </div>
-                    
-                    ${ultimasMinutasHtml}
-                </div>
-            `;
         }
 
         function setupHistoricoFilters() {
@@ -1130,20 +1330,131 @@
             document.getElementById('relatorio-content').innerHTML = relatorioHtml;
         }
 
+        function debugDados() {
+            if (!currentUser.isJuiz) return;
+            
+            console.log("=== DEBUG DE DADOS ===");
+            console.log("Minutas no sistema:", minutas);
+            console.log("Assessores:", assessores);
+            console.log("Data hoje:", getHojeString());
+            
+            // Analisar minutas por assessor
+            const analise = {
+                total: Object.keys(minutas).length,
+                hoje: Object.values(minutas).filter(m => m.data === getHojeString()).length,
+                gilbert: {
+                    total: getMinutasHoje('gilbert').length,
+                    ids: Object.entries(minutas)
+                        .filter(([id, m]) => {
+                            const match = m.assessorId === 'gilbert' || 
+                                         m.assessorId === 'assessor1' || 
+                                         (m.assessorNome && m.assessorNome.includes('Gilbert'));
+                            return match && m.data === getHojeString();
+                        })
+                        .map(([id, m]) => ({id, assessorId: m.assessorId, assessorNome: m.assessorNome}))
+                },
+                laise: {
+                    total: getMinutasHoje('laise').length,
+                    ids: Object.entries(minutas)
+                        .filter(([id, m]) => {
+                            const match = m.assessorId === 'laise' || 
+                                         m.assessorId === 'assessor2' || 
+                                         (m.assessorNome && m.assessorNome.includes('Laíse'));
+                            return match && m.data === getHojeString();
+                        })
+                        .map(([id, m]) => ({id, assessorId: m.assessorId, assessorNome: m.assessorNome}))
+                }
+            };
+            
+            console.log("Análise:", analise);
+            
+            alert(`
+DEBUG DE DADOS:
+- Total de minutas: ${analise.total}
+- Minutas hoje: ${analise.hoje}
+- Gilbert hoje: ${analise.gilbert.total}
+- Laíse hoje: ${analise.laise.total}
+
+Detalhes no console (F12)
+            `);
+        }
+
         function limparDadosInconsistentes() {
             if (!currentUser.isJuiz) return;
             
-            if (confirm('Deseja limpar dados inconsistentes? Esta ação não pode ser desfeita.')) {
+            const problemasEncontrados = [];
+            
+            // Verificar problemas
+            Object.entries(minutas).forEach(([id, minuta]) => {
+                if (id.startsWith('demo')) {
+                    problemasEncontrados.push(`${id}: Dados de demonstração`);
+                }
+                if (!minuta.assessorNome && (minuta.assessorId === 'assessor1' || minuta.assessorId === 'assessor2')) {
+                    problemasEncontrados.push(`${id}: IDs antigos sem nome`);
+                }
+                if (!minuta.status) {
+                    problemasEncontrados.push(`${id}: Sem status definido`);
+                }
+            });
+            
+            if (problemasEncontrados.length === 0) {
+                alert('Nenhum problema encontrado nos dados!');
+                return;
+            }
+            
+            const confirmacao = confirm(`
+Problemas encontrados:
+${problemasEncontrados.join('\n')}
+
+Deseja corrigir automaticamente? Esta ação não pode ser desfeita.
+            `);
+            
+            if (confirmacao) {
                 try {
-                    // Remover dados demo e inconsistentes
-                    Object.keys(minutas).forEach(id => {
-                        if (id.startsWith('demo') || !minutas[id].assessorNome) {
+                    let corrigidos = 0;
+                    
+                    Object.entries(minutas).forEach(([id, minuta]) => {
+                        let needsUpdate = false;
+                        const minutaAtualizada = {...minuta};
+                        
+                        // Corrigir IDs antigos
+                        if (minuta.assessorId === 'assessor1') {
+                            minutaAtualizada.assessorId = 'gilbert';
+                            minutaAtualizada.assessorNome = 'Gilbert Juliano';
+                            needsUpdate = true;
+                        }
+                        if (minuta.assessorId === 'assessor2') {
+                            minutaAtualizada.assessorId = 'laise';
+                            minutaAtualizada.assessorNome = 'Laíse Vital';
+                            needsUpdate = true;
+                        }
+                        
+                        // Adicionar status se não existir
+                        if (!minuta.status) {
+                            minutaAtualizada.status = 'pendente';
+                            needsUpdate = true;
+                        }
+                        
+                        if (needsUpdate) {
+                            database.ref(`minutas/${id}`).set(minutaAtualizada);
+                            minutas[id] = minutaAtualizada;
+                            corrigidos++;
+                        }
+                        
+                        // Remover dados demo
+                        if (id.startsWith('demo')) {
                             database.ref(`minutas/${id}`).remove();
+                            delete minutas[id];
+                            corrigidos++;
                         }
                     });
-                    alert('Dados inconsistentes removidos!');
+                    
+                    alert(`${corrigidos} problemas corrigidos!`);
+                    renderDashboard();
+                    
                 } catch (error) {
-                    console.error('Erro ao limpar dados:', error);
+                    console.error('Erro ao corrigir dados:', error);
+                    alert('Erro ao corrigir dados. Verifique o console.');
                 }
             }
         }
