@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Produtividade Judicial</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .realtime-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Indicador de Conexão -->
+    <div id="connection-status" class="realtime-indicator">
+        <div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+            <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
+            Conectado
+        </div>
+    </div>
+
+    <!-- Tela de Login -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+            <div class="text-center mb-8">
+                <div class="mx-auto h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <i data-lucide="scale" class="h-8 w-8 text-blue-600"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Sistema de Produtividade Judicial</h1>
+                <p class="text-gray-600">Selecione seu perfil para acessar o sistema</p>
+            </div>
+            
+            <div class="space-y-3">
+                <button onclick="login('juiz')" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium flex items-center justify-center">
+                    <i data-lucide="user-check" class="h-5 w-5 mr-2"></i>
+                    Acesso do Juiz
+                </button>
+                
+                <button onclick="login('assessor1')" class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition-colors font-medium flex items-center justify-center">
+                    <i data-lucide="user" class="h-5 w-5 mr-2"></i>
+                    Assessor 1
+                </button>
+                
+                <button onclick="login('assessor2')" class="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 transition-colors font-medium flex items-center justify-center">
+                    <i data-lucide="user" class="h-5 w-5 mr-2"></i>
+                    Assessor 2
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aplicação Principal -->
+    <div id="main-app" class="hidden p-4 max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Sistema de Produtividade Judicial</h1>
+                    <p id="user-info" class="text-gray-600"></p>
+                </div>
+                <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors flex items-center">
+                    <i data-lucide="log-out" class="h-4 w-4 mr-2"></i>
+                    Sair
+                </button>
+            </div>
+            
+            <!-- Navegação -->
+            <div id="navigation" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="text-center py-12">
+            <div class="loading-spinner"></div>
+            <p class="text-gray-600 mt-4">Carregando dados...</p>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard-view" class="hidden space-y-6"></div>
+
+        <!-- Registro -->
+        <div id="registro-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center mb-6">
+                    <i data-lucide="plus" class="h-6 w-6 text-blue-600 mr-2"></i>
+                    <h2 class="text-xl font-semibold text-gray-800">Registrar Nova Minuta</h2>
+                </div>
+                
+                <div id="registro-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo</label>
+                        <input type="text" id="numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 1234567-89.2024.8.12.3456">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta</label>
+                        <select id="tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Selecione o tipo</option>
+                            <option value="Despacho">Despacho</option>
+                            <option value="Decisão">Decisão</option>
+                            <option value="Sentença">Sentença</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                        <select id="categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Selecione a categoria</option>
+                            <option value="meta1">Meta 1 CNJ</option>
+                            <option value="sem_movimento">Sem movimentação 100+ dias</option>
+                            <option value="outros">Pedidos/Atos/Urgentes</option>
+                        </select>
+                    </div>
+                    
+                    <button onclick="registrarMinuta()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                        Registrar Minuta
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Histórico -->
+        <div id="historico-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center mb-6">
+                    <i data-lucide="clock" class="h-6 w-6 text-gray-600 mr-2"></i>
+                    <h2 class="text-xl font-semibold text-gray-800">Histórico de Minutas</h2>
+                </div>
+                <div id="historico-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Firebase - PRODUÇÃO
+        const firebaseConfig = {
+            apiKey: "AIzaSyCzuoRgbvKQSjOFssde-qUEtNDqGNJML7E",
+            authDomain: "produtividade-gabinete.firebaseapp.com",
+            databaseURL: "https://produtividade-gabinete-default-rtdb.firebaseio.com",
+            projectId: "produtividade-gabinete",
+            storageBucket: "produtividade-gabinete.firebasestorage.app",
+            messagingSenderId: "370364917935",
+            appId: "1:370364917935:web:a6205cc718748abcbdcc5a"
+        };
+
+        console.log("🔥 Firebase configurado com sucesso!");
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Inicializar ícones Lucide
+        lucide.createIcons();
+
+        // Utilitários
+        function isDiaUtil(data) {
+            const dia = data.getDay();
+            return dia >= 1 && dia <= 5;
+        }
+
+        function getHojeString() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        // Estado da aplicação
+        let currentUser = null;
+        let currentView = 'dashboard';
+        let minutas = {
+            // Dados de demonstração
+            demo1: {
+                assessorId: 'assessor1',
+                numeroProcesso: '1234567-89.2024.8.12.3456',
+                tipoMinuta: 'Sentença',
+                categoria: 'meta1',
+                data: getHojeString(),
+                timestamp: '09:30:00',
+                createdAt: Date.now() - 3600000
+            },
+            demo2: {
+                assessorId: 'assessor1',
+                numeroProcesso: '2345678-90.2024.8.12.3457',
+                tipoMinuta: 'Despacho',
+                categoria: 'sem_movimento',
+                data: getHojeString(),
+                timestamp: '10:15:00',
+                createdAt: Date.now() - 1800000
+            },
+            demo3: {
+                assessorId: 'assessor2',
+                numeroProcesso: '3456789-01.2024.8.12.3458',
+                tipoMinuta: 'Decisão',
+                categoria: 'outros',
+                data: getHojeString(),
+                timestamp: '11:00:00',
+                createdAt: Date.now() - 900000
+            }
+        };
+        let assessores = {
+            assessor1: { nome: 'Assessor 1', ativo: true },
+            assessor2: { nome: 'Assessor 2', ativo: true }
+        };
+
+        const categorias = {
+            'meta1': { nome: 'Meta 1 CNJ', cor: 'bg-red-500', meta: 2 },
+            'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
+            'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 }
+        };
+
+        function getMinutasHoje(assessorId) {
+            return Object.values(minutas).filter(m => 
+                m.assessorId === assessorId && 
+                m.data === getHojeString()
+            );
+        }
+
+        function getProgressoCategoria(assessorId, categoria) {
+            const minutasHoje = getMinutasHoje(assessorId);
+            const count = minutasHoje.filter(m => m.categoria === categoria).length;
+            const meta = categorias[categoria].meta;
+            return { atual: count, meta, percentual: Math.min((count / meta) * 100, 100) };
+        }
+
+        function getProgressoTotal(assessorId) {
+            const minutasHoje = getMinutasHoje(assessorId);
+            const total = minutasHoje.length;
+            const meta = 10;
+            return { atual: total, meta, percentual: Math.min((total / meta) * 100, 100) };
+        }
+
+        // Autenticação
+        function login(userType) {
+            currentUser = {
+                type: userType,
+                isJuiz: userType === 'juiz',
+                assessorId: userType.startsWith('assessor') ? userType : null,
+                nome: userType === 'juiz' ? 'Juiz' : assessores[userType]?.nome || userType
+            };
+            
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
+            initializeApp();
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+
+        // Inicialização da aplicação
+        function initializeApp() {
+            setupUserInfo();
+            setupNavigation();
+            setupFirebaseListeners();
+            showView('dashboard');
+        }
+
+        function setupUserInfo() {
+            document.getElementById('user-info').textContent = 
+                `Logado como: ${currentUser.nome}`;
+        }
+
+        function setupNavigation() {
+            const nav = document.getElementById('navigation');
+            let buttons = '';
+
+            // Dashboard sempre disponível
+            buttons += `
+                <button onclick="showView('dashboard')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
+                    <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2"></i>
+                    Dashboard
+                </button>
+            `;
+
+            // Registro apenas para assessores
+            if (!currentUser.isJuiz) {
+                buttons += `
+                    <button onclick="showView('registro')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
+                        Registrar Minuta
+                    </button>
+                `;
+            }
+
+            // Histórico sempre disponível
+            buttons += `
+                <button onclick="showView('historico')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    <i data-lucide="clock" class="h-4 w-4 mr-2"></i>
+                    Histórico
+                </button>
+            `;
+
+            nav.innerHTML = buttons;
+            lucide.createIcons();
+        }
+
+        function showView(view) {
+            // Esconder todas as views
+            document.querySelectorAll('[id$="-view"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('loading').classList.add('hidden');
+            
+            // Atualizar navegação
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
+            });
+            
+            // Destacar botão ativo
+            const activeBtn = event?.target.closest('button');
+            if (activeBtn) {
+                activeBtn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white';
+            }
+
+            currentView = view;
+            
+            // Mostrar view solicitada
+            if (view === 'dashboard') {
+                renderDashboard();
+            } else if (view === 'registro') {
+                document.getElementById('registro-view').classList.remove('hidden');
+            } else if (view === 'historico') {
+                renderHistorico();
+            }
+        }
+
+        // Firebase
+        function setupFirebaseListeners() {
+            console.log("🔥 Configurando listeners do Firebase...");
+            
+            // Para garantir que funcione mesmo sem Firebase inicialmente
+            document.getElementById('loading').classList.add('hidden');
+            
+            // Tentar conectar ao Firebase
+            try {
+                // Listener para minutas em tempo real
+                database.ref('minutas').on('value', (snapshot) => {
+                    minutas = snapshot.val() || {};
+                    console.log(`📊 ${Object.keys(minutas).length} minutas carregadas do Firebase`);
+                    
+                    // Atualizar interface
+                    if (currentView === 'dashboard') renderDashboard();
+                    if (currentView === 'historico') renderHistorico();
+                });
+
+                // Listener para assessores
+                database.ref('assessores').on('value', (snapshot) => {
+                    const assessoresFirebase = snapshot.val();
+                    if (assessoresFirebase) {
+                        assessores = assessoresFirebase;
+                        console.log("👥 Assessores carregados do Firebase");
+                    }
+                });
+
+                // Configurar dados iniciais se não existirem
+                database.ref('assessores').once('value', (snapshot) => {
+                    if (!snapshot.exists()) {
+                        database.ref('assessores').set({
+                            assessor1: { nome: 'Assessor 1', ativo: true },
+                            assessor2: { nome: 'Assessor 2', ativo: true }
+                        });
+                        console.log("✅ Dados iniciais dos assessores criados");
+                    }
+                });
+
+                // Status de conexão
+                database.ref('.info/connected').on('value', (snapshot) => {
+                    const connected = snapshot.val();
+                    const statusDiv = document.getElementById('connection-status');
+                    
+                    if (connected) {
+                        statusDiv.innerHTML = `
+                            <div class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                                <div class="w-2 h-2 bg-white rounded-full mr-2 pulse"></div>
+                                Online
+                            </div>
+                        `;
+                        console.log("🟢 Firebase conectado");
+                    } else {
+                        statusDiv.innerHTML = `
+                            <div class="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                                <div class="w-2 h-2 bg-white rounded-full mr-2"></div>
+                                Offline
+                            </div>
+                        `;
+                        console.log("🟡 Firebase desconectado - usando dados locais");
+                    }
+                });
+
+            } catch (error) {
+                console.warn("⚠️ Firebase não configurado - usando modo local", error);
+                document.getElementById('connection-status').innerHTML = `
+                    <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        Modo Local
+                    </div>
+                `;
+            }
+            
+            // Garantir que o dashboard seja renderizado
+            renderDashboard();
+        }
+
+        function registrarMinuta() {
+            const numeroProcesso = document.getElementById('numero-processo').value;
+            const tipoMinuta = document.getElementById('tipo-minuta').value;
+            const categoria = document.getElementById('categoria-minuta').value;
+
+            if (!numeroProcesso || !tipoMinuta || !categoria) {
+                alert('Por favor, preencha todos os campos.');
+                return;
+            }
+
+            const novaMinuta = {
+                assessorId: currentUser.assessorId,
+                numeroProcesso,
+                tipoMinuta,
+                categoria,
+                data: getHojeString(),
+                timestamp: new Date().toLocaleTimeString(),
+                createdAt: Date.now()
+            };
+
+            // Tentar salvar no Firebase, se não conseguir salvar localmente
+            try {
+                const minutaComTimestamp = {
+                    ...novaMinuta,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP
+                };
+                
+                database.ref('minutas').push(minutaComTimestamp)
+                    .then(() => {
+                        console.log("✅ Minuta salva no Firebase");
+                        limparFormularioRegistro();
+                        alert('Minuta registrada com sucesso!');
+                        showView('dashboard');
+                    })
+                    .catch((error) => {
+                        console.warn("⚠️ Erro no Firebase, salvando localmente:", error);
+                        salvarMinutaLocal(novaMinuta);
+                    });
+            } catch (error) {
+                console.warn("⚠️ Firebase não disponível, salvando localmente:", error);
+                salvarMinutaLocal(novaMinuta);
+            }
+        }
+
+        function salvarMinutaLocal(minuta) {
+            // Salvar localmente quando Firebase não estiver disponível
+            const id = 'local_' + Date.now();
+            minutas[id] = minuta;
+            
+            limparFormularioRegistro();
+            alert('Minuta registrada localmente!');
+            showView('dashboard');
+            
+            // Tentar sincronizar com Firebase depois
+            sincronizarComFirebase();
+        }
+
+        function limparFormularioRegistro() {
+            document.getElementById('numero-processo').value = '';
+            document.getElementById('tipo-minuta').value = '';
+            document.getElementById('categoria-minuta').value = '';
+        }
+
+        function sincronizarComFirebase() {
+            // Tentar enviar minutas locais para Firebase
+            Object.entries(minutas).forEach(([id, minuta]) => {
+                if (id.startsWith('local_')) {
+                    try {
+                        database.ref('minutas').push(minuta)
+                            .then(() => {
+                                delete minutas[id]; // Remove da memória local
+                                console.log(`✅ Minuta ${id} sincronizada com Firebase`);
+                            });
+                    } catch (error) {
+                        console.log("Aguardando conexão para sincronizar...");
+                    }
+                }
+            });
+        }
+
+        // Renderização
+        function renderDashboard() {
+            console.log("🎨 Renderizando dashboard...", { currentUser, minutas });
+            
+            const dashboard = document.getElementById('dashboard-view');
+            const hoje = new Date();
+            
+            if (!isDiaUtil(hoje)) {
+                dashboard.innerHTML = `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                        <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
+                        <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
+                        <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
+                    </div>
+                    ${renderAssessoresCards()}
+                `;
+            } else {
+                const totalMinutasHoje = Object.values(minutas).filter(m => m.data === getHojeString()).length;
+                const metaTotal = 20; // 2 assessores x 10 minutas
+
+                dashboard.innerHTML = `
+                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
+                                <p class="text-blue-100">
+                                    ${hoje.toLocaleDateString('pt-BR', { 
+                                        weekday: 'long', 
+                                        year: 'numeric', 
+                                        month: 'long', 
+                                        day: 'numeric' 
+                                    })}
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold">${totalMinutasHoje}/${metaTotal}</div>
+                                <div class="text-blue-100">minutas produzidas</div>
+                            </div>
+                        </div>
+                    </div>
+                    ${renderAssessoresCards()}
+                `;
+            }
+            
+            dashboard.classList.remove('hidden');
+            lucide.createIcons();
+            console.log("✅ Dashboard renderizado com sucesso");
+        }
+
+        function renderAssessoresCards() {
+            if (currentUser.isJuiz) {
+                // Juiz vê ambos assessores
+                return `
+                    <div class="grid md:grid-cols-2 gap-6">
+                        ${renderAssessorCard('assessor1')}
+                        ${renderAssessorCard('assessor2')}
+                    </div>
+                `;
+            } else {
+                // Assessor vê apenas seus próprios dados
+                return `
+                    <div class="max-w-md mx-auto">
+                        ${renderAssessorCard(currentUser.assessorId)}
+                    </div>
+                `;
+            }
+        }
+
+        function renderAssessorCard(assessorId) {
+            const assessor = assessores[assessorId];
+            const progressoTotal = getProgressoTotal(assessorId);
+            const minutasHoje = getMinutasHoje(assessorId);
+            
+            let categoriasHtml = '';
+            Object.entries(categorias).forEach(([key, cat]) => {
+                const progresso = getProgressoCategoria(assessorId, key);
+                categoriasHtml += `
+                    <div>
+                        <div class="flex justify-between text-sm text-gray-600 mb-1">
+                            <span>${cat.nome}</span>
+                            <span>${progresso.atual}/${progresso.meta}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3">
+                            <div class="${cat.cor} h-3 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            let ultimasMinutasHtml = '';
+            if (minutasHoje.length > 0) {
+                const ultimasMinutas = minutasHoje.slice(-3).reverse();
+                ultimasMinutasHtml = `
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
+                        <div class="space-y-1 max-h-32 overflow-y-auto">
+                            ${ultimasMinutas.map(minuta => `
+                                <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                    <div class="font-medium">${minuta.numeroProcesso}</div>
+                                    <div>${minuta.tipoMinuta} - ${categorias[minuta.categoria].nome}</div>
+                                    <div class="text-gray-500">${minuta.timestamp}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
+                        <div class="px-3 py-1 rounded-full text-sm font-medium ${
+                            progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }">
+                            ${progressoTotal.atual}/10 minutas
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm text-gray-600 mb-1">
+                            <span>Progresso Diário</span>
+                            <span>${Math.round(progressoTotal.percentual)}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3">
+                            <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        ${categoriasHtml}
+                    </div>
+                    
+                    ${ultimasMinutasHtml}
+                </div>
+            `;
+        }
+
+        function renderHistorico() {
+            const historico = document.getElementById('historico-view');
+            const minutasArray = Object.entries(minutas).map(([key, minuta]) => ({
+                ...minuta,
+                id: key
+            })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            
+            let content = '';
+            if (minutasArray.length === 0) {
+                content = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                        <p>Nenhuma minuta registrada ainda.</p>
+                    </div>
+                `;
+            } else {
+                // Filtrar minutas se for assessor
+                const minutasFiltradas = currentUser.isJuiz ? 
+                    minutasArray : 
+                    minutasArray.filter(m => m.assessorId === currentUser.assessorId);
+                
+                content = `
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        ${minutasFiltradas.map(minuta => {
+                            const assessor = assessores[minuta.assessorId];
+                            const categoria = categorias[minuta.categoria];
+                            
+                            return `
+                                <div class="border border-gray-200 rounded-lg p-4">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="font-medium text-gray-800">${assessor?.nome}</span>
+                                                <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor} text-white">
+                                                    ${categoria.nome}
+                                                </span>
+                                            </div>
+                                            <div class="text-sm text-gray-600">
+                                                <div><strong>Processo:</strong> ${minuta.numeroProcesso}</div>
+                                                <div><strong>Tipo:</strong> ${minuta.tipoMinuta}</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-xs text-gray-500 text-right">
+                                            <div>${new Date(minuta.data).toLocaleDateString('pt-BR')}</div>
+                                            <div>${minuta.timestamp}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+            
+            document.getElementById('historico-content').innerHTML = content;
+            historico.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        // Inicializar aplicação
+        document.addEventListener('DOMContentLoaded', function() {
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
