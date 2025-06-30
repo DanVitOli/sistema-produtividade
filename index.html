@@ -61,6 +61,10 @@
             cursor: pointer;
             transition: all 0.2s;
             position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4px;
         }
         .calendar-day:hover {
             background-color: #f3f4f6;
@@ -80,6 +84,10 @@
         .calendar-day.has-data.selected {
             background-color: #15803d;
         }
+        .calendar-day.other-month {
+            color: #9ca3af;
+            background-color: #f9fafb;
+        }
         .productivity-indicator {
             position: absolute;
             bottom: 2px;
@@ -88,6 +96,18 @@
             height: 6px;
             border-radius: 50%;
             background-color: #22c55e;
+        }
+        .day-number {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .day-count {
+            font-size: 0.75rem;
+            text-align: center;
+            background-color: rgba(34, 197, 94, 0.1);
+            border-radius: 4px;
+            padding: 1px 3px;
+            margin-top: 2px;
         }
     </style>
 </head>
@@ -241,7 +261,7 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Calendário -->
                     <div class="space-y-4">
                         <!-- Cabeçalho dos dias da semana -->
@@ -471,6 +491,20 @@
             });
         }
 
+        function getMinutasPorData(data, assessorId = null) {
+            return Object.values(minutas).filter(m => {
+                if (!m || !m.data || m.data !== data) return false;
+                
+                if (assessorId) {
+                    return m.assessorId === assessorId || 
+                           (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                           (assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+                }
+                
+                return true;
+            });
+        }
+
         function getProgressoCategoria(assessorId, categoria) {
             const minutasHoje = getMinutasHoje(assessorId);
             const count = minutasHoje.filter(m => m.categoria === categoria).length;
@@ -539,14 +573,19 @@
         
         function initializeApp() {
             try {
-                // Inicializar Firebase
-                firebase = window.firebase;
-                firebase.initializeApp(firebaseConfig);
-                database = firebase.database();
+                // Inicializar Firebase (modo offline se falhar)
+                try {
+                    firebase = window.firebase;
+                    firebase.initializeApp(firebaseConfig);
+                    database = firebase.database();
+                } catch (error) {
+                    log('Firebase não disponível - modo offline', error);
+                    database = null;
+                }
                 
                 setupUserInfo();
                 setupNavigation();
-                setupFirebaseListeners();
+                if (database) setupFirebaseListeners();
                 showView('dashboard');
                 
                 log('Aplicação inicializada com sucesso');
@@ -591,7 +630,7 @@
                 </button>
             `;
 
-            // Relatórios apenas para juiz
+            // Calendário e Relatórios apenas para juiz
             if (currentUser.isJuiz) {
                 buttons += `
                     <button onclick="showView('calendario')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
@@ -672,6 +711,7 @@
                     
                     if (currentView === 'dashboard') renderDashboard();
                     if (currentView === 'historico') renderHistorico();
+                    if (currentView === 'calendario') renderCalendario();
                 });
 
                 // Listener para assessores
@@ -751,18 +791,22 @@
             };
 
             try {
-                // Salvar no Firebase
-                database.ref('minutas').push({
-                    ...novaMinuta,
-                    createdAt: firebase.database.ServerValue.TIMESTAMP
-                }).then(() => {
-                    limparFormularioRegistro();
-                    showNotification('Minuta registrada com sucesso!', 'success');
-                    showView('dashboard');
-                    log('Minuta registrada no Firebase', numeroProcesso);
-                }).catch(() => {
+                if (database) {
+                    // Salvar no Firebase
+                    database.ref('minutas').push({
+                        ...novaMinuta,
+                        createdAt: firebase.database.ServerValue.TIMESTAMP
+                    }).then(() => {
+                        limparFormularioRegistro();
+                        showNotification('Minuta registrada com sucesso!', 'success');
+                        showView('dashboard');
+                        log('Minuta registrada no Firebase', numeroProcesso);
+                    }).catch(() => {
+                        salvarMinutaLocal(novaMinuta);
+                    });
+                } else {
                     salvarMinutaLocal(novaMinuta);
-                });
+                }
                 
             } catch (error) {
                 salvarMinutaLocal(novaMinuta);
@@ -784,6 +828,229 @@
             document.getElementById('tipo-minuta').value = '';
             document.getElementById('categoria-minuta').value = '';
             document.getElementById('observacoes-minuta').value = '';
+        }
+
+        // ==================== CALENDÁRIO ====================
+        
+        function renderCalendario() {
+            try {
+                const calendarioView = document.getElementById('calendario-view');
+                if (!calendarioView) return;
+
+                // Atualizar cabeçalho do mês/ano
+                const mesAno = document.getElementById('calendario-mes-ano');
+                const dataAtual = new Date(calendarioData.anoAtual, calendarioData.mesAtual, 1);
+                mesAno.textContent = dataAtual.toLocaleDateString('pt-BR', { 
+                    month: 'long', 
+                    year: 'numeric' 
+                }).replace(/^\w/, c => c.toUpperCase());
+
+                // Renderizar dias do calendário
+                renderDiasCalendario();
+
+                calendarioView.classList.remove('hidden');
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Calendário renderizado');
+                
+            } catch (error) {
+                log('Erro ao renderizar calendário', error);
+                showNotification('Erro ao carregar calendário', 'error');
+            }
+        }
+
+        function renderDiasCalendario() {
+            const calendarioDias = document.getElementById('calendario-dias');
+            if (!calendarioDias) return;
+
+            const hoje = new Date();
+            const hojeString = getHojeString();
+            
+            const primeiroDia = new Date(calendarioData.anoAtual, calendarioData.mesAtual, 1);
+            const ultimoDia = new Date(calendarioData.anoAtual, calendarioData.mesAtual + 1, 0);
+            
+            // Calcular dias do mês anterior para preencher a primeira semana
+            const diasMesAnterior = primeiroDia.getDay();
+            const inicioCalendario = new Date(primeiroDia);
+            inicioCalendario.setDate(inicioCalendario.getDate() - diasMesAnterior);
+            
+            let diasHtml = '';
+            let dataAtual = new Date(inicioCalendario);
+            
+            // Renderizar 6 semanas (42 dias)
+            for (let i = 0; i < 42; i++) {
+                const dataString = dataAtual.toISOString().split('T')[0];
+                const isHoje = dataString === hojeString;
+                const isOutroMes = dataAtual.getMonth() !== calendarioData.mesAtual;
+                const isSelecionado = dataString === calendarioData.diaSelecionado;
+                
+                // Obter minutas do dia
+                const minutasDia = getMinutasPorData(dataString);
+                const hasData = minutasDia.length > 0;
+                
+                let classes = 'calendar-day';
+                if (isHoje) classes += ' today';
+                if (isOutroMes) classes += ' other-month';
+                if (isSelecionado) classes += ' selected';
+                if (hasData && !isOutroMes) classes += ' has-data';
+                
+                diasHtml += `
+                    <div class="${classes}" onclick="selecionarDia('${dataString}')">
+                        <div class="day-number">${dataAtual.getDate()}</div>
+                        ${hasData && !isOutroMes ? `<div class="day-count">${minutasDia.length}</div>` : ''}
+                    </div>
+                `;
+                
+                dataAtual.setDate(dataAtual.getDate() + 1);
+            }
+            
+            calendarioDias.innerHTML = diasHtml;
+        }
+
+        function navegarMes(direcao) {
+            calendarioData.mesAtual += direcao;
+            
+            if (calendarioData.mesAtual > 11) {
+                calendarioData.mesAtual = 0;
+                calendarioData.anoAtual++;
+            } else if (calendarioData.mesAtual < 0) {
+                calendarioData.mesAtual = 11;
+                calendarioData.anoAtual--;
+            }
+            
+            renderCalendario();
+        }
+
+        function irParaHoje() {
+            const hoje = new Date();
+            calendarioData.mesAtual = hoje.getMonth();
+            calendarioData.anoAtual = hoje.getFullYear();
+            calendarioData.diaSelecionado = getHojeString();
+            
+            renderCalendario();
+            renderDetalhesCalendario(calendarioData.diaSelecionado);
+        }
+
+        function selecionarDia(dataString) {
+            calendarioData.diaSelecionado = dataString;
+            renderDiasCalendario();
+            renderDetalhesCalendario(dataString);
+        }
+
+        function renderDetalhesCalendario(dataString) {
+            const detalhesDiv = document.getElementById('calendario-detalhes');
+            if (!detalhesDiv || !dataString) return;
+
+            const data = new Date(dataString + 'T12:00:00');
+            const minutasDia = getMinutasPorData(dataString);
+            
+            if (minutasDia.length === 0) {
+                detalhesDiv.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i data-lucide="calendar-x" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-600 mb-2">
+                            ${data.toLocaleDateString('pt-BR', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                            })}
+                        </h3>
+                        <p>Nenhuma minuta registrada neste dia</p>
+                    </div>
+                `;
+                setTimeout(() => lucide.createIcons(), 100);
+                return;
+            }
+
+            // Agrupar minutas por assessor
+            const minutasPorAssessor = {
+                gilbert: minutasDia.filter(m => 
+                    m.assessorId === 'gilbert' || 
+                    m.assessorId === 'assessor1' || 
+                    (m.assessorNome && m.assessorNome.includes('Gilbert'))
+                ),
+                laise: minutasDia.filter(m => 
+                    m.assessorId === 'laise' || 
+                    m.assessorId === 'assessor2' || 
+                    (m.assessorNome && m.assessorNome.includes('Laíse'))
+                )
+            };
+
+            let detalhesHtml = `
+                <div class="space-y-4">
+                    <div class="text-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">
+                            ${data.toLocaleDateString('pt-BR', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                            })}
+                        </h3>
+                        <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg inline-flex items-center">
+                            <i data-lucide="file-text" class="h-5 w-5 mr-2"></i>
+                            ${minutasDia.length} minutas produzidas
+                        </div>
+                    </div>
+            `;
+
+            // Renderizar minutas por assessor
+            Object.entries(minutasPorAssessor).forEach(([assessorId, minutasAssessor]) => {
+                if (minutasAssessor.length === 0) return;
+
+                const assessor = assessores[assessorId];
+                const estatisticas = {
+                    meta1: minutasAssessor.filter(m => m.categoria === 'meta1').length,
+                    sem_movimento: minutasAssessor.filter(m => m.categoria === 'sem_movimento').length,
+                    outros: minutasAssessor.filter(m => m.categoria === 'outros').length
+                };
+
+                detalhesHtml += `
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-medium text-gray-800">${assessor.nome}</h4>
+                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">${minutasAssessor.length} minutas</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
+                            <div class="bg-red-100 text-red-800 p-2 rounded text-center">
+                                <div class="font-medium">${estatisticas.meta1}</div>
+                                <div>Meta 1</div>
+                            </div>
+                            <div class="bg-orange-100 text-orange-800 p-2 rounded text-center">
+                                <div class="font-medium">${estatisticas.sem_movimento}</div>
+                                <div>100+ dias</div>
+                            </div>
+                            <div class="bg-blue-100 text-blue-800 p-2 rounded text-center">
+                                <div class="font-medium">${estatisticas.outros}</div>
+                                <div>Outros</div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                            ${minutasAssessor.map(minuta => {
+                                const categoria = categorias[minuta.categoria];
+                                const status = statusOptions[minuta.status || 'pendente'];
+                                
+                                return `
+                                    <div class="bg-white p-2 rounded border text-xs">
+                                        <div class="font-medium text-gray-800">${minuta.numeroProcesso || 'Sem número'}</div>
+                                        <div class="flex justify-between items-center mt-1">
+                                            <span class="text-gray-600">${minuta.tipoMinuta}</span>
+                                            <span class="status-badge ${status.cor}">${status.nome}</span>
+                                        </div>
+                                        ${minuta.timestamp ? `<div class="text-gray-500 mt-1">${minuta.timestamp}</div>` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            detalhesHtml += '</div>';
+            detalhesDiv.innerHTML = detalhesHtml;
+            setTimeout(() => lucide.createIcons(), 100);
         }
 
         // ==================== EDIÇÃO/EXCLUSÃO ====================
@@ -842,22 +1109,30 @@
             };
 
             try {
-                database.ref(`minutas/${minutaEditando.id}`).set(minutaAtualizada)
-                    .then(() => {
-                        minutas[minutaEditando.id] = minutaAtualizada;
-                        fecharModalEdicao();
-                        renderHistorico();
-                        renderDashboard();
-                        showNotification('Minuta atualizada com sucesso!', 'success');
-                        log('Minuta editada no Firebase', numeroProcesso);
-                    })
-                    .catch(() => {
-                        minutas[minutaEditando.id] = minutaAtualizada;
-                        fecharModalEdicao();
-                        renderHistorico();
-                        renderDashboard();
-                        showNotification('Minuta atualizada localmente!', 'warning');
-                    });
+                if (database) {
+                    database.ref(`minutas/${minutaEditando.id}`).set(minutaAtualizada)
+                        .then(() => {
+                            minutas[minutaEditando.id] = minutaAtualizada;
+                            fecharModalEdicao();
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('Minuta atualizada com sucesso!', 'success');
+                            log('Minuta editada no Firebase', numeroProcesso);
+                        })
+                        .catch(() => {
+                            minutas[minutaEditando.id] = minutaAtualizada;
+                            fecharModalEdicao();
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('Minuta atualizada localmente!', 'warning');
+                        });
+                } else {
+                    minutas[minutaEditando.id] = minutaAtualizada;
+                    fecharModalEdicao();
+                    renderHistorico();
+                    renderDashboard();
+                    showNotification('Minuta atualizada localmente!', 'warning');
+                }
             } catch (error) {
                 minutas[minutaEditando.id] = minutaAtualizada;
                 fecharModalEdicao();
@@ -886,20 +1161,27 @@
             }
 
             try {
-                database.ref(`minutas/${minutaId}`).remove()
-                    .then(() => {
-                        delete minutas[minutaId];
-                        renderHistorico();
-                        renderDashboard();
-                        showNotification('Minuta excluída com sucesso!', 'success');
-                        log('Minuta excluída do Firebase', minuta.numeroProcesso);
-                    })
-                    .catch(() => {
-                        delete minutas[minutaId];
-                        renderHistorico();
-                        renderDashboard();
-                        showNotification('Minuta excluída localmente!', 'warning');
-                    });
+                if (database) {
+                    database.ref(`minutas/${minutaId}`).remove()
+                        .then(() => {
+                            delete minutas[minutaId];
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('Minuta excluída com sucesso!', 'success');
+                            log('Minuta excluída do Firebase', minuta.numeroProcesso);
+                        })
+                        .catch(() => {
+                            delete minutas[minutaId];
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('Minuta excluída localmente!', 'warning');
+                        });
+                } else {
+                    delete minutas[minutaId];
+                    renderHistorico();
+                    renderDashboard();
+                    showNotification('Minuta excluída localmente!', 'warning');
+                }
             } catch (error) {
                 delete minutas[minutaId];
                 renderHistorico();
@@ -912,13 +1194,19 @@
             if (!currentUser.isJuiz) return;
 
             try {
-                database.ref(`minutas/${minutaId}/status`).set(novoStatus)
-                    .then(() => {
-                        minutas[minutaId].status = novoStatus;
-                        renderHistorico();
-                        showNotification(`Status atualizado para: ${statusOptions[novoStatus].nome}`, 'success');
-                        log('Status atualizado', `${minutaId} -> ${novoStatus}`);
-                    });
+                if (database) {
+                    database.ref(`minutas/${minutaId}/status`).set(novoStatus)
+                        .then(() => {
+                            minutas[minutaId].status = novoStatus;
+                            renderHistorico();
+                            showNotification(`Status atualizado para: ${statusOptions[novoStatus].nome}`, 'success');
+                            log('Status atualizado', `${minutaId} -> ${novoStatus}`);
+                        });
+                } else {
+                    minutas[minutaId].status = novoStatus;
+                    renderHistorico();
+                    showNotification('Status atualizado localmente!', 'warning');
+                }
             } catch (error) {
                 minutas[minutaId].status = novoStatus;
                 renderHistorico();
@@ -1382,7 +1670,7 @@
                 // Atalhos de teclado
                 document.addEventListener('keydown', function(e) {
                     // ESC para fechar modal
-                    if (e.key === 'Escape' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
+                    if (e.key === 'Escape' && !document.getElementById('modal-dicao').classList.contains('hidden')) {
                         fecharModalEdicao();
                     }
                     
