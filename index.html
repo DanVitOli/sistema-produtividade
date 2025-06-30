@@ -55,6 +55,40 @@
             .no-print { display: none !important; }
             body { background: white !important; }
         }
+        .calendar-day {
+            min-height: 40px;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .calendar-day:hover {
+            background-color: #f3f4f6;
+        }
+        .calendar-day.today {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+        }
+        .calendar-day.selected {
+            background-color: #1d4ed8;
+            color: white;
+        }
+        .calendar-day.has-data {
+            background-color: #f0fdf4;
+            border-color: #22c55e;
+        }
+        .calendar-day.has-data.selected {
+            background-color: #15803d;
+        }
+        .productivity-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #22c55e;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -185,6 +219,73 @@
             </div>
         </div>
 
+        <!-- Calendário -->
+        <div id="calendario-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center">
+                        <i data-lucide="calendar-days" class="h-6 w-6 text-gray-600 mr-2"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">Calendário de Produtividade</h2>
+                    </div>
+                    <div class="flex items-center gap-2 no-print">
+                        <button onclick="navegarMes(-1)" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                            <i data-lucide="chevron-left" class="h-5 w-5"></i>
+                        </button>
+                        <span id="calendario-mes-ano" class="text-lg font-medium px-4"></span>
+                        <button onclick="navegarMes(1)" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                            <i data-lucide="chevron-right" class="h-5 w-5"></i>
+                        </button>
+                        <button onclick="irParaHoje()" class="ml-4 bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-sm">
+                            Hoje
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- Calendário -->
+                    <div class="space-y-4">
+                        <!-- Cabeçalho dos dias da semana -->
+                        <div class="grid grid-cols-7 gap-1 text-center text-sm font-medium text-gray-600">
+                            <div class="py-2">Dom</div>
+                            <div class="py-2">Seg</div>
+                            <div class="py-2">Ter</div>
+                            <div class="py-2">Qua</div>
+                            <div class="py-2">Qui</div>
+                            <div class="py-2">Sex</div>
+                            <div class="py-2">Sáb</div>
+                        </div>
+                        
+                        <!-- Dias do calendário -->
+                        <div id="calendario-dias" class="grid grid-cols-7 gap-1"></div>
+                        
+                        <!-- Legenda -->
+                        <div class="mt-4 text-xs text-gray-600 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 bg-blue-200 border border-blue-400 rounded"></div>
+                                <span>Hoje</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 bg-green-50 border border-green-500 rounded"></div>
+                                <span>Dias com produtividade</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 bg-blue-800 rounded"></div>
+                                <span>Dia selecionado</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detalhes do dia selecionado -->
+                    <div id="calendario-detalhes" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">
+                            <i data-lucide="calendar-check" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                            <p>Clique em um dia para ver os detalhes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Relatórios -->
         <div id="relatorios-view" class="hidden">
             <div class="bg-white rounded-lg shadow-md p-6">
@@ -310,6 +411,11 @@
         let currentView = 'dashboard';
         let minutas = {};
         let minutaEditando = null;
+        let calendarioData = {
+            mesAtual: new Date().getMonth(),
+            anoAtual: new Date().getFullYear(),
+            diaSelecionado: null
+        };
         let assessores = {
             gilbert: { nome: 'Gilbert Juliano', ativo: true },
             laise: { nome: 'Laíse Vital', ativo: true }
@@ -488,6 +594,10 @@
             // Relatórios apenas para juiz
             if (currentUser.isJuiz) {
                 buttons += `
+                    <button onclick="showView('calendario')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <i data-lucide="calendar-days" class="h-4 w-4 mr-2"></i>
+                        Calendário
+                    </button>
                     <button onclick="showView('relatorios')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
                         <i data-lucide="bar-chart" class="h-4 w-4 mr-2"></i>
                         Relatórios
@@ -534,6 +644,9 @@
                     case 'historico':
                         setupHistoricoFilters();
                         renderHistorico();
+                        break;
+                    case 'calendario':
+                        renderCalendario();
                         break;
                     case 'relatorios':
                         document.getElementById('relatorios-view')?.classList.remove('hidden');
