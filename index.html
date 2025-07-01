@@ -235,7 +235,7 @@
                                 <option value="meta1">Meta 1 CNJ (2/dia)</option>
                                 <option value="meta2">Meta 2 CNJ (1 sentença/semana)</option>
                                 <option value="meta10" id="meta10-option" class="hidden">Meta 10 CNJ (1/semana)</option>
-                                <option value="seeu" id="seeu-option" class="hidden">SEEU - Execução Penal (1 a cada 10 dias)</option>
+                                <option value="seeu" id="seeu-option" class="hidden">SEEU - Execução Penal (controle 10 dias - não conta para meta diária)</option>
                                 <option value="sem_movimento">Sem movimentação 100+ dias (5/dia)</option>
                                 <option value="outros">Pedidos/Atos/Urgentes (3/dia)</option>
                                 <option value="alem_meta">Além da Meta (produtividade adicional - não conta para meta diária)</option>
@@ -254,7 +254,7 @@
                     </button>
                     
                     <div class="text-xs text-gray-500 text-center mt-2 bg-gray-50 p-2 rounded">
-                        ℹ️ Minutas registradas contam automaticamente para a produtividade. O juiz pode excluí-las da contagem posteriormente se necessário.
+                        ℹ️ Minutas registradas contam automaticamente para a produtividade, exceto "SEEU" e "Além da Meta" que são controles específicos. O juiz pode excluir minutas da contagem se necessário.
                     </div>
                 </div>
             </div>
@@ -463,7 +463,7 @@
                         <option value="meta1">Meta 1 CNJ</option>
                         <option value="meta2">Meta 2 CNJ</option>
                         <option value="meta10" id="edit-meta10-option" class="hidden">Meta 10 CNJ</option>
-                        <option value="seeu" id="edit-seeu-option" class="hidden">SEEU - Execução Penal</option>
+                        <option value="seeu" id="edit-seeu-option" class="hidden">SEEU - Execução Penal (controle)</option>
                         <option value="sem_movimento">Sem movimentação 100+ dias</option>
                         <option value="outros">Pedidos/Atos/Urgentes</option>
                         <option value="alem_meta">Além da Meta (produtividade adicional)</option>
@@ -517,7 +517,7 @@
             'meta1': { nome: 'Meta 1 CNJ', cor: 'bg-red-500', meta: 2 },
             'meta2': { nome: 'Meta 2 CNJ', cor: 'bg-pink-500', meta: 1, semanal: true, requerSentenca: true },
             'meta10': { nome: 'Meta 10 CNJ', cor: 'bg-purple-500', meta: 1, semanal: true, totalAnual: 9 },
-            'seeu': { nome: 'SEEU - Execução Penal', cor: 'bg-teal-500', meta: 1, prazo: 10 },
+            'seeu': { nome: 'SEEU - Execução Penal', cor: 'bg-teal-500', meta: 1, prazo: 10, naoContaMeta: true },
             'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
             'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 },
             'alem_meta': { nome: 'Além da Meta (produtividade adicional)', cor: 'bg-gray-500', meta: 0, semMeta: true }
@@ -899,16 +899,17 @@
 
         function getProgressoTotal(assessorId) {
             const minutasHoje = getMinutasHoje(assessorId);
-            // Excluir minutas "Além da Meta" do cálculo da meta diária
-            const minutasParaMeta = minutasHoje.filter(m => m.categoria !== 'alem_meta');
+            // Excluir minutas "Além da Meta" e "SEEU" do cálculo da meta diária
+            const minutasParaMeta = minutasHoje.filter(m => m.categoria !== 'alem_meta' && m.categoria !== 'seeu');
             const total = minutasParaMeta.length;
             const meta = 10;
             return { 
                 atual: total, 
                 meta, 
                 percentual: Math.min((total / meta) * 100, 100),
-                totalGeral: minutasHoje.length, // Total incluindo "Além da Meta"
-                alemDaMeta: minutasHoje.filter(m => m.categoria === 'alem_meta').length
+                totalGeral: minutasHoje.length, // Total incluindo "Além da Meta" e "SEEU"
+                alemDaMeta: minutasHoje.filter(m => m.categoria === 'alem_meta').length,
+                seeu: minutasHoje.filter(m => m.categoria === 'seeu').length
             };
         }
 
@@ -1234,7 +1235,7 @@
                         } else if (categoria === 'meta10') {
                             showNotification('✨ Processo da Meta 10 CNJ registrado! Meta semanal cumprida!', 'success');
                         } else if (categoria === 'seeu') {
-                            showNotification('🛡️ Acesso ao SEEU registrado! Meta de 10 dias cumprida!', 'success');
+                            showNotification('🛡️ Acesso ao SEEU registrado! Controle de 10 dias atualizado (não conta para meta diária).', 'success');
                         } else if (categoria === 'alem_meta') {
                             showNotification('➕ Minuta "Além da Meta" registrada! Produtividade adicional contabilizada (não conta para meta diária).', 'success');
                         } else {
@@ -1264,7 +1265,7 @@
             } else if (minuta.categoria === 'meta10') {
                 showNotification('✨ Processo da Meta 10 registrado localmente!', 'warning');
             } else if (minuta.categoria === 'seeu') {
-                showNotification('🛡️ Acesso ao SEEU registrado localmente!', 'warning');
+                showNotification('🛡️ Acesso ao SEEU registrado localmente! (controle de 10 dias)', 'warning');
             } else if (minuta.categoria === 'alem_meta') {
                 showNotification('➕ Minuta "Além da Meta" registrada localmente! (não conta para meta diária)', 'warning');
             } else {
@@ -1362,8 +1363,9 @@
                     `;
                 } else {
                     const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
-                    const minutasParaMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria !== 'alem_meta' && m.status !== 'excluida').length;
-                    const minutasAlemMeta = totalMinutasHoje - minutasParaMeta;
+                    const minutasParaMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria !== 'alem_meta' && m.categoria !== 'seeu' && m.status !== 'excluida').length;
+                    const minutasAlemMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria === 'alem_meta' && m.status !== 'excluida').length;
+                    const minutasSEEU = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria === 'seeu' && m.status !== 'excluida').length;
                     const metaTotal = 20; // Meta total do gabinete (10 por assessor)
 
                     content += `
@@ -1382,28 +1384,39 @@
                                 </div>
                                 <div class="text-right">
                                     <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
-                                    <div class="text-blue-100 text-sm">minutas para metas oficiais</div>
-                                    ${minutasAlemMeta > 0 ? `
-                                        <div class="text-lg font-medium mt-2 text-blue-200">+${minutasAlemMeta} além da meta</div>
-                                        <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
+                                    <div class="text-blue-100 text-sm">minutas para metas CNJ</div>
+                                    ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
+                                        <div class="text-sm text-blue-200 mt-2 space-y-1">
+                                            ${minutasAlemMeta > 0 ? `<div>+${minutasAlemMeta} além da meta</div>` : ''}
+                                            ${minutasSEEU > 0 ? `<div>+${minutasSEEU} SEEU (controle 10 dias)</div>` : ''}
+                                        </div>
+                                        <div class="text-blue-200 text-sm">Total geral: ${totalMinutasHoje} minutas</div>
                                         <div class="text-xs text-blue-300 mt-1">
-                                            ➕ Minutas "Além da Meta" são produtividade adicional
+                                            💡 SEEU e "Além da Meta" não contam para meta diária
                                         </div>
                                     ` : ''}
                                 </div>
                             </div>
                             
-                            ${minutasAlemMeta > 0 ? `
+                            ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
                                 <div class="mt-4 pt-4 border-t border-blue-500">
-                                    <div class="grid grid-cols-2 gap-4 text-center">
+                                    <div class="grid grid-cols-${minutasAlemMeta > 0 && minutasSEEU > 0 ? '3' : '2'} gap-4 text-center">
                                         <div>
                                             <div class="text-xl font-bold">${minutasParaMeta}</div>
-                                            <div class="text-blue-100 text-sm">Minutas para Metas CNJ</div>
+                                            <div class="text-blue-100 text-sm">Metas CNJ</div>
                                         </div>
-                                        <div>
-                                            <div class="text-xl font-bold text-blue-200">${minutasAlemMeta}</div>
-                                            <div class="text-blue-200 text-sm">Produtividade Adicional</div>
-                                        </div>
+                                        ${minutasAlemMeta > 0 ? `
+                                            <div>
+                                                <div class="text-xl font-bold text-blue-200">${minutasAlemMeta}</div>
+                                                <div class="text-blue-200 text-sm">Além da Meta</div>
+                                            </div>
+                                        ` : ''}
+                                        ${minutasSEEU > 0 ? `
+                                            <div>
+                                                <div class="text-xl font-bold text-teal-200">${minutasSEEU}</div>
+                                                <div class="text-teal-200 text-sm">SEEU (controle)</div>
+                                            </div>
+                                        ` : ''}
                                     </div>
                                 </div>
                             ` : ''}
@@ -1733,29 +1746,29 @@
                 if (key === 'meta10' || key === 'meta2') {
                     metaText = progresso.semanal ? `${progresso.atual}/${progresso.meta} (semanal)` : `${progresso.atual}/${progresso.meta}`;
                 } else if (key === 'seeu') {
-                    metaText = `${progresso.atual}/${progresso.meta} (a cada 10 dias)`;
+                    metaText = `${progresso.atual}/${progresso.meta} (controle 10 dias)`;
                 } else if (key === 'alem_meta') {
                     metaText = `${progresso.atual} (sem limite de meta)`;
                 } else {
                     metaText = `${progresso.atual}/${progresso.meta}`;
                 }
                 
-                // Destacar categoria "Além da Meta"
-                const isAlemMeta = key === 'alem_meta';
+                // Destacar categorias que não contam para meta diária
+                const naoContaMeta = key === 'alem_meta' || key === 'seeu';
                 
                 categoriasHtml += `
-                    <div class="mb-3 ${isAlemMeta ? 'border-l-4 border-gray-400 pl-3 bg-gray-50 rounded-r-lg py-2' : ''}">
+                    <div class="mb-3 ${naoContaMeta ? 'border-l-4 border-gray-400 pl-3 bg-gray-50 rounded-r-lg py-2' : ''}">
                         <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span class="${isAlemMeta ? 'font-medium text-gray-700' : ''}">${cat.nome}</span>
-                            <span class="font-medium ${isAlemMeta ? 'text-gray-800' : ''}">${metaText}</span>
+                            <span class="${naoContaMeta ? 'font-medium text-gray-700' : ''}">${cat.nome}</span>
+                            <span class="font-medium ${naoContaMeta ? 'text-gray-800' : ''}">${metaText}</span>
                         </div>
-                        ${progresso.semMeta ? `
+                        ${progresso.semMeta || key === 'seeu' ? `
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.atual > 0 ? '100%' : '0%'}"></div>
                             </div>
-                            ${isAlemMeta && progresso.atual > 0 ? `
+                            ${naoContaMeta && progresso.atual > 0 ? `
                                 <div class="text-xs text-gray-500 mt-1 text-center">
-                                    ➕ Produtividade adicional (não conta para meta diária)
+                                    ${key === 'alem_meta' ? '➕ Produtividade adicional (não conta para meta diária)' : '🛡️ Controle SEEU (não conta para meta diária)'}
                                 </div>
                             ` : ''}
                         ` : `
@@ -1839,11 +1852,20 @@
                             <div class="px-3 py-1 rounded-full text-sm font-medium ${
                                 progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                             }">
-                                ${progressoTotal.atual}/10 minutas oficiais
+                                ${progressoTotal.atual}/10 minutas CNJ
                             </div>
-                            ${progressoTotal.alemDaMeta > 0 ? `
-                                <div class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 mt-1">
-                                    +${progressoTotal.alemDaMeta} produtividade adicional
+                            ${(progressoTotal.alemDaMeta > 0 || progressoTotal.seeu > 0) ? `
+                                <div class="text-xs text-gray-600 mt-1 space-y-1">
+                                    ${progressoTotal.alemDaMeta > 0 ? `
+                                        <div class="px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                                            +${progressoTotal.alemDaMeta} além da meta
+                                        </div>
+                                    ` : ''}
+                                    ${progressoTotal.seeu > 0 ? `
+                                        <div class="px-2 py-1 rounded-full bg-teal-100 text-teal-600">
+                                            +${progressoTotal.seeu} SEEU (controle)
+                                        </div>
+                                    ` : ''}
                                 </div>
                             ` : ''}
                         </div>
@@ -1851,15 +1873,21 @@
                     
                     <div class="mb-4">
                         <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Progresso Diário (Apenas Metas CNJ)</span>
+                            <span>Progresso Diário (Metas CNJ)</span>
                             <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-3">
                             <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
                         </div>
-                        ${progressoTotal.alemDaMeta > 0 ? `
-                            <div class="text-xs text-gray-500 mt-1 text-center">
-                                Total geral produzido: ${progressoTotal.totalGeral} minutas (${progressoTotal.atual} oficiais + ${progressoTotal.alemDaMeta} adicionais)
+                        ${(progressoTotal.alemDaMeta > 0 || progressoTotal.seeu > 0) ? `
+                            <div class="text-xs text-gray-500 mt-1 text-center space-y-1">
+                                <div>Total geral: ${progressoTotal.totalGeral} minutas</div>
+                                <div class="flex justify-center gap-4 text-xs">
+                                    <span class="text-blue-600">${progressoTotal.atual} metas CNJ</span>
+                                    ${progressoTotal.alemDaMeta > 0 ? `<span class="text-gray-600">${progressoTotal.alemDaMeta} além da meta</span>` : ''}
+                                    ${progressoTotal.seeu > 0 ? `<span class="text-teal-600">${progressoTotal.seeu} SEEU</span>` : ''}
+                                </div>
+                                <div class="text-gray-400">💡 SEEU e "Além da Meta" não contam para meta diária</div>
                             </div>
                         ` : ''}
                     </div>
@@ -2592,7 +2620,7 @@
                         <option value="meta1">Meta 1 CNJ</option>
                         <option value="meta2">Meta 2 CNJ</option>
                         <option value="meta10">Meta 10 CNJ</option>
-                        <option value="seeu">SEEU - Execução Penal</option>
+                        <option value="seeu">SEEU - Execução Penal (controle)</option>
                         <option value="sem_movimento">Sem movimentação 100+ dias</option>
                         <option value="outros">Pedidos/Atos/Urgentes</option>
                         <option value="alem_meta">Além da Meta (adicional)</option>
