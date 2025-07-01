@@ -18,6 +18,8 @@
             animation: spin 2s linear infinite;
             margin: 0 auto;
         }
+
+        // ==================== HISTÓRICO ====================
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -379,6 +381,57 @@
         </div>
     </div>
 
+    <!-- Modal de Correção -->
+    <div id="modal-correcao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalCorrecao()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="edit" class="h-5 w-5 text-blue-600 mr-2"></i>
+                    Solicitar Correção
+                </h3>
+                <button onclick="fecharModalCorrecao()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div class="text-sm text-blue-800">
+                        <div class="font-medium" id="modal-correcao-processo">Processo: </div>
+                        <div class="text-xs mt-1" id="modal-correcao-assessor">Assessor: </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Especifique a correção necessária: *
+                    </label>
+                    <textarea 
+                        id="correcao-detalhes" 
+                        rows="4" 
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Descreva detalhadamente o que precisa ser corrigido nesta minuta..."
+                    ></textarea>
+                </div>
+                
+                <div class="flex gap-2 pt-4">
+                    <button onclick="confirmarCorrecao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                        <i data-lucide="check" class="h-4 w-4 mr-1 inline"></i>
+                        Solicitar Correção
+                    </button>
+                    <button onclick="fecharModalCorrecao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+                
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Confirmar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Edição -->
     <div id="modal-edicao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalEdicao()">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
@@ -484,6 +537,7 @@
         let currentView = 'dashboard';
         let minutas = {};
         let minutaEditando = null;
+        let minutaCorrecao = null; // Para o modal de correção
         let calendarioData = {
             mesAtual: new Date().getMonth(),
             anoAtual: new Date().getFullYear(),
@@ -1610,7 +1664,7 @@
                         <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
                         <div class="space-y-2 max-h-32 overflow-y-auto">
                             ${ultimasMinutas.map(minuta => `
-                                <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'meta10' ? 'border-l-2 border-purple-400 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-l-2 border-teal-400 bg-teal-50' : minuta.categoria === 'alem_meta' ? 'border-l-2 border-gray-400 bg-gray-100' : ''}">
+                                <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'meta10' ? 'border-l-2 border-purple-400 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-l-2 border-teal-400 bg-teal-50' : minuta.categoria === 'alem_meta' ? 'border-l-2 border-gray-400 bg-gray-100' : ''} ${minuta.status === 'correcao' ? 'border-l-4 border-blue-500 bg-blue-50 animate-pulse' : ''}">
                                     <div class="font-medium flex items-center gap-1">
                                         ${minuta.numeroProcesso || 'Sem número'}
                                         ${minuta.categoria === 'meta10' ? '<span class="text-purple-600">🎯</span>' : ''}
@@ -1618,14 +1672,43 @@
                                         ${minuta.categoria === 'seeu' ? '<span class="text-teal-600">🛡️</span>' : ''}
                                         ${minuta.categoria === 'alem_meta' ? '<span class="text-gray-600">➕</span>' : ''}
                                         ${minuta.editadaEm ? '<span class="text-orange-600" title="Editada">✏️</span>' : ''}
+                                        ${minuta.status === 'correcao' ? '<span class="text-blue-600" title="Correção Solicitada">📝</span>' : ''}
                                     </div>
                                     <div class="flex justify-between items-center">
                                         <span class="text-xs">${minuta.tipoMinuta} - ${categorias[minuta.categoria]?.nome}</span>
                                         <span class="status-badge ${statusOptions[minuta.status]?.cor || 'status-pendente'}">${statusOptions[minuta.status]?.nome || 'Pendente'}</span>
                                     </div>
+                                    ${minuta.status === 'correcao' && minuta.correcaoSolicitada ? `
+                                        <div class="mt-2 p-2 bg-blue-100 rounded text-xs">
+                                            <div class="font-medium text-blue-800">📝 Correção solicitada:</div>
+                                            <div class="text-blue-700 mt-1">"${minuta.correcaoSolicitada.length > 60 ? minuta.correcaoSolicitada.substring(0, 60) + '...' : minuta.correcaoSolicitada}"</div>
+                                        </div>
+                                    ` : ''}
                                     <div class="text-gray-500 text-xs">${minuta.timestamp}</div>
                                 </div>
                             `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Verificar se há correções pendentes
+            const correcoesPendentes = minutasHoje.filter(m => m.status === 'correcao').length;
+            let alertaCorrecoes = '';
+            
+            if (correcoesPendentes > 0) {
+                alertaCorrecoes = `
+                    <div class="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div class="flex items-center">
+                            <i data-lucide="alert-circle" class="h-5 w-5 text-blue-600 mr-2"></i>
+                            <div>
+                                <div class="font-medium text-blue-800">
+                                    ${correcoesPendentes} correç${correcoesPendentes === 1 ? 'ão pendente' : 'ões pendentes'}
+                                </div>
+                                <div class="text-xs text-blue-600">
+                                    Verifique o histórico para detalhes das correções solicitadas
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1668,6 +1751,7 @@
                         ${categoriasHtml}
                     </div>
                     
+                    ${alertaCorrecoes}
                     ${ultimasMinutasHtml}
                 </div>
             `;
@@ -2171,6 +2255,12 @@
         function atualizarStatus(minutaId, novoStatus) {
             if (!currentUser.isJuiz) return;
 
+            // Se for correção, abrir modal para especificar detalhes
+            if (novoStatus === 'correcao') {
+                solicitarCorrecao(minutaId);
+                return;
+            }
+
             const minuta = minutas[minutaId];
             const statusAnterior = minuta?.status || 'pendente';
 
@@ -2179,6 +2269,15 @@
                     database.ref(`minutas/${minutaId}/status`).set(novoStatus)
                         .then(() => {
                             minutas[minutaId].status = novoStatus;
+                            
+                            // Limpar correção se não for mais necessária
+                            if (novoStatus !== 'correcao' && minutas[minutaId].correcaoSolicitada) {
+                                database.ref(`minutas/${minutaId}/correcaoSolicitada`).remove();
+                                database.ref(`minutas/${minutaId}/correcaoSolicitadaEm`).remove();
+                                delete minutas[minutaId].correcaoSolicitada;
+                                delete minutas[minutaId].correcaoSolicitadaEm;
+                            }
+                            
                             renderHistorico();
                             renderDashboard(); // Atualizar dashboard para recalcular produtividade
                             
@@ -2210,7 +2309,149 @@
             }
         }
 
-        // ==================== HISTÓRICO ====================
+        function solicitarCorrecao(minutaId) {
+            const minuta = minutas[minutaId];
+            if (!minuta) return;
+
+            minutaCorrecao = { id: minutaId, ...minuta };
+            
+            // Preencher informações da minuta no modal
+            document.getElementById('modal-correcao-processo').textContent = `Processo: ${minuta.numeroProcesso || 'Não informado'}`;
+            document.getElementById('modal-correcao-assessor').textContent = `Assessor: ${minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor'}`;
+            
+            // Limpar campo de correção
+            document.getElementById('correcao-detalhes').value = '';
+            
+            document.getElementById('modal-correcao').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('correcao-detalhes').focus();
+                lucide.createIcons();
+            }, 100);
+        }
+
+        function fecharModalCorrecao() {
+            document.getElementById('modal-correcao').classList.add('hidden');
+            minutaCorrecao = null;
+        }
+
+        function confirmarCorrecao() {
+            if (!minutaCorrecao) return;
+
+            const correcaoDetalhes = document.getElementById('correcao-detalhes').value.trim();
+            
+            if (!correcaoDetalhes) {
+                showNotification('Por favor, especifique a correção necessária.', 'warning');
+                return;
+            }
+
+            const agora = new Date();
+            const correcaoData = {
+                status: 'correcao',
+                correcaoSolicitada: correcaoDetalhes,
+                correcaoSolicitadaEm: agora.toLocaleString('pt-BR'),
+                correcaoSolicitadaPor: currentUser.nome
+            };
+
+            try {
+                if (database) {
+                    // Atualizar no Firebase
+                    const updates = {};
+                    updates[`minutas/${minutaCorrecao.id}/status`] = 'correcao';
+                    updates[`minutas/${minutaCorrecao.id}/correcaoSolicitada`] = correcaoDetalhes;
+                    updates[`minutas/${minutaCorrecao.id}/correcaoSolicitadaEm`] = agora.toLocaleString('pt-BR');
+                    updates[`minutas/${minutaCorrecao.id}/correcaoSolicitadaPor`] = currentUser.nome;
+                    
+                    database.ref().update(updates)
+                        .then(() => {
+                            Object.assign(minutas[minutaCorrecao.id], correcaoData);
+                            fecharModalCorrecao();
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('📝 Correção solicitada! O assessor foi notificado sobre as alterações necessárias.', 'success');
+                            log('Correção solicitada', minutaCorrecao.numeroProcesso);
+                        })
+                        .catch(() => {
+                            Object.assign(minutas[minutaCorrecao.id], correcaoData);
+                            fecharModalCorrecao();
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('Correção solicitada localmente!', 'warning');
+                        });
+                } else {
+                    Object.assign(minutas[minutaCorrecao.id], correcaoData);
+                    fecharModalCorrecao();
+                    renderHistorico();
+                    renderDashboard();
+                    showNotification('Correção solicitada localmente!', 'warning');
+                }
+            } catch (error) {
+                Object.assign(minutas[minutaCorrecao.id], correcaoData);
+                fecharModalCorrecao();
+                renderHistorico();
+                renderDashboard();
+                showNotification('Correção solicitada localmente!', 'warning');
+            }
+        }
+
+        function marcarComoCorrigida(minutaId) {
+            const minuta = minutas[minutaId];
+            if (!minuta || currentUser.isJuiz) return;
+
+            // Verificar propriedade
+            const isOwner = minuta.assessorId === currentUser.assessorId || 
+                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome?.includes('Gilbert'))) ||
+                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome?.includes('Laíse')));
+
+            if (!isOwner) {
+                showNotification('Você só pode marcar suas próprias minutas como corrigidas.', 'error');
+                return;
+            }
+
+            if (!confirm('Confirma que as correções solicitadas foram realizadas? A minuta retornará para análise do juiz.')) {
+                return;
+            }
+
+            const agora = new Date();
+            const updates = {
+                status: 'pendente',
+                corrigidaEm: agora.toLocaleString('pt-BR'),
+                corrigidaPor: currentUser.nome
+            };
+
+            try {
+                if (database) {
+                    const firebaseUpdates = {};
+                    firebaseUpdates[`minutas/${minutaId}/status`] = 'pendente';
+                    firebaseUpdates[`minutas/${minutaId}/corrigidaEm`] = agora.toLocaleString('pt-BR');
+                    firebaseUpdates[`minutas/${minutaId}/corrigidaPor`] = currentUser.nome;
+                    
+                    database.ref().update(firebaseUpdates)
+                        .then(() => {
+                            Object.assign(minutas[minutaId], updates);
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('✅ Minuta marcada como corrigida! Aguardando nova análise do juiz.', 'success');
+                            log('Minuta corrigida', minuta.numeroProcesso);
+                        })
+                        .catch(() => {
+                            Object.assign(minutas[minutaId], updates);
+                            renderHistorico();
+                            renderDashboard();
+                            showNotification('Minuta marcada como corrigida localmente!', 'warning');
+                        });
+                } else {
+                    Object.assign(minutas[minutaId], updates);
+                    renderHistorico();
+                    renderDashboard();
+                    showNotification('Minuta marcada como corrigida localmente!', 'warning');
+                }
+            } catch (error) {
+                Object.assign(minutas[minutaId], updates);
+                renderHistorico();
+                renderDashboard();
+                showNotification('Minuta marcada como corrigida localmente!', 'warning');
+            }
+        }
         
         function setupHistoricoFilters() {
             const filtersDiv = document.getElementById('historico-filters');
@@ -2300,7 +2541,7 @@
                                 const status = statusOptions[minuta.status || 'pendente'];
                                 
                                 return `
-                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${minuta.categoria === 'meta10' ? 'border-purple-300 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-pink-300 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-teal-300 bg-teal-50' : minuta.categoria === 'alem_meta' ? 'border-gray-300 bg-gray-100' : ''} ${minuta.status === 'excluida' ? 'opacity-60 border-red-300 bg-red-50' : ''}">
+                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${minuta.categoria === 'meta10' ? 'border-purple-300 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-pink-300 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-teal-300 bg-teal-50' : minuta.categoria === 'alem_meta' ? 'border-gray-300 bg-gray-100' : ''} ${minuta.status === 'excluida' ? 'opacity-60 border-red-300 bg-red-50' : minuta.status === 'correcao' ? 'border-blue-400 bg-blue-50' : ''}">
                                         <div class="flex items-start justify-between">
                                             <div class="flex-1">
                                                 <div class="flex items-center gap-2 mb-2">
@@ -2310,6 +2551,7 @@
                                                     </span>
                                                     <span class="status-badge ${status.cor}">${status.nome}</span>
                                                     ${minuta.status === 'excluida' ? '<span class="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full font-medium">⚠️ NÃO CONTA PARA PRODUTIVIDADE</span>' : ''}
+                                                    ${minuta.status === 'correcao' ? '<span class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full font-medium animate-pulse">📝 CORREÇÃO SOLICITADA</span>' : ''}
                                                     ${minuta.categoria === 'meta10' ? '<span class="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">Meta 10 🎯</span>' : ''}
                                                     ${minuta.categoria === 'meta2' ? '<span class="text-xs text-pink-600 bg-pink-100 px-2 py-1 rounded-full">Meta 2 ⚖️</span>' : ''}
                                                     ${minuta.categoria === 'seeu' ? '<span class="text-xs text-teal-600 bg-teal-100 px-2 py-1 rounded-full">SEEU 🛡️</span>' : ''}
@@ -2322,6 +2564,22 @@
                                                     ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
                                                     ${minuta.editadaEm ? `<div class="text-xs text-orange-600"><strong>Editada em:</strong> ${minuta.editadaEm}</div>` : ''}
                                                 </div>
+                                                
+                                                ${minuta.status === 'correcao' && minuta.correcaoSolicitada ? `
+                                                    <div class="bg-blue-100 border border-blue-300 rounded-lg p-3 mb-3">
+                                                        <div class="flex items-center mb-2">
+                                                            <i data-lucide="alert-circle" class="h-4 w-4 text-blue-600 mr-2"></i>
+                                                            <span class="font-medium text-blue-800">Correção Solicitada</span>
+                                                        </div>
+                                                        <div class="text-sm text-blue-700 bg-white rounded p-2 border border-blue-200">
+                                                            "${minuta.correcaoSolicitada}"
+                                                        </div>
+                                                        <div class="text-xs text-blue-600 mt-2">
+                                                            Solicitado por ${minuta.correcaoSolicitadaPor || 'Juiz'} em ${minuta.correcaoSolicitadaEm}
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
+                                                
                                                 ${currentUser.isJuiz ? `
                                                     <div class="flex gap-2 mt-2">
                                                         <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors">
@@ -2342,6 +2600,11 @@
                                                         <button onclick="excluirMinuta('${minuta.id}')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200 transition-colors">
                                                             <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>Excluir
                                                         </button>
+                                                        ${minuta.status === 'correcao' ? `
+                                                            <button onclick="marcarComoCorrigida('${minuta.id}')" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors">
+                                                                <i data-lucide="check-circle" class="h-3 w-3 mr-1 inline"></i>Marcar como Corrigida
+                                                            </button>
+                                                        ` : ''}
                                                     </div>
                                                 `}
                                             </div>
@@ -2727,14 +2990,24 @@
                 
                 // Atalhos de teclado
                 document.addEventListener('keydown', function(e) {
-                    // ESC para fechar modal
-                    if (e.key === 'Escape' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
-                        fecharModalEdicao();
+                    // ESC para fechar modais
+                    if (e.key === 'Escape') {
+                        if (!document.getElementById('modal-edicao').classList.contains('hidden')) {
+                            fecharModalEdicao();
+                        }
+                        if (!document.getElementById('modal-correcao').classList.contains('hidden')) {
+                            fecharModalCorrecao();
+                        }
                     }
                     
-                    // Ctrl+Enter para salvar edição
-                    if (e.ctrlKey && e.key === 'Enter' && !document.getElementById('modal-edicao').classList.contains('hidden')) {
-                        salvarEdicao();
+                    // Ctrl+Enter para salvar
+                    if (e.ctrlKey && e.key === 'Enter') {
+                        if (!document.getElementById('modal-edicao').classList.contains('hidden')) {
+                            salvarEdicao();
+                        }
+                        if (!document.getElementById('modal-correcao').classList.contains('hidden')) {
+                            confirmarCorrecao();
+                        }
                     }
                 });
                 
