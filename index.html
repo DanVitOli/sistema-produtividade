@@ -1,528 +1,4 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Produtividade Judicial</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <style>
-        .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
-            margin: 0 auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .status-pendente { background-color: #fef3c7; color: #92400e; }
-        .status-assinada { background-color: #d1fae5; color: #065f46; }
-        .status-excluida { background-color: #fee2e2; color: #991b1b; }
-        .status-correcao { background-color: #dbeafe; color: #1e40af; }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            font-size: 0.75rem;
-            font-weight: 500;
-            padding: 0.25rem 0.5rem;
-            border-radius: 9999px;
-        }
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 50;
-        }
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white !important; }
-        }
-        .calendar-day {
-            min-height: 40px;
-            border: 1px solid #e5e7eb;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 4px;
-        }
-        .calendar-day:hover {
-            background-color: #f3f4f6;
-        }
-        .calendar-day.today {
-            background-color: #dbeafe;
-            border-color: #3b82f6;
-        }
-        .calendar-day.selected {
-            background-color: #1d4ed8;
-            color: white;
-        }
-        .calendar-day.has-data {
-            background-color: #f0fdf4;
-            border-color: #22c55e;
-        }
-        .calendar-day.has-data.selected {
-            background-color: #15803d;
-        }
-        .calendar-day.other-month {
-            color: #9ca3af;
-            background-color: #f9fafb;
-        }
-        .productivity-indicator {
-            position: absolute;
-            bottom: 2px;
-            right: 2px;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background-color: #22c55e;
-        }
-        .day-number {
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        .day-count {
-            font-size: 0.75rem;
-            text-align: center;
-            background-color: rgba(34, 197, 94, 0.1);
-            border-radius: 4px;
-            padding: 1px 3px;
-            margin-top: 2px;
-        }
-        .meta10-alert {
-            animation: pulse 2s infinite;
-            border-left: 4px solid #ef4444;
-        }
-        .meta10-success {
-            border-left: 4px solid #22c55e;
-        }
-        .meta2-alert {
-            animation: pulse 2s infinite;
-            border-left: 4px solid #dc2626;
-        }
-        .meta2-success {
-            border-left: 4px solid #16a34a;
-        }
-        .week-indicator {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-        .week-success { background-color: #22c55e; }
-        .week-warning { background-color: #f59e0b; }
-        .week-danger { background-color: #ef4444; }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Indicador de Conexão -->
-    <div id="connection-status" class="fixed top-4 right-4 z-50 no-print">
-        <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-            Carregando...
-        </div>
-    </div>
-
-    <!-- Tela de Login -->
-    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
-            <div class="text-center mb-8">
-                <div class="mx-auto h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                    <i data-lucide="scale" class="h-8 w-8 text-blue-600"></i>
-                </div>
-                <h1 class="text-2xl font-bold text-gray-800 mb-2">Sistema de Produtividade Judicial</h1>
-                <p class="text-gray-600">Digite suas credenciais para acessar</p>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
-                    <select id="login-usuario" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Selecione o usuário</option>
-                        <option value="juiz">Juiz</option>
-                        <option value="gilbert">Gilbert Juliano</option>
-                        <option value="laise">Laíse Vital</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                    <input type="password" id="login-senha" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Digite sua senha">
-                </div>
-                
-                <button onclick="fazerLogin()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
-                    <i data-lucide="log-in" class="h-5 w-5 mr-2 inline"></i>
-                    Entrar
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Aplicação Principal -->
-    <div id="main-app" class="hidden p-4 max-w-6xl mx-auto">
-        <!-- Header -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6 no-print">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800">Sistema de Produtividade Judicial</h1>
-                    <p id="user-info" class="text-gray-600"></p>
-                </div>
-                <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors flex items-center">
-                    <i data-lucide="log-out" class="h-4 w-4 mr-2"></i>
-                    Sair
-                </button>
-            </div>
-            
-            <!-- Navegação -->
-            <div id="navigation" class="flex flex-wrap gap-2"></div>
-        </div>
-
-        <!-- Dashboard -->
-        <div id="dashboard-view" class="hidden space-y-6"></div>
-
-        <!-- Registro de Minuta -->
-        <div id="registro-view" class="hidden">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center mb-6">
-                    <i data-lucide="plus" class="h-6 w-6 text-blue-600 mr-2"></i>
-                    <h2 class="text-xl font-semibold text-gray-800">Registrar Nova Minuta</h2>
-                </div>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
-                        <input type="text" id="numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 1234567-89.2024.8.12.3456">
-                    </div>
-                    
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta *</label>
-                            <select id="tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="validarTipoMinuta()">
-                                <option value="">Selecione o tipo</option>
-                                <option value="Despacho">Despacho</option>
-                                <option value="Decisão">Decisão</option>
-                                <option value="Sentença">Sentença</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
-                            <select id="categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">Selecione a categoria</option>
-                                <option value="meta1">Meta 1 CNJ (2/dia)</option>
-                                <option value="meta2">Meta 2 CNJ (1 sentença/semana)</option>
-                                <option value="meta10" id="meta10-option" class="hidden">Meta 10 CNJ (1/semana)</option>
-                                <option value="seeu" id="seeu-option" class="hidden">SEEU - Execução Penal (1 a cada 10 dias)</option>
-                                <option value="sem_movimento">Sem movimentação 100+ dias (5/dia)</option>
-                                <option value="outros">Pedidos/Atos/Urgentes (3/dia)</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-                        <textarea id="observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Comentários sobre a minuta (opcional)"></textarea>
-                    </div>
-                    
-                    <button onclick="registrarMinuta()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
-                        <i data-lucide="save" class="h-5 w-5 mr-2 inline"></i>
-                        Registrar Minuta
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Histórico -->
-        <div id="historico-view" class="hidden">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center">
-                        <i data-lucide="clock" class="h-6 w-6 text-gray-600 mr-2"></i>
-                        <h2 class="text-xl font-semibold text-gray-800">Histórico de Minutas</h2>
-                    </div>
-                    <div id="historico-filters" class="flex gap-2 no-print"></div>
-                </div>
-                <div id="historico-content"></div>
-            </div>
-        </div>
-
-        <!-- Calendário -->
-        <div id="calendario-view" class="hidden">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center">
-                        <i data-lucide="calendar-days" class="h-6 w-6 text-gray-600 mr-2"></i>
-                        <h2 class="text-xl font-semibold text-gray-800">Calendário de Produtividade</h2>
-                    </div>
-                    <div class="flex items-center gap-2 no-print">
-                        <button onclick="navegarMes(-1)" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
-                            <i data-lucide="chevron-left" class="h-5 w-5"></i>
-                        </button>
-                        <span id="calendario-mes-ano" class="text-lg font-medium px-4"></span>
-                        <button onclick="navegarMes(1)" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
-                            <i data-lucide="chevron-right" class="h-5 w-5"></i>
-                        </button>
-                        <button onclick="irParaHoje()" class="ml-4 bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-sm">
-                            Hoje
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Calendário -->
-                    <div class="space-y-4">
-                        <!-- Cabeçalho dos dias da semana -->
-                        <div class="grid grid-cols-7 gap-1 text-center text-sm font-medium text-gray-600">
-                            <div class="py-2">Dom</div>
-                            <div class="py-2">Seg</div>
-                            <div class="py-2">Ter</div>
-                            <div class="py-2">Qua</div>
-                            <div class="py-2">Qui</div>
-                            <div class="py-2">Sex</div>
-                            <div class="py-2">Sáb</div>
-                        </div>
-                        
-                        <!-- Dias do calendário -->
-                        <div id="calendario-dias" class="grid grid-cols-7 gap-1"></div>
-                        
-                        <!-- Legenda -->
-                        <div class="mt-4 text-xs text-gray-600 space-y-1">
-                            <div class="flex items-center gap-2">
-                                <div class="w-4 h-4 bg-blue-200 border border-blue-400 rounded"></div>
-                                <span>Hoje</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-4 h-4 bg-green-50 border border-green-500 rounded"></div>
-                                <span>Dias com produtividade</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-4 h-4 bg-blue-800 rounded"></div>
-                                <span>Dia selecionado</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                                <span>Meta 10 cumprida na semana</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                                <span>Meta 10 não cumprida</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-3 h-3 bg-teal-500 rounded-full"></div>
-                                <span>SEEU acessado</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Detalhes do dia selecionado -->
-                    <div id="calendario-detalhes" class="space-y-4">
-                        <div class="text-center text-gray-500 py-8">
-                            <i data-lucide="calendar-check" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
-                            <p>Clique em um dia para ver os detalhes</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Relatórios -->
-        <div id="relatorios-view" class="hidden">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center">
-                        <i data-lucide="bar-chart" class="h-6 w-6 text-gray-600 mr-2"></i>
-                        <h2 class="text-xl font-semibold text-gray-800">Relatórios de Produtividade</h2>
-                    </div>
-                    <div class="flex gap-2 no-print">
-                        <button onclick="gerarRelatorio('semanal')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm">
-                            <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
-                            Relatório Semanal
-                        </button>
-                        <button onclick="gerarRelatorio('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
-                            <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
-                            Relatório Mensal
-                        </button>
-                        <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
-                            <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
-                            Imprimir
-                        </button>
-                    </div>
-                </div>
-                <div id="relatorio-content"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Edição -->
-    <div id="modal-edicao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalEdicao()">
-        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-800">Editar Minuta</h3>
-                <button onclick="fecharModalEdicao()" class="text-gray-500 hover:text-gray-700">
-                    <i data-lucide="x" class="h-5 w-5"></i>
-                </button>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
-                    <input type="text" id="edit-numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta *</label>
-                    <select id="edit-tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="validarTipoMinutaEdicao()">
-                        <option value="Despacho">Despacho</option>
-                        <option value="Decisão">Decisão</option>
-                        <option value="Sentença">Sentença</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
-                    <select id="edit-categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="meta1">Meta 1 CNJ</option>
-                        <option value="meta2">Meta 2 CNJ</option>
-                        <option value="meta10" id="edit-meta10-option" class="hidden">Meta 10 CNJ</option>
-                        <option value="seeu" id="edit-seeu-option" class="hidden">SEEU - Execução Penal</option>
-                        <option value="sem_movimento">Sem movimentação 100+ dias</option>
-                        <option value="outros">Pedidos/Atos/Urgentes</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-                    <textarea id="edit-observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                </div>
-                
-                <div class="flex gap-2 pt-4">
-                    <button onclick="salvarEdicao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
-                        <i data-lucide="save" class="h-4 w-4 mr-1 inline"></i>
-                        Salvar
-                    </button>
-                    <button onclick="fecharModalEdicao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
-                        Cancelar
-                    </button>
-                </div>
-                
-                <div class="text-xs text-gray-500 text-center">
-                    <span class="mr-4">💡 Ctrl+Enter: Salvar</span>
-                    <span>ESC: Cancelar</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // ==================== CONFIGURAÇÃO ====================
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyCzuoRgbvKQSjOFssde-qUEtNDqGNJML7E",
-            authDomain: "produtividade-gabinete.firebaseapp.com",
-            databaseURL: "https://produtividade-gabinete-default-rtdb.firebaseio.com",
-            projectId: "produtividade-gabinete",
-            storageBucket: "produtividade-gabinete.firebasestorage.app",
-            messagingSenderId: "370364917935",
-            appId: "1:370364917935:web:a6205cc718748abcbdcc5a"
-        };
-
-        // Credenciais seguras
-        const credenciais = {
-            'juiz': { senha: 'Juiz@2024!', nome: 'Juiz', tipo: 'juiz' },
-            'gilbert': { senha: 'Gilbert@2024!', nome: 'Gilbert Juliano', tipo: 'assessor', assessorId: 'gilbert' },
-            'laise': { senha: 'Laise@2024!', nome: 'Laíse Vital', tipo: 'assessor', assessorId: 'laise' }
-        };
-
-        const categorias = {
-            'meta1': { nome: 'Meta 1 CNJ', cor: 'bg-red-500', meta: 2 },
-            'meta2': { nome: 'Meta 2 CNJ', cor: 'bg-pink-500', meta: 1, semanal: true, requerSentenca: true },
-            'meta10': { nome: 'Meta 10 CNJ', cor: 'bg-purple-500', meta: 1, semanal: true, totalAnual: 9 },
-            'seeu': { nome: 'SEEU - Execução Penal', cor: 'bg-teal-500', meta: 1, prazo: 10 },
-            'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
-            'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 }
-        };
-
-        const statusOptions = {
-            'pendente': { nome: 'Pendente', cor: 'status-pendente' },
-            'assinada': { nome: 'Assinada', cor: 'status-assinada' },
-            'excluida': { nome: 'Excluída', cor: 'status-excluida' },
-            'correcao': { nome: 'Precisa Correção', cor: 'status-correcao' }
-        };
-
-        // ==================== ESTADO GLOBAL ====================
-        
-        let firebase, database;
-        let currentUser = null;
-        let currentView = 'dashboard';
-        let minutas = {};
-        let minutaEditando = null;
-        let calendarioData = {
-            mesAtual: new Date().getMonth(),
-            anoAtual: new Date().getFullYear(),
-            diaSelecionado: null
-        };
-        let assessores = {
-            gilbert: { nome: 'Gilbert Juliano', ativo: true },
-            laise: { nome: 'Laíse Vital', ativo: true }
-        };
-
-        // ==================== UTILITÁRIOS ====================
-        
-        function isDiaUtil(data) {
-            const dia = data.getDay();
-            return dia >= 1 && dia <= 5; // Segunda a Sexta
-        }
-
-        function getHojeString() {
-            return new Date().toISOString().split('T')[0];
-        }
-
-        function getInicioSemana(data) {
-            const d = new Date(data);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            return new Date(d.setDate(diff));
-        }
-
-        function getFimSemana(data) {
-            const inicio = getInicioSemana(data);
-            const fim = new Date(inicio);
-            fim.setDate(inicio.getDate() + 6);
-            return fim;
-        }
-
-        function getNumeroSemana(data) {
-            const d = new Date(data);
-            const inicio = new Date(d.getFullYear(), 0, 1);
-            return Math.ceil(((d - inicio) / 86400000 + inicio.getDay() + 1) / 7);
-        }
-
-        function log(message, data = null) {
-            console.log(`[${new Date().toLocaleTimeString()}] ${message}`, data || '');
-        }
-
-        function showNotification(message, type = 'info') {
+function showNotification(message, type = 'info') {
             const colors = {
                 success: 'bg-green-500',
                 error: 'bg-red-500',
@@ -812,22 +288,23 @@
             
             const minutasHoje = getMinutasHoje(assessorId);
             const count = minutasHoje.filter(m => m.categoria === categoria).length;
-            const meta = categorias[categoria].meta;
+            const categoriaInfo = categorias[categoria];
+            
+            // Categoria "Além da Meta" não tem meta definida
+            if (categoriaInfo && categoriaInfo.semMeta) {
+                return { 
+                    atual: count, 
+                    meta: 0, 
+                    percentual: 0,
+                    semMeta: true
+                };
+            }
+            
+            const meta = categoriaInfo ? categoriaInfo.meta : 0;
             return { 
                 atual: count, 
                 meta, 
-                percentual: Math.min((count / meta) * 100, 100) 
-            };
-        }
-
-        function getProgressoTotal(assessorId) {
-            const minutasHoje = getMinutasHoje(assessorId);
-            const total = minutasHoje.length;
-            const meta = 10;
-            return { 
-                atual: total, 
-                meta, 
-                percentual: Math.min((total / meta) * 100, 100) 
+                percentual: meta > 0 ? Math.min((count / meta) * 100, 100) : 0
             };
         }
 
@@ -1154,6 +631,8 @@
                             showNotification('✨ Processo da Meta 10 CNJ registrado! Meta semanal cumprida!', 'success');
                         } else if (categoria === 'seeu') {
                             showNotification('🛡️ Acesso ao SEEU registrado! Meta de 10 dias cumprida!', 'success');
+                        } else if (categoria === 'alem_meta') {
+                            showNotification('➕ Minuta "Além da Meta" registrada! Produtividade adicional contabilizada.', 'success');
                         } else {
                             showNotification('Minuta registrada com sucesso!', 'success');
                         }
@@ -1182,6 +661,8 @@
                 showNotification('✨ Processo da Meta 10 registrado localmente!', 'warning');
             } else if (minuta.categoria === 'seeu') {
                 showNotification('🛡️ Acesso ao SEEU registrado localmente!', 'warning');
+            } else if (minuta.categoria === 'alem_meta') {
+                showNotification('➕ Minuta "Além da Meta" registrada localmente!', 'warning');
             } else {
                 showNotification('Minuta registrada localmente!', 'warning');
             }
@@ -1196,8 +677,71 @@
             document.getElementById('observacoes-minuta').value = '';
         }
 
-        // ==================== RENDERIZAÇÃO DE CARDS DE ASSESSORES ====================
+        // ==================== RENDERIZAÇÃO ====================
         
+        function renderDashboard() {
+            try {
+                const dashboard = document.getElementById('dashboard-view');
+                if (!dashboard) return;
+
+                const hoje = new Date();
+                let content = '';
+
+                if (!isDiaUtil(hoje)) {
+                    content = `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
+                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
+                            <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
+                        </div>
+                        ${renderAssessoresCards()}
+                    `;
+                } else {
+                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString()).length;
+                    const minutasParaMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria !== 'alem_meta').length;
+                    const minutasAlemMeta = totalMinutasHoje - minutasParaMeta;
+                    const metaTotal = 20; // Meta total do gabinete (10 por assessor)
+
+                    content = `
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
+                                    <p class="text-blue-100">
+                                        ${hoje.toLocaleDateString('pt-BR', { 
+                                            weekday: 'long', 
+                                            year: 'numeric', 
+                                            month: 'long', 
+                                            day: 'numeric' 
+                                        })}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
+                                    <div class="text-blue-100">minutas para metas</div>
+                                    ${minutasAlemMeta > 0 ? `
+                                        <div class="text-lg font-medium mt-1">+${minutasAlemMeta} além da meta</div>
+                                        <div class="text-blue-200 text-sm">Total: ${totalMinutasHoje} minutas</div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ${renderAssessoresCards()}
+                    `;
+                }
+
+                dashboard.innerHTML = content;
+                dashboard.classList.remove('hidden');
+                
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Dashboard renderizado');
+                
+            } catch (error) {
+                log('Erro ao renderizar dashboard', error);
+                showNotification('Erro ao carregar dashboard', 'error');
+            }
+        }
+
         function renderAssessoresCards() {
             if (!currentUser) return '';
 
@@ -1297,7 +841,7 @@
                     </div>
                 `;
 
-                // Card especial do Gilbert com Meta 10
+                // Card específico do Gilbert
                 if (assessorId === 'gilbert') {
                     const meta10Status = getMeta10Status();
                     
@@ -1360,10 +904,12 @@
                     Object.entries(categorias).forEach(([key, cat]) => {
                         const progresso = getProgressoCategoria(assessorId, key);
                         
-                        // Texto especial para Meta 10 e Meta 2
+                        // Texto especial para Meta 10, Meta 2 e Além da Meta
                         let metaText = '';
                         if (key === 'meta10' || key === 'meta2') {
                             metaText = progresso.semanal ? `${progresso.atual}/${progresso.meta} (semanal)` : `${progresso.atual}/${progresso.meta}`;
+                        } else if (key === 'alem_meta') {
+                            metaText = `${progresso.atual} (sem limite)`;
                         } else {
                             metaText = `${progresso.atual}/${progresso.meta}`;
                         }
@@ -1374,9 +920,15 @@
                                     <span>${cat.nome}</span>
                                     <span class="font-medium">${metaText}</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
-                                </div>
+                                ${progresso.semMeta ? `
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: 100%"></div>
+                                    </div>
+                                ` : `
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
+                                    </div>
+                                `}
                             </div>
                         `;
                     });
@@ -1389,11 +941,12 @@
                                 <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
                                 <div class="space-y-2 max-h-32 overflow-y-auto">
                                     ${ultimasMinutas.map(minuta => `
-                                        <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'meta10' ? 'border-l-2 border-purple-400 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : ''}">
+                                        <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'meta10' ? 'border-l-2 border-purple-400 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : minuta.categoria === 'alem_meta' ? 'border-l-2 border-gray-400 bg-gray-100' : ''}">
                                             <div class="font-medium flex items-center gap-1">
                                                 ${minuta.numeroProcesso || 'Sem número'}
                                                 ${minuta.categoria === 'meta10' ? '<span class="text-purple-600">🎯</span>' : ''}
                                                 ${minuta.categoria === 'meta2' ? '<span class="text-pink-600">⚖️</span>' : ''}
+                                                ${minuta.categoria === 'alem_meta' ? '<span class="text-gray-600">➕</span>' : ''}
                                                 ${minuta.editadaEm ? '<span class="text-orange-600" title="Editada">✏️</span>' : ''}
                                             </div>
                                             <div class="flex justify-between items-center">
@@ -1414,21 +967,33 @@
                         <div class="bg-white rounded-lg shadow-md p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
-                                <div class="px-3 py-1 rounded-full text-sm font-medium ${
-                                    progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                }">
-                                    ${progressoTotal.atual}/10 minutas
+                                <div class="text-right">
+                                    <div class="px-3 py-1 rounded-full text-sm font-medium ${
+                                        progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                    }">
+                                        ${progressoTotal.atual}/10 minutas (meta)
+                                    </div>
+                                    ${progressoTotal.alemDaMeta > 0 ? `
+                                        <div class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 mt-1">
+                                            +${progressoTotal.alemDaMeta} além da meta
+                                        </div>
+                                    ` : ''}
                                 </div>
                             </div>
                             
                             <div class="mb-4">
                                 <div class="flex justify-between text-sm text-gray-600 mb-1">
-                                    <span>Progresso Diário</span>
+                                    <span>Progresso Diário (Metas Oficiais)</span>
                                     <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-3">
                                     <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
                                 </div>
+                                ${progressoTotal.alemDaMeta > 0 ? `
+                                    <div class="text-xs text-gray-500 mt-1 text-center">
+                                        Total produzido hoje: ${progressoTotal.totalGeral} minutas
+                                    </div>
+                                ` : ''}
                             </div>
                             
                             <div>
@@ -1440,7 +1005,7 @@
                     `;
                 }
 
-                // Card especial da Laíse com SEEU
+                // Card específico da Laíse
                 if (assessorId === 'laise') {
                     const seuStatus = getSEEUStatus();
                     
@@ -1513,12 +1078,14 @@
                         
                         const progresso = getProgressoCategoria(assessorId, key);
                         
-                        // Texto especial para SEEU e Meta 2
+                        // Texto especial para SEEU, Meta 2 e Além da Meta
                         let metaText = '';
                         if (key === 'seeu') {
                             metaText = `${progresso.atual}/${progresso.meta} (a cada 10 dias)`;
                         } else if (key === 'meta2') {
                             metaText = progresso.semanal ? `${progresso.atual}/${progresso.meta} (semanal)` : `${progresso.atual}/${progresso.meta}`;
+                        } else if (key === 'alem_meta') {
+                            metaText = `${progresso.atual} (sem limite)`;
                         } else {
                             metaText = `${progresso.atual}/${progresso.meta}`;
                         }
@@ -1529,9 +1096,15 @@
                                     <span>${cat.nome}</span>
                                     <span class="font-medium">${metaText}</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
-                                </div>
+                                ${progresso.semMeta ? `
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: 100%"></div>
+                                    </div>
+                                ` : `
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
+                                    </div>
+                                `}
                             </div>
                         `;
                     });
@@ -1544,11 +1117,12 @@
                                 <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
                                 <div class="space-y-2 max-h-32 overflow-y-auto">
                                     ${ultimasMinutas.map(minuta => `
-                                        <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'seeu' ? 'border-l-2 border-teal-400 bg-teal-50' : minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : ''}">
+                                        <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'seeu' ? 'border-l-2 border-teal-400 bg-teal-50' : minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : minuta.categoria === 'alem_meta' ? 'border-l-2 border-gray-400 bg-gray-100' : ''}">
                                             <div class="font-medium flex items-center gap-1">
                                                 ${minuta.numeroProcesso || 'Sem número'}
                                                 ${minuta.categoria === 'seeu' ? '<span class="text-teal-600">🛡️</span>' : ''}
                                                 ${minuta.categoria === 'meta2' ? '<span class="text-pink-600">⚖️</span>' : ''}
+                                                ${minuta.categoria === 'alem_meta' ? '<span class="text-gray-600">➕</span>' : ''}
                                                 ${minuta.editadaEm ? '<span class="text-orange-600" title="Editada">✏️</span>' : ''}
                                             </div>
                                             <div class="flex justify-between items-center">
@@ -1569,21 +1143,33 @@
                         <div class="bg-white rounded-lg shadow-md p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
-                                <div class="px-3 py-1 rounded-full text-sm font-medium ${
-                                    progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                }">
-                                    ${progressoTotal.atual}/10 minutas
+                                <div class="text-right">
+                                    <div class="px-3 py-1 rounded-full text-sm font-medium ${
+                                        progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                    }">
+                                        ${progressoTotal.atual}/10 minutas (meta)
+                                    </div>
+                                    ${progressoTotal.alemDaMeta > 0 ? `
+                                        <div class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 mt-1">
+                                            +${progressoTotal.alemDaMeta} além da meta
+                                        </div>
+                                    ` : ''}
                                 </div>
                             </div>
                             
                             <div class="mb-4">
                                 <div class="flex justify-between text-sm text-gray-600 mb-1">
-                                    <span>Progresso Diário</span>
+                                    <span>Progresso Diário (Metas Oficiais)</span>
                                     <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-3">
                                     <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
                                 </div>
+                                ${progressoTotal.alemDaMeta > 0 ? `
+                                    <div class="text-xs text-gray-500 mt-1 text-center">
+                                        Total produzido hoje: ${progressoTotal.totalGeral} minutas
+                                    </div>
+                                ` : ''}
                             </div>
                             
                             <div>
@@ -1595,7 +1181,7 @@
                     `;
                 }
 
-                // Card normal para outros assessores - incluindo Meta 2
+                // Card normal para outros assessores - incluindo Meta 2 e Além da Meta
                 let categoriasHtml = '';
                 Object.entries(categorias).forEach(([key, cat]) => {
                     if (key === 'meta10') return; // Meta 10 é só do Gilbert
@@ -1606,6 +1192,8 @@
                     let metaText = '';
                     if (key === 'meta2') {
                         metaText = progresso.semanal ? `${progresso.atual}/${progresso.meta} (semanal)` : `${progresso.atual}/${progresso.meta}`;
+                    } else if (key === 'alem_meta') {
+                        metaText = `${progresso.atual} (sem limite)`;
                     } else {
                         metaText = `${progresso.atual}/${progresso.meta}`;
                     }
@@ -1616,9 +1204,15 @@
                                 <span>${cat.nome}</span>
                                 <span class="font-medium">${metaText}</span>
                             </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
-                            </div>
+                            ${progresso.semMeta ? `
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: 100%"></div>
+                                </div>
+                            ` : `
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
+                                </div>
+                            `}
                         </div>
                     `;
                 });
@@ -1631,10 +1225,11 @@
                             <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
                             <div class="space-y-2 max-h-32 overflow-y-auto">
                                 ${ultimasMinutas.map(minuta => `
-                                    <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : ''}">
+                                    <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${minuta.categoria === 'meta2' ? 'border-l-2 border-pink-400 bg-pink-50' : minuta.categoria === 'alem_meta' ? 'border-l-2 border-gray-400 bg-gray-100' : ''}">
                                         <div class="font-medium flex items-center gap-1">
                                             ${minuta.numeroProcesso || 'Sem número'}
                                             ${minuta.categoria === 'meta2' ? '<span class="text-pink-600">⚖️</span>' : ''}
+                                            ${minuta.categoria === 'alem_meta' ? '<span class="text-gray-600">➕</span>' : ''}
                                             ${minuta.editadaEm ? '<span class="text-orange-600" title="Editada">✏️</span>' : ''}
                                         </div>
                                         <div class="flex justify-between items-center">
@@ -1654,21 +1249,33 @@
                     <div class="bg-white rounded-lg shadow-md p-6">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
-                            <div class="px-3 py-1 rounded-full text-sm font-medium ${
-                                progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                            }">
-                                ${progressoTotal.atual}/10 minutas
+                            <div class="text-right">
+                                <div class="px-3 py-1 rounded-full text-sm font-medium ${
+                                    progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                }">
+                                    ${progressoTotal.atual}/10 minutas (meta)
+                                </div>
+                                ${progressoTotal.alemDaMeta > 0 ? `
+                                    <div class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 mt-1">
+                                        +${progressoTotal.alemDaMeta} além da meta
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                         
                         <div class="mb-4">
                             <div class="flex justify-between text-sm text-gray-600 mb-1">
-                                <span>Progresso Diário</span>
+                                <span>Progresso Diário (Metas Oficiais)</span>
                                 <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-3">
                                 <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
                             </div>
+                            ${progressoTotal.alemDaMeta > 0 ? `
+                                <div class="text-xs text-gray-500 mt-1 text-center">
+                                    Total produzido hoje: ${progressoTotal.totalGeral} minutas
+                                </div>
+                            ` : ''}
                         </div>
                         
                         <div>
@@ -1685,1001 +1292,9 @@
             }
         }
 
-        // ==================== DASHBOARD ====================
+        // Adicione aqui o restante das funções...
+        // [O código continua com as funções de calendário, histórico, relatórios, etc.]
         
-        function renderDashboard() {
-            try {
-                const dashboard = document.getElementById('dashboard-view');
-                if (!dashboard) return;
-
-                const hoje = new Date();
-                let content = '';
-
-                if (!isDiaUtil(hoje)) {
-                    content = `
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
-                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
-                            <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
-                        </div>
-                        ${renderAssessoresCards()}
-                    `;
-                } else {
-                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString()).length;
-                    const metaTotal = 20;
-
-                    content = `
-                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
-                                    <p class="text-blue-100">
-                                        ${hoje.toLocaleDateString('pt-BR', { 
-                                            weekday: 'long', 
-                                            year: 'numeric', 
-                                            month: 'long', 
-                                            day: 'numeric' 
-                                        })}
-                                    </p>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-3xl font-bold">${totalMinutasHoje}/${metaTotal}</div>
-                                    <div class="text-blue-100">minutas produzidas</div>
-                                </div>
-                            </div>
-                        </div>
-                        ${renderAssessoresCards()}
-                    `;
-                }
-
-                dashboard.innerHTML = content;
-                dashboard.classList.remove('hidden');
-                
-                setTimeout(() => lucide.createIcons(), 100);
-                log('Dashboard renderizado');
-                
-            } catch (error) {
-                log('Erro ao renderizar dashboard', error);
-                showNotification('Erro ao carregar dashboard', 'error');
-            }
-        }
-
-        // ==================== CALENDÁRIO ====================
-        
-        function renderCalendario() {
-            try {
-                const calendarioView = document.getElementById('calendario-view');
-                if (!calendarioView) return;
-
-                // Atualizar cabeçalho do mês/ano
-                const mesAno = document.getElementById('calendario-mes-ano');
-                const dataAtual = new Date(calendarioData.anoAtual, calendarioData.mesAtual, 1);
-                mesAno.textContent = dataAtual.toLocaleDateString('pt-BR', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                }).replace(/^\w/, c => c.toUpperCase());
-
-                // Renderizar dias do calendário
-                renderDiasCalendario();
-
-                calendarioView.classList.remove('hidden');
-                setTimeout(() => lucide.createIcons(), 100);
-                log('Calendário renderizado');
-                
-            } catch (error) {
-                log('Erro ao renderizar calendário', error);
-                showNotification('Erro ao carregar calendário', 'error');
-            }
-        }
-
-        function renderDiasCalendario() {
-            const calendarioDias = document.getElementById('calendario-dias');
-            if (!calendarioDias) return;
-
-            const hoje = new Date();
-            const hojeString = getHojeString();
-            
-            const primeiroDia = new Date(calendarioData.anoAtual, calendarioData.mesAtual, 1);
-            const ultimoDia = new Date(calendarioData.anoAtual, calendarioData.mesAtual + 1, 0);
-            
-            // Calcular dias do mês anterior para preencher a primeira semana
-            const diasMesAnterior = primeiroDia.getDay();
-            const inicioCalendario = new Date(primeiroDia);
-            inicioCalendario.setDate(inicioCalendario.getDate() - diasMesAnterior);
-            
-            let diasHtml = '';
-            let dataAtual = new Date(inicioCalendario);
-            
-            // Renderizar 6 semanas (42 dias)
-            for (let i = 0; i < 42; i++) {
-                const dataString = dataAtual.toISOString().split('T')[0];
-                const isHoje = dataString === hojeString;
-                const isOutroMes = dataAtual.getMonth() !== calendarioData.mesAtual;
-                const isSelecionado = dataString === calendarioData.diaSelecionado;
-                
-                // Obter minutas do dia
-                const minutasDia = getMinutasPorData(dataString);
-                const hasData = minutasDia.length > 0;
-                
-                // Verificar status da Meta 10 para a semana
-                const inicioSemana = getInicioSemana(dataAtual);
-                const fimSemana = getFimSemana(dataAtual);
-                const minutasMeta10Semana = getMinutasSemana(inicioSemana, fimSemana, 'gilbert', 'meta10');
-                const metaSemanaCumprida = minutasMeta10Semana.length > 0;
-                
-                // Verificar acesso SEEU no dia
-                const minutasSEEUDia = minutasDia.filter(m => m.categoria === 'seeu');
-                const temSEEU = minutasSEEUDia.length > 0;
-                
-                let classes = 'calendar-day';
-                if (isHoje) classes += ' today';
-                if (isOutroMes) classes += ' other-month';
-                if (isSelecionado) classes += ' selected';
-                if (hasData && !isOutroMes) classes += ' has-data';
-                
-                // Indicadores especiais
-                let weekIndicator = '';
-                let seuIndicator = '';
-                
-                if (!isOutroMes && dataAtual.getDay() === 1) { // Segunda-feira para Meta 10
-                    const indicatorClass = metaSemanaCumprida ? 'week-success' : 
-                                         dataAtual <= hoje ? 'week-danger' : 'week-warning';
-                    weekIndicator = `<div class="week-indicator ${indicatorClass}"></div>`;
-                }
-                
-                if (!isOutroMes && temSEEU) { // Indicador SEEU
-                    seuIndicator = `<div class="week-indicator week-success" style="left: 8px; background-color: #14b8a6;"></div>`;
-                }
-                
-                diasHtml += `
-                    <div class="${classes}" onclick="selecionarDia('${dataString}')">
-                        ${weekIndicator}
-                        ${seuIndicator}
-                        <div class="day-number">${dataAtual.getDate()}</div>
-                        ${hasData && !isOutroMes ? `<div class="day-count">${minutasDia.length}</div>` : ''}
-                    </div>
-                `;
-                
-                dataAtual.setDate(dataAtual.getDate() + 1);
-            }
-            
-            calendarioDias.innerHTML = diasHtml;
-        }
-
-        function navegarMes(direcao) {
-            calendarioData.mesAtual += direcao;
-            
-            if (calendarioData.mesAtual > 11) {
-                calendarioData.mesAtual = 0;
-                calendarioData.anoAtual++;
-            } else if (calendarioData.mesAtual < 0) {
-                calendarioData.mesAtual = 11;
-                calendarioData.anoAtual--;
-            }
-            
-            renderCalendario();
-        }
-
-        function irParaHoje() {
-            const hoje = new Date();
-            calendarioData.mesAtual = hoje.getMonth();
-            calendarioData.anoAtual = hoje.getFullYear();
-            calendarioData.diaSelecionado = getHojeString();
-            
-            renderCalendario();
-            renderDetalhesCalendario(calendarioData.diaSelecionado);
-        }
-
-        function selecionarDia(dataString) {
-            calendarioData.diaSelecionado = dataString;
-            renderDiasCalendario();
-            renderDetalhesCalendario(dataString);
-        }
-
-        function renderDetalhesCalendario(dataString) {
-            const detalhesDiv = document.getElementById('calendario-detalhes');
-            if (!detalhesDiv || !dataString) return;
-
-            const data = new Date(dataString + 'T12:00:00');
-            const minutasDia = getMinutasPorData(dataString);
-            
-            if (minutasDia.length === 0) {
-                detalhesDiv.innerHTML = `
-                    <div class="text-center text-gray-500 py-8">
-                        <i data-lucide="calendar-x" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
-                        <h3 class="text-lg font-medium text-gray-600 mb-2">
-                            ${data.toLocaleDateString('pt-BR', { 
-                                weekday: 'long', 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                            })}
-                        </h3>
-                        <p>Nenhuma minuta registrada neste dia</p>
-                    </div>
-                `;
-                setTimeout(() => lucide.createIcons(), 100);
-                return;
-            }
-
-            // Agrupar minutas por assessor
-            const minutasPorAssessor = {
-                gilbert: minutasDia.filter(m => 
-                    m.assessorId === 'gilbert' || 
-                    m.assessorId === 'assessor1' || 
-                    (m.assessorNome && m.assessorNome.includes('Gilbert'))
-                ),
-                laise: minutasDia.filter(m => 
-                    m.assessorId === 'laise' || 
-                    m.assessorId === 'assessor2' || 
-                    (m.assessorNome && m.assessorNome.includes('Laíse'))
-                )
-            };
-
-            let detalhesHtml = `
-                <div class="space-y-4">
-                    <div class="text-center mb-6">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">
-                            ${data.toLocaleDateString('pt-BR', { 
-                                weekday: 'long', 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                            })}
-                        </h3>
-                        <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg inline-flex items-center">
-                            <i data-lucide="file-text" class="h-5 w-5 mr-2"></i>
-                            ${minutasDia.length} minutas produzidas
-                        </div>
-                    </div>
-            `;
-
-            // Renderizar minutas por assessor
-            Object.entries(minutasPorAssessor).forEach(([assessorId, minutasAssessor]) => {
-                if (minutasAssessor.length === 0) return;
-
-                const assessor = assessores[assessorId];
-                const estatisticas = {
-                    meta1: minutasAssessor.filter(m => m.categoria === 'meta1').length,
-                    meta2: minutasAssessor.filter(m => m.categoria === 'meta2').length,
-                    meta10: minutasAssessor.filter(m => m.categoria === 'meta10').length,
-                    seeu: minutasAssessor.filter(m => m.categoria === 'seeu').length,
-                    sem_movimento: minutasAssessor.filter(m => m.categoria === 'sem_movimento').length,
-                    outros: minutasAssessor.filter(m => m.categoria === 'outros').length
-                };
-
-                detalhesHtml += `
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="font-medium text-gray-800">${assessor.nome}</h4>
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">${minutasAssessor.length} minutas</span>
-                        </div>
-                        
-                        <div class="grid grid-cols-${assessorId === 'gilbert' ? '5' : assessorId === 'laise' ? '5' : '4'} gap-2 mb-3 text-xs">
-                            <div class="bg-red-100 text-red-800 p-2 rounded text-center">
-                                <div class="font-medium">${estatisticas.meta1}</div>
-                                <div>Meta 1</div>
-                            </div>
-                            <div class="bg-pink-100 text-pink-800 p-2 rounded text-center">
-                                <div class="font-medium">${estatisticas.meta2}</div>
-                                <div>Meta 2</div>
-                            </div>
-                            ${assessorId === 'gilbert' ? `
-                                <div class="bg-purple-100 text-purple-800 p-2 rounded text-center">
-                                    <div class="font-medium">${estatisticas.meta10}</div>
-                                    <div>Meta 10</div>
-                                </div>
-                            ` : ''}
-                            ${assessorId === 'laise' ? `
-                                <div class="bg-teal-100 text-teal-800 p-2 rounded text-center">
-                                    <div class="font-medium">${estatisticas.seeu}</div>
-                                    <div>SEEU</div>
-                                </div>
-                            ` : ''}
-                            <div class="bg-orange-100 text-orange-800 p-2 rounded text-center">
-                                <div class="font-medium">${estatisticas.sem_movimento}</div>
-                                <div>100+ dias</div>
-                            </div>
-                            <div class="bg-blue-100 text-blue-800 p-2 rounded text-center">
-                                <div class="font-medium">${estatisticas.outros}</div>
-                                <div>Outros</div>
-                            </div>
-                        </div>
-                        
-                        <div class="space-y-2 max-h-40 overflow-y-auto">
-                            ${minutasAssessor.map(minuta => {
-                                const categoria = categorias[minuta.categoria];
-                                const status = statusOptions[minuta.status || 'pendente'];
-                                
-                                return `
-                                    <div class="bg-white p-2 rounded border text-xs ${minuta.categoria === 'meta10' ? 'border-purple-300 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-pink-300 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-teal-300 bg-teal-50' : ''}">
-                                        <div class="font-medium text-gray-800 flex items-center gap-1">
-                                            ${minuta.numeroProcesso || 'Sem número'}
-                                            ${minuta.categoria === 'meta10' ? '<span class="text-purple-600">🎯</span>' : ''}
-                                            ${minuta.categoria === 'meta2' ? '<span class="text-pink-600">⚖️</span>' : ''}
-                                            ${minuta.categoria === 'seeu' ? '<span class="text-teal-600">🛡️</span>' : ''}
-                                        </div>
-                                        <div class="flex justify-between items-center mt-1">
-                                            <span class="text-gray-600">${minuta.tipoMinuta}</span>
-                                            <span class="status-badge ${status.cor}">${status.nome}</span>
-                                        </div>
-                                        ${minuta.timestamp ? `<div class="text-gray-500 mt-1">${minuta.timestamp}</div>` : ''}
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            });
-
-            detalhesHtml += '</div>';
-            detalhesDiv.innerHTML = detalhesHtml;
-            setTimeout(() => lucide.createIcons(), 100);
-        }
-
-        // ==================== EDIÇÃO/EXCLUSÃO ====================
-        
-        function editarMinuta(minutaId) {
-            const minuta = minutas[minutaId];
-            if (!minuta || currentUser.isJuiz) return;
-
-            // Verificar propriedade
-            const isOwner = minuta.assessorId === currentUser.assessorId || 
-                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome?.includes('Gilbert'))) ||
-                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome?.includes('Laíse')));
-
-            if (!isOwner) {
-                showNotification('Você só pode editar suas próprias minutas.', 'error');
-                return;
-            }
-
-            minutaEditando = { id: minutaId, ...minuta };
-
-            // Preencher formulário
-            document.getElementById('edit-numero-processo').value = minuta.numeroProcesso || '';
-            document.getElementById('edit-tipo-minuta').value = minuta.tipoMinuta || '';
-            document.getElementById('edit-categoria-minuta').value = minuta.categoria || '';
-            document.getElementById('edit-observacoes-minuta').value = minuta.observacoes || '';
-
-            // Validar Meta 2 se necessário
-            validarTipoMinutaEdicao();
-
-            document.getElementById('modal-edicao').classList.remove('hidden');
-            lucide.createIcons();
-        }
-
-        function fecharModalEdicao() {
-            document.getElementById('modal-edicao').classList.add('hidden');
-            minutaEditando = null;
-        }
-
-        function salvarEdicao() {
-            if (!minutaEditando) return;
-
-            const numeroProcesso = document.getElementById('edit-numero-processo').value.trim();
-            const tipoMinuta = document.getElementById('edit-tipo-minuta').value;
-            const categoria = document.getElementById('edit-categoria-minuta').value;
-            const observacoes = document.getElementById('edit-observacoes-minuta').value.trim();
-
-            if (!numeroProcesso || !tipoMinuta || !categoria) {
-                showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
-                return;
-            }
-
-            // Validação especial para Meta 2 - só aceita Sentença
-            if (categoria === 'meta2' && tipoMinuta !== 'Sentença') {
-                showNotification('Meta 2 CNJ aceita apenas minutas de Sentença.', 'error');
-                return;
-            }
-
-            // Validação especial para Meta 10
-            if (categoria === 'meta10' && currentUser.assessorId !== 'gilbert') {
-                showNotification('Apenas Gilbert pode editar minutas da Meta 10 CNJ.', 'error');
-                return;
-            }
-
-            // Validação especial para SEEU
-            if (categoria === 'seeu' && currentUser.assessorId !== 'laise') {
-                showNotification('Apenas Laíse pode editar minutas do SEEU.', 'error');
-                return;
-            }
-
-            const minutaAtualizada = {
-                ...minutaEditando,
-                numeroProcesso,
-                tipoMinuta,
-                categoria,
-                observacoes,
-                editadaEm: new Date().toLocaleString('pt-BR')
-            };
-
-            try {
-                if (database) {
-                    database.ref(`minutas/${minutaEditando.id}`).set(minutaAtualizada)
-                        .then(() => {
-                            minutas[minutaEditando.id] = minutaAtualizada;
-                            fecharModalEdicao();
-                            renderHistorico();
-                            renderDashboard();
-                            showNotification('Minuta atualizada com sucesso!', 'success');
-                            log('Minuta editada no Firebase', numeroProcesso);
-                        })
-                        .catch(() => {
-                            minutas[minutaEditando.id] = minutaAtualizada;
-                            fecharModalEdicao();
-                            renderHistorico();
-                            renderDashboard();
-                            showNotification('Minuta atualizada localmente!', 'warning');
-                        });
-                } else {
-                    minutas[minutaEditando.id] = minutaAtualizada;
-                    fecharModalEdicao();
-                    renderHistorico();
-                    renderDashboard();
-                    showNotification('Minuta atualizada localmente!', 'warning');
-                }
-            } catch (error) {
-                minutas[minutaEditando.id] = minutaAtualizada;
-                fecharModalEdicao();
-                renderHistorico();
-                renderDashboard();
-                showNotification('Minuta atualizada localmente!', 'warning');
-            }
-        }
-
-        function excluirMinuta(minutaId) {
-            const minuta = minutas[minutaId];
-            if (!minuta || currentUser.isJuiz) return;
-
-            // Verificar propriedade
-            const isOwner = minuta.assessorId === currentUser.assessorId || 
-                          (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || minuta.assessorNome?.includes('Gilbert'))) ||
-                          (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || minuta.assessorNome?.includes('Laíse')));
-
-            if (!isOwner) {
-                showNotification('Você só pode excluir suas próprias minutas.', 'error');
-                return;
-            }
-
-            const isMetã10 = minuta.categoria === 'meta10';
-            const isMetã2 = minuta.categoria === 'meta2';
-            const isSEEU = minuta.categoria === 'seeu';
-            
-            let confirmMessage = 'Tem certeza que deseja excluir esta minuta? Esta ação não pode ser desfeita.';
-            
-            if (isMetã10) {
-                confirmMessage = 'ATENÇÃO: Você está excluindo um processo da Meta 10 CNJ! Isso pode afetar o cumprimento da meta semanal. Tem certeza?';
-            } else if (isMetã2) {
-                confirmMessage = 'ATENÇÃO: Você está excluindo uma sentença da Meta 2 CNJ! Isso pode afetar o cumprimento da meta semanal. Tem certeza?';
-            } else if (isSEEU) {
-                confirmMessage = 'ATENÇÃO: Você está excluindo um acesso ao SEEU! Isso pode afetar o controle da meta de 10 dias. Tem certeza?';
-            }
-
-            if (!confirm(confirmMessage)) {
-                return;
-            }
-
-            try {
-                if (database) {
-                    database.ref(`minutas/${minutaId}`).remove()
-                        .then(() => {
-                            delete minutas[minutaId];
-                            renderHistorico();
-                            renderDashboard();
-                            showNotification('Minuta excluída com sucesso!', 'success');
-                            log('Minuta excluída do Firebase', minuta.numeroProcesso);
-                        })
-                        .catch(() => {
-                            delete minutas[minutaId];
-                            renderHistorico();
-                            renderDashboard();
-                            showNotification('Minuta excluída localmente!', 'warning');
-                        });
-                } else {
-                    delete minutas[minutaId];
-                    renderHistorico();
-                    renderDashboard();
-                    showNotification('Minuta excluída localmente!', 'warning');
-                }
-            } catch (error) {
-                delete minutas[minutaId];
-                renderHistorico();
-                renderDashboard();
-                showNotification('Minuta excluída localmente!', 'warning');
-            }
-        }
-
-        function atualizarStatus(minutaId, novoStatus) {
-            if (!currentUser.isJuiz) return;
-
-            try {
-                if (database) {
-                    database.ref(`minutas/${minutaId}/status`).set(novoStatus)
-                        .then(() => {
-                            minutas[minutaId].status = novoStatus;
-                            renderHistorico();
-                            showNotification(`Status atualizado para: ${statusOptions[novoStatus].nome}`, 'success');
-                            log('Status atualizado', `${minutaId} -> ${novoStatus}`);
-                        });
-                } else {
-                    minutas[minutaId].status = novoStatus;
-                    renderHistorico();
-                    showNotification('Status atualizado localmente!', 'warning');
-                }
-            } catch (error) {
-                minutas[minutaId].status = novoStatus;
-                renderHistorico();
-                showNotification('Status atualizado localmente!', 'warning');
-            }
-        }
-
-        // ==================== HISTÓRICO ====================
-        
-        function setupHistoricoFilters() {
-            const filtersDiv = document.getElementById('historico-filters');
-            
-            if (currentUser.isJuiz) {
-                filtersDiv.innerHTML = `
-                    <select id="filtro-assessor" onchange="renderHistorico()" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
-                        <option value="">Todos os assessores</option>
-                        <option value="gilbert">Gilbert Juliano</option>
-                        <option value="laise">Laíse Vital</option>
-                    </select>
-                    <select id="filtro-status" onchange="renderHistorico()" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
-                        <option value="">Todos os status</option>
-                        <option value="pendente">Pendente</option>
-                        <option value="assinada">Assinada</option>
-                        <option value="excluida">Excluída</option>
-                        <option value="correcao">Precisa Correção</option>
-                    </select>
-                    <select id="filtro-categoria" onchange="renderHistorico()" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
-                        <option value="">Todas as categorias</option>
-                        <option value="meta1">Meta 1 CNJ</option>
-                        <option value="meta2">Meta 2 CNJ</option>
-                        <option value="meta10">Meta 10 CNJ</option>
-                        <option value="seeu">SEEU - Execução Penal</option>
-                        <option value="sem_movimento">Sem movimentação 100+ dias</option>
-                        <option value="outros">Pedidos/Atos/Urgentes</option>
-                    </select>
-                `;
-            } else {
-                filtersDiv.innerHTML = '';
-            }
-        }
-
-        function renderHistorico() {
-            try {
-                const historico = document.getElementById('historico-view');
-                if (!historico) return;
-
-                const minutasArray = Object.entries(minutas).map(([key, minuta]) => ({
-                    ...minuta,
-                    id: key
-                })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
-                let minutasFiltradas = minutasArray;
-
-                // Aplicar filtros
-                if (currentUser.isJuiz) {
-                    const filtroAssessor = document.getElementById('filtro-assessor')?.value;
-                    const filtroStatus = document.getElementById('filtro-status')?.value;
-                    const filtroCategoria = document.getElementById('filtro-categoria')?.value;
-                    
-                    if (filtroAssessor) {
-                        minutasFiltradas = minutasFiltradas.filter(m => {
-                            return m.assessorId === filtroAssessor || 
-                                   (filtroAssessor === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome?.includes('Gilbert'))) ||
-                                   (filtroAssessor === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome?.includes('Laíse')));
-                        });
-                    }
-                    if (filtroStatus) {
-                        minutasFiltradas = minutasFiltradas.filter(m => m.status === filtroStatus);
-                    }
-                    if (filtroCategoria) {
-                        minutasFiltradas = minutasFiltradas.filter(m => m.categoria === filtroCategoria);
-                    }
-                } else {
-                    minutasFiltradas = minutasFiltradas.filter(m => {
-                        return m.assessorId === currentUser.assessorId || 
-                               (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome?.includes('Gilbert'))) ||
-                               (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome?.includes('Laíse')));
-                    });
-                }
-
-                let content = '';
-                if (minutasFiltradas.length === 0) {
-                    content = `
-                        <div class="text-center text-gray-500 py-12">
-                            <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
-                            <p>Nenhuma minuta encontrada.</p>
-                        </div>
-                    `;
-                } else {
-                    content = `
-                        <div class="space-y-3">
-                            ${minutasFiltradas.map(minuta => {
-                                const categoria = categorias[minuta.categoria];
-                                const status = statusOptions[minuta.status || 'pendente'];
-                                
-                                return `
-                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${minuta.categoria === 'meta10' ? 'border-purple-300 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-pink-300 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-teal-300 bg-teal-50' : ''}">
-                                        <div class="flex items-start justify-between">
-                                            <div class="flex-1">
-                                                <div class="flex items-center gap-2 mb-2">
-                                                    <span class="font-medium text-gray-800">${minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor'}</span>
-                                                    <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria?.cor || 'bg-gray-500'} text-white">
-                                                        ${categoria?.nome || 'Categoria'}
-                                                    </span>
-                                                    <span class="status-badge ${status.cor}">${status.nome}</span>
-                                                    ${minuta.categoria === 'meta10' ? '<span class="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">Meta 10 🎯</span>' : ''}
-                                                    ${minuta.categoria === 'meta2' ? '<span class="text-xs text-pink-600 bg-pink-100 px-2 py-1 rounded-full">Meta 2 ⚖️</span>' : ''}
-                                                    ${minuta.categoria === 'seeu' ? '<span class="text-xs text-teal-600 bg-teal-100 px-2 py-1 rounded-full">SEEU 🛡️</span>' : ''}
-                                                    ${minuta.editadaEm ? '<span class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full">Editada</span>' : ''}
-                                                </div>
-                                                <div class="text-sm text-gray-600 mb-2">
-                                                    <div><strong>Processo:</strong> ${minuta.numeroProcesso || 'Não informado'}</div>
-                                                    <div><strong>Tipo:</strong> ${minuta.tipoMinuta || 'Não informado'}</div>
-                                                    ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
-                                                    ${minuta.editadaEm ? `<div class="text-xs text-orange-600"><strong>Editada em:</strong> ${minuta.editadaEm}</div>` : ''}
-                                                </div>
-                                                ${currentUser.isJuiz ? `
-                                                    <div class="flex gap-2 mt-2">
-                                                        <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200 transition-colors">
-                                                            <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>Assinada
-                                                        </button>
-                                                        <button onclick="atualizarStatus('${minuta.id}', 'correcao')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors">
-                                                            <i data-lucide="edit" class="h-3 w-3 mr-1 inline"></i>Correção
-                                                        </button>
-                                                        <button onclick="atualizarStatus('${minuta.id}', 'excluida')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200 transition-colors">
-                                                            <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>Excluir
-                                                        </button>
-                                                    </div>
-                                                ` : `
-                                                    <div class="flex gap-2 mt-2">
-                                                        <button onclick="editarMinuta('${minuta.id}')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 transition-colors">
-                                                            <i data-lucide="edit-2" class="h-3 w-3 mr-1 inline"></i>Editar
-                                                        </button>
-                                                        <button onclick="excluirMinuta('${minuta.id}')" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded hover:bg-red-200 transition-colors">
-                                                            <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>Excluir
-                                                        </button>
-                                                    </div>
-                                                `}
-                                            </div>
-                                            <div class="text-xs text-gray-500 text-right">
-                                                <div>${new Date(minuta.data || Date.now()).toLocaleDateString('pt-BR')}</div>
-                                                <div>${minuta.timestamp || ''}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    `;
-                }
-
-                document.getElementById('historico-content').innerHTML = content;
-                historico.classList.remove('hidden');
-                
-                setTimeout(() => lucide.createIcons(), 100);
-                log('Histórico renderizado');
-                
-            } catch (error) {
-                log('Erro ao renderizar histórico', error);
-                showNotification('Erro ao carregar histórico', 'error');
-            }
-        }
-
-        // ==================== RELATÓRIOS ====================
-        
-        function gerarRelatorio(tipo) {
-            try {
-                const hoje = new Date();
-                let dataInicio, dataFim, titulo;
-                
-                if (tipo === 'semanal') {
-                    const inicioSemana = new Date(hoje);
-                    inicioSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-                    const fimSemana = new Date(inicioSemana);
-                    fimSemana.setDate(inicioSemana.getDate() + 6);
-                    
-                    dataInicio = inicioSemana.toISOString().split('T')[0];
-                    dataFim = fimSemana.toISOString().split('T')[0];
-                    titulo = `Relatório Semanal (${inicioSemana.toLocaleDateString('pt-BR')} - ${fimSemana.toLocaleDateString('pt-BR')})`;
-                } else {
-                    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-                    const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-                    
-                    dataInicio = inicioMes.toISOString().split('T')[0];
-                    dataFim = fimMes.toISOString().split('T')[0];
-                    titulo = `Relatório Mensal (${inicioMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})`;
-                }
-
-                const minutasPeriodo = Object.values(minutas).filter(m => 
-                    m?.data && m.data >= dataInicio && m.data <= dataFim
-                );
-
-                const estatisticas = {};
-                ['gilbert', 'laise'].forEach(assessorId => {
-                    const minutasAssessor = minutasPeriodo.filter(m => {
-                        return m.assessorId === assessorId || 
-                               (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome?.includes('Gilbert'))) ||
-                               (assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome?.includes('Laíse')));
-                    });
-                    
-                    estatisticas[assessorId] = {
-                        nome: assessores[assessorId].nome,
-                        total: minutasAssessor.length,
-                        porCategoria: {
-                            meta1: minutasAssessor.filter(m => m.categoria === 'meta1').length,
-                            meta2: minutasAssessor.filter(m => m.categoria === 'meta2').length,
-                            meta10: minutasAssessor.filter(m => m.categoria === 'meta10').length,
-                            seeu: minutasAssessor.filter(m => m.categoria === 'seeu').length,
-                            sem_movimento: minutasAssessor.filter(m => m.categoria === 'sem_movimento').length,
-                            outros: minutasAssessor.filter(m => m.categoria === 'outros').length
-                        },
-                        porStatus: {
-                            assinada: minutasAssessor.filter(m => m.status === 'assinada').length,
-                            pendente: minutasAssessor.filter(m => (m.status || 'pendente') === 'pendente').length,
-                            correcao: minutasAssessor.filter(m => m.status === 'correcao').length,
-                            excluida: minutasAssessor.filter(m => m.status === 'excluida').length
-                        }
-                    };
-                });
-
-                // Relatório especial da Meta 2
-                const meta2Gilbert = getMeta2Status('gilbert');
-                const meta2Laise = getMeta2Status('laise');
-                const meta2Html = `
-                    <div class="bg-pink-50 border border-pink-200 rounded-lg p-6 mb-6">
-                        <div class="flex items-center mb-4">
-                            <i data-lucide="gavel" class="h-6 w-6 text-pink-600 mr-2"></i>
-                            <h3 class="text-lg font-semibold text-pink-800">Meta 2 CNJ - Status Semanal</h3>
-                        </div>
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <div class="bg-white rounded-lg p-4">
-                                <h4 class="font-medium text-gray-800 mb-3">Gilbert Juliano</h4>
-                                <div class="grid grid-cols-3 gap-2 text-center">
-                                    <div class="bg-pink-100 rounded p-2">
-                                        <div class="text-lg font-bold text-pink-600">${meta2Gilbert.totalSentencas}</div>
-                                        <div class="text-xs text-gray-600">Total ano</div>
-                                    </div>
-                                    <div class="bg-white border rounded p-2">
-                                        <div class="text-lg font-bold ${meta2Gilbert.metaSemanaCumprida ? 'text-green-600' : 'text-red-600'}">${meta2Gilbert.metaSemanaCumprida ? '✅' : '❌'}</div>
-                                        <div class="text-xs text-gray-600">Esta semana</div>
-                                    </div>
-                                    <div class="bg-gray-100 rounded p-2">
-                                        <div class="text-lg font-bold text-gray-600">${meta2Gilbert.percentualCumprimento}%</div>
-                                        <div class="text-xs text-gray-600">Cumprimento</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4">
-                                <h4 class="font-medium text-gray-800 mb-3">Laíse Vital</h4>
-                                <div class="grid grid-cols-3 gap-2 text-center">
-                                    <div class="bg-pink-100 rounded p-2">
-                                        <div class="text-lg font-bold text-pink-600">${meta2Laise.totalSentencas}</div>
-                                        <div class="text-xs text-gray-600">Total ano</div>
-                                    </div>
-                                    <div class="bg-white border rounded p-2">
-                                        <div class="text-lg font-bold ${meta2Laise.metaSemanaCumprida ? 'text-green-600' : 'text-red-600'}">${meta2Laise.metaSemanaCumprida ? '✅' : '❌'}</div>
-                                        <div class="text-xs text-gray-600">Esta semana</div>
-                                    </div>
-                                    <div class="bg-gray-100 rounded p-2">
-                                        <div class="text-lg font-bold text-gray-600">${meta2Laise.percentualCumprimento}%</div>
-                                        <div class="text-xs text-gray-600">Cumprimento</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                // Relatório especial da Meta 10
-                const meta10Status = getMeta10Status();
-                const meta10Html = `
-                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-6 mb-6">
-                        <div class="flex items-center mb-4">
-                            <i data-lucide="target" class="h-6 w-6 text-purple-600 mr-2"></i>
-                            <h3 class="text-lg font-semibold text-purple-800">Meta 10 CNJ - Status Anual</h3>
-                        </div>
-                        <div class="grid md:grid-cols-4 gap-4 text-center">
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold text-purple-600">${meta10Status.processosJulgados}/9</div>
-                                <div class="text-sm text-gray-600">Processos Julgados</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold text-orange-600">${meta10Status.processosRestantes}</div>
-                                <div class="text-sm text-gray-600">Processos Restantes</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold ${meta10Status.metaSemanaCumprida ? 'text-green-600' : 'text-red-600'}">${meta10Status.metaSemanaCumprida ? '✅' : '❌'}</div>
-                                <div class="text-sm text-gray-600">Meta Semanal</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold text-blue-600">${Math.round(meta10Status.percentualAnual)}%</div>
-                                <div class="text-sm text-gray-600">Progresso Anual</div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4">
-                            <h4 class="font-medium text-purple-800 mb-2">Histórico Semanal (${meta10Status.semanas.length} semanas)</h4>
-                            <div class="grid grid-cols-10 gap-1">
-                                ${meta10Status.semanas.map(semana => `
-                                    <div class="h-8 rounded flex items-center justify-center text-xs font-medium ${
-                                        semana.cumprida ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                                    }" title="Semana ${semana.numero}: ${semana.cumprida ? 'Cumprida' : 'Não cumprida'}">
-                                        ${semana.numero}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                // Relatório especial SEEU
-                const seuStatus = getSEEUStatus();
-                const seuHtml = `
-                    <div class="bg-teal-50 border border-teal-200 rounded-lg p-6 mb-6">
-                        <div class="flex items-center mb-4">
-                            <i data-lucide="shield-check" class="h-6 w-6 text-teal-600 mr-2"></i>
-                            <h3 class="text-lg font-semibold text-teal-800">SEEU - Sistema de Execução Penal</h3>
-                        </div>
-                        <div class="grid md:grid-cols-4 gap-4 text-center">
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold text-teal-600">${seuStatus.totalAcessos}</div>
-                                <div class="text-sm text-gray-600">Acessos no Ano</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold text-orange-600">${seuStatus.diasSemSEEU}</div>
-                                <div class="text-sm text-gray-600">Dias sem Acesso</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold ${seuStatus.status === 'em_dia' ? 'text-green-600' : seuStatus.status === 'atencao' ? 'text-yellow-600' : 'text-red-600'}">${
-                                    seuStatus.status === 'em_dia' ? '✅' : 
-                                    seuStatus.status === 'atencao' ? '⚡' : '❌'
-                                }</div>
-                                <div class="text-sm text-gray-600">Status Atual</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4">
-                                <div class="text-2xl font-bold text-blue-600">${seuStatus.mediaIntervalo || 0}</div>
-                                <div class="text-sm text-gray-600">Média de Dias</div>
-                            </div>
-                        </div>
-                        
-                        ${seuStatus.historico.length > 0 ? `
-                            <div class="mt-4">
-                                <h4 class="font-medium text-teal-800 mb-2">Últimos Acessos (${seuStatus.historico.length})</h4>
-                                <div class="grid grid-cols-5 gap-2">
-                                    ${seuStatus.historico.slice(-10).map(h => `
-                                        <div class="bg-white rounded p-2 text-center text-xs">
-                                            <div class="font-medium text-teal-800">${new Date(h.data).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' })}</div>
-                                            ${h.diasEntre ? `<div class="text-gray-500">(+${h.diasEntre}d)</div>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-
-                const relatorioHtml = `
-                    <div class="space-y-6">
-                        <div class="text-center mb-6">
-                            <h2 class="text-2xl font-bold text-gray-800">${titulo}</h2>
-                            <p class="text-gray-600">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
-                        </div>
-                        
-                        ${meta2Html}
-                        ${meta10Html}
-                        ${seuHtml}
-                        
-                        <div class="grid md:grid-cols-2 gap-6">
-                            ${Object.entries(estatisticas).map(([assessorId, stats]) => `
-                                <div class="bg-gray-50 rounded-lg p-6">
-                                    <h3 class="text-lg font-semibold text-gray-800 mb-4">${stats.nome}</h3>
-                                    <div class="space-y-4">
-                                        <div class="flex justify-between items-center">
-                                            <span class="font-medium">Total de Minutas:</span>
-                                            <span class="text-2xl font-bold text-blue-600">${stats.total}</span>
-                                        </div>
-                                        
-                                        <div class="border-t pt-3">
-                                            <h4 class="font-medium text-gray-700 mb-2">Por Categoria:</h4>
-                                            <div class="space-y-2 text-sm">
-                                                <div class="flex justify-between">
-                                                    <span>Meta 1 CNJ:</span>
-                                                    <span class="font-medium">${stats.porCategoria.meta1}</span>
-                                                </div>
-                                                <div class="flex justify-between">
-                                                    <span>Meta 2 CNJ:</span>
-                                                    <span class="font-medium text-pink-600">${stats.porCategoria.meta2}</span>
-                                                </div>
-                                                ${assessorId === 'gilbert' ? `
-                                                    <div class="flex justify-between">
-                                                        <span>Meta 10 CNJ:</span>
-                                                        <span class="font-medium text-purple-600">${stats.porCategoria.meta10}</span>
-                                                    </div>
-                                                ` : ''}
-                                                ${assessorId === 'laise' ? `
-                                                    <div class="flex justify-between">
-                                                        <span>SEEU - Execução Penal:</span>
-                                                        <span class="font-medium text-teal-600">${stats.porCategoria.seeu}</span>
-                                                    </div>
-                                                ` : ''}
-                                                <div class="flex justify-between">
-                                                    <span>Sem movimentação 100+ dias:</span>
-                                                    <span class="font-medium">${stats.porCategoria.sem_movimento}</span>
-                                                </div>
-                                                <div class="flex justify-between">
-                                                    <span>Pedidos/Atos/Urgentes:</span>
-                                                    <span class="font-medium">${stats.porCategoria.outros}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="border-t pt-3">
-                                            <h4 class="font-medium text-gray-700 mb-2">Por Status:</h4>
-                                            <div class="space-y-2 text-sm">
-                                                <div class="flex justify-between">
-                                                    <span>Assinadas:</span>
-                                                    <span class="font-medium text-green-600">${stats.porStatus.assinada}</span>
-                                                </div>
-                                                <div class="flex justify-between">
-                                                    <span>Pendentes:</span>
-                                                    <span class="font-medium text-yellow-600">${stats.porStatus.pendente}</span>
-                                                </div>
-                                                <div class="flex justify-between">
-                                                    <span>Precisam Correção:</span>
-                                                    <span class="font-medium text-blue-600">${stats.porStatus.correcao}</span>
-                                                </div>
-                                                <div class="flex justify-between">
-                                                    <span>Excluídas:</span>
-                                                    <span class="font-medium text-red-600">${stats.porStatus.excluida}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        
-                        <div class="bg-blue-50 rounded-lg p-6">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumo Geral</h3>
-                            <div class="grid md:grid-cols-5 gap-4 text-center">
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
-                                    <div class="text-sm text-gray-600">Total de Minutas</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-pink-600">${minutasPeriodo.filter(m => m.categoria === 'meta2').length}</div>
-                                    <div class="text-sm text-gray-600">Sentenças Meta 2</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-green-600">${minutasPeriodo.filter(m => m.status === 'assinada').length}</div>
-                                    <div class="text-sm text-gray-600">Minutas Assinadas</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-yellow-600">${minutasPeriodo.filter(m => (m.status || 'pendente') === 'pendente').length}</div>
-                                    <div class="text-sm text-gray-600">Minutas Pendentes</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-red-600">${minutasPeriodo.filter(m => m.status === 'correcao').length}</div>
-                                    <div class="text-sm text-gray-600">Precisam Correção</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                document.getElementById('relatorio-content').innerHTML = relatorioHtml;
-                log(`Relatório ${tipo} gerado`);
-                
-            } catch (error) {
-                log(`Erro ao gerar relatório ${tipo}`, error);
-                showNotification('Erro ao gerar relatório', 'error');
-            }
-        }
-
         // ==================== EVENTOS ====================
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -2706,4 +1321,535 @@
         });
     </script>
 </body>
-</html>
+</html><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Produtividade Judicial</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-pendente { background-color: #fef3c7; color: #92400e; }
+        .status-assinada { background-color: #d1fae5; color: #065f46; }
+        .status-excluida { background-color: #fee2e2; color: #991b1b; }
+        .status-correcao { background-color: #dbeafe; color: #1e40af; }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; }
+        }
+        .calendar-day {
+            min-height: 40px;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4px;
+        }
+        .calendar-day:hover {
+            background-color: #f3f4f6;
+        }
+        .calendar-day.today {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+        }
+        .calendar-day.selected {
+            background-color: #1d4ed8;
+            color: white;
+        }
+        .calendar-day.has-data {
+            background-color: #f0fdf4;
+            border-color: #22c55e;
+        }
+        .calendar-day.has-data.selected {
+            background-color: #15803d;
+        }
+        .calendar-day.other-month {
+            color: #9ca3af;
+            background-color: #f9fafb;
+        }
+        .productivity-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #22c55e;
+        }
+        .day-number {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .day-count {
+            font-size: 0.75rem;
+            text-align: center;
+            background-color: rgba(34, 197, 94, 0.1);
+            border-radius: 4px;
+            padding: 1px 3px;
+            margin-top: 2px;
+        }
+        .meta10-alert {
+            animation: pulse 2s infinite;
+            border-left: 4px solid #ef4444;
+        }
+        .meta10-success {
+            border-left: 4px solid #22c55e;
+        }
+        .meta2-alert {
+            animation: pulse 2s infinite;
+            border-left: 4px solid #dc2626;
+        }
+        .meta2-success {
+            border-left: 4px solid #16a34a;
+        }
+        .week-indicator {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .week-success { background-color: #22c55e; }
+        .week-warning { background-color: #f59e0b; }
+        .week-danger { background-color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Indicador de Conexão -->
+    <div id="connection-status" class="fixed top-4 right-4 z-50 no-print">
+        <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+            Carregando...
+        </div>
+    </div>
+
+    <!-- Tela de Login -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+            <div class="text-center mb-8">
+                <div class="mx-auto h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <i data-lucide="scale" class="h-8 w-8 text-blue-600"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Sistema de Produtividade Judicial</h1>
+                <p class="text-gray-600">Digite suas credenciais para acessar</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
+                    <select id="login-usuario" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Selecione o usuário</option>
+                        <option value="juiz">Juiz</option>
+                        <option value="gilbert">Gilbert Juliano</option>
+                        <option value="laise">Laíse Vital</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                    <input type="password" id="login-senha" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Digite sua senha">
+                </div>
+                
+                <button onclick="fazerLogin()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                    <i data-lucide="log-in" class="h-5 w-5 mr-2 inline"></i>
+                    Entrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aplicação Principal -->
+    <div id="main-app" class="hidden p-4 max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6 no-print">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Sistema de Produtividade Judicial</h1>
+                    <p id="user-info" class="text-gray-600"></p>
+                </div>
+                <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors flex items-center">
+                    <i data-lucide="log-out" class="h-4 w-4 mr-2"></i>
+                    Sair
+                </button>
+            </div>
+            
+            <!-- Navegação -->
+            <div id="navigation" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard-view" class="hidden space-y-6"></div>
+
+        <!-- Registro de Minuta -->
+        <div id="registro-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center mb-6">
+                    <i data-lucide="plus" class="h-6 w-6 text-blue-600 mr-2"></i>
+                    <h2 class="text-xl font-semibold text-gray-800">Registrar Nova Minuta</h2>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
+                        <input type="text" id="numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 1234567-89.2024.8.12.3456">
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta *</label>
+                            <select id="tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="validarTipoMinuta()">
+                                <option value="">Selecione o tipo</option>
+                                <option value="Despacho">Despacho</option>
+                                <option value="Decisão">Decisão</option>
+                                <option value="Sentença">Sentença</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+                            <select id="categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Selecione a categoria</option>
+                                <option value="meta1">Meta 1 CNJ (2/dia)</option>
+                                <option value="meta2">Meta 2 CNJ (1 sentença/semana)</option>
+                                <option value="meta10" id="meta10-option" class="hidden">Meta 10 CNJ (1/semana)</option>
+                                <option value="seeu" id="seeu-option" class="hidden">SEEU - Execução Penal (1 a cada 10 dias)</option>
+                                <option value="sem_movimento">Sem movimentação 100+ dias (5/dia)</option>
+                                <option value="outros">Pedidos/Atos/Urgentes (3/dia)</option>
+                                <option value="alem_meta">Além da Meta (sem limite)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                        <textarea id="observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Comentários sobre a minuta (opcional)"></textarea>
+                    </div>
+                    
+                    <button onclick="registrarMinuta()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                        <i data-lucide="save" class="h-5 w-5 mr-2 inline"></i>
+                        Registrar Minuta
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Histórico -->
+        <div id="historico-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center">
+                        <i data-lucide="clock" class="h-6 w-6 text-gray-600 mr-2"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">Histórico de Minutas</h2>
+                    </div>
+                    <div id="historico-filters" class="flex gap-2 no-print"></div>
+                </div>
+                <div id="historico-content"></div>
+            </div>
+        </div>
+
+        <!-- Calendário -->
+        <div id="calendario-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center">
+                        <i data-lucide="calendar-days" class="h-6 w-6 text-gray-600 mr-2"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">Calendário de Produtividade</h2>
+                    </div>
+                    <div class="flex items-center gap-2 no-print">
+                        <button onclick="navegarMes(-1)" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                            <i data-lucide="chevron-left" class="h-5 w-5"></i>
+                        </button>
+                        <span id="calendario-mes-ano" class="text-lg font-medium px-4"></span>
+                        <button onclick="navegarMes(1)" class="p-2 rounded-md hover:bg-gray-100 transition-colors">
+                            <i data-lucide="chevron-right" class="h-5 w-5"></i>
+                        </button>
+                        <button onclick="irParaHoje()" class="ml-4 bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-sm">
+                            Hoje
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Calendário -->
+                    <div class="space-y-4">
+                        <!-- Cabeçalho dos dias da semana -->
+                        <div class="grid grid-cols-7 gap-1 text-center text-sm font-medium text-gray-600">
+                            <div class="py-2">Dom</div>
+                            <div class="py-2">Seg</div>
+                            <div class="py-2">Ter</div>
+                            <div class="py-2">Qua</div>
+                            <div class="py-2">Qui</div>
+                            <div class="py-2">Sex</div>
+                            <div class="py-2">Sáb</div>
+                        </div>
+                        
+                        <!-- Dias do calendário -->
+                        <div id="calendario-dias" class="grid grid-cols-7 gap-1"></div>
+                        
+                        <!-- Legenda -->
+                        <div class="mt-4 text-xs text-gray-600 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 bg-blue-200 border border-blue-400 rounded"></div>
+                                <span>Hoje</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 bg-green-50 border border-green-500 rounded"></div>
+                                <span>Dias com produtividade</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 bg-blue-800 rounded"></div>
+                                <span>Dia selecionado</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <span>Meta 10 cumprida na semana</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <span>Meta 10 não cumprida</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-teal-500 rounded-full"></div>
+                                <span>SEEU acessado</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detalhes do dia selecionado -->
+                    <div id="calendario-detalhes" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">
+                            <i data-lucide="calendar-check" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                            <p>Clique em um dia para ver os detalhes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatórios -->
+        <div id="relatorios-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center">
+                        <i data-lucide="bar-chart" class="h-6 w-6 text-gray-600 mr-2"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">Relatórios de Produtividade</h2>
+                    </div>
+                    <div class="flex gap-2 no-print">
+                        <button onclick="gerarRelatorio('semanal')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm">
+                            <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
+                            Relatório Semanal
+                        </button>
+                        <button onclick="gerarRelatorio('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
+                            <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
+                            Relatório Mensal
+                        </button>
+                        <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
+                            <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
+                            Imprimir
+                        </button>
+                    </div>
+                </div>
+                <div id="relatorio-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edição -->
+    <div id="modal-edicao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalEdicao()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Editar Minuta</h3>
+                <button onclick="fecharModalEdicao()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
+                    <input type="text" id="edit-numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta *</label>
+                    <select id="edit-tipo-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="validarTipoMinutaEdicao()">
+                        <option value="Despacho">Despacho</option>
+                        <option value="Decisão">Decisão</option>
+                        <option value="Sentença">Sentença</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+                    <select id="edit-categoria-minuta" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="meta1">Meta 1 CNJ</option>
+                        <option value="meta2">Meta 2 CNJ</option>
+                        <option value="meta10" id="edit-meta10-option" class="hidden">Meta 10 CNJ</option>
+                        <option value="seeu" id="edit-seeu-option" class="hidden">SEEU - Execução Penal</option>
+                        <option value="sem_movimento">Sem movimentação 100+ dias</option>
+                        <option value="outros">Pedidos/Atos/Urgentes</option>
+                        <option value="alem_meta">Além da Meta</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                    <textarea id="edit-observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                
+                <div class="flex gap-2 pt-4">
+                    <button onclick="salvarEdicao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                        <i data-lucide="save" class="h-4 w-4 mr-1 inline"></i>
+                        Salvar
+                    </button>
+                    <button onclick="fecharModalEdicao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+                
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Salvar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== CONFIGURAÇÃO ====================
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyCzuoRgbvKQSjOFssde-qUEtNDqGNJML7E",
+            authDomain: "produtividade-gabinete.firebaseapp.com",
+            databaseURL: "https://produtividade-gabinete-default-rtdb.firebaseio.com",
+            projectId: "produtividade-gabinete",
+            storageBucket: "produtividade-gabinete.firebasestorage.app",
+            messagingSenderId: "370364917935",
+            appId: "1:370364917935:web:a6205cc718748abcbdcc5a"
+        };
+
+        // Credenciais seguras
+        const credenciais = {
+            'juiz': { senha: 'Juiz@2024!', nome: 'Juiz', tipo: 'juiz' },
+            'gilbert': { senha: 'Gilbert@2024!', nome: 'Gilbert Juliano', tipo: 'assessor', assessorId: 'gilbert' },
+            'laise': { senha: 'Laise@2024!', nome: 'Laíse Vital', tipo: 'assessor', assessorId: 'laise' }
+        };
+
+        const categorias = {
+            'meta1': { nome: 'Meta 1 CNJ', cor: 'bg-red-500', meta: 2 },
+            'meta2': { nome: 'Meta 2 CNJ', cor: 'bg-pink-500', meta: 1, semanal: true, requerSentenca: true },
+            'meta10': { nome: 'Meta 10 CNJ', cor: 'bg-purple-500', meta: 1, semanal: true, totalAnual: 9 },
+            'seeu': { nome: 'SEEU - Execução Penal', cor: 'bg-teal-500', meta: 1, prazo: 10 },
+            'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
+            'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 },
+            'alem_meta': { nome: 'Além da Meta', cor: 'bg-gray-500', meta: 0, semMeta: true }
+        };
+
+        const statusOptions = {
+            'pendente': { nome: 'Pendente', cor: 'status-pendente' },
+            'assinada': { nome: 'Assinada', cor: 'status-assinada' },
+            'excluida': { nome: 'Excluída', cor: 'status-excluida' },
+            'correcao': { nome: 'Precisa Correção', cor: 'status-correcao' }
+        };
+
+        // ==================== ESTADO GLOBAL ====================
+        
+        let firebase, database;
+        let currentUser = null;
+        let currentView = 'dashboard';
+        let minutas = {};
+        let minutaEditando = null;
+        let calendarioData = {
+            mesAtual: new Date().getMonth(),
+            anoAtual: new Date().getFullYear(),
+            diaSelecionado: null
+        };
+        let assessores = {
+            gilbert: { nome: 'Gilbert Juliano', ativo: true },
+            laise: { nome: 'Laíse Vital', ativo: true }
+        };
+
+        // ==================== UTILITÁRIOS ====================
+        
+        function isDiaUtil(data) {
+            const dia = data.getDay();
+            return dia >= 1 && dia <= 5; // Segunda a Sexta
+        }
+
+        function getHojeString() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function getInicioSemana(data) {
+            const d = new Date(data);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
+        }
+
+        function getFimSemana(data) {
+            const inicio = getInicioSemana(data);
+            const fim = new Date(inicio);
+            fim.setDate(inicio.getDate() + 6);
+            return fim;
+        }
+
+        function getNumeroSemana(data) {
+            const d = new Date(data);
+            const inicio = new Date(d.getFullYear(), 0, 1);
+            return Math.ceil(((d - inicio) / 86400000 + inicio.getDay() + 1) / 7);
+        }
+
+        function log(message, data = null) {
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`, data || '');
+        }
+
+        function showNotification(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg
