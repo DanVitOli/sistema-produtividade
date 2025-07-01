@@ -236,7 +236,7 @@
                                 <option value="seeu" id="seeu-option" class="hidden">SEEU - Execução Penal (1 a cada 10 dias)</option>
                                 <option value="sem_movimento">Sem movimentação 100+ dias (5/dia)</option>
                                 <option value="outros">Pedidos/Atos/Urgentes (3/dia)</option>
-                                <option value="alem_meta">Além da Meta (sem limite)</option>
+                                <option value="alem_meta">Além da Meta (produtividade adicional - não conta para meta diária)</option>
                             </select>
                         </div>
                     </div>
@@ -250,6 +250,10 @@
                         <i data-lucide="save" class="h-5 w-5 mr-2 inline"></i>
                         Registrar Minuta
                     </button>
+                    
+                    <div class="text-xs text-gray-500 text-center mt-2 bg-gray-50 p-2 rounded">
+                        ℹ️ Minutas registradas contam automaticamente para a produtividade. O juiz pode excluí-las da contagem posteriormente se necessário.
+                    </div>
                 </div>
             </div>
         </div>
@@ -409,7 +413,7 @@
                         <option value="seeu" id="edit-seeu-option" class="hidden">SEEU - Execução Penal</option>
                         <option value="sem_movimento">Sem movimentação 100+ dias</option>
                         <option value="outros">Pedidos/Atos/Urgentes</option>
-                        <option value="alem_meta">Além da Meta</option>
+                        <option value="alem_meta">Além da Meta (produtividade adicional)</option>
                     </select>
                 </div>
                 
@@ -463,7 +467,7 @@
             'seeu': { nome: 'SEEU - Execução Penal', cor: 'bg-teal-500', meta: 1, prazo: 10 },
             'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
             'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 },
-            'alem_meta': { nome: 'Além da Meta', cor: 'bg-gray-500', meta: 0, semMeta: true }
+            'alem_meta': { nome: 'Além da Meta (produtividade adicional)', cor: 'bg-gray-500', meta: 0, semMeta: true }
         };
 
         const statusOptions = {
@@ -582,6 +586,7 @@
             const hoje = getHojeString();
             return Object.values(minutas).filter(m => {
                 if (!m || !m.data || m.data !== hoje) return false;
+                if (m.status === 'excluida') return false; // Excluir minutas marcadas como excluídas
                 
                 return m.assessorId === assessorId || 
                        (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
@@ -592,6 +597,7 @@
         function getMinutasPorData(data, assessorId = null) {
             return Object.values(minutas).filter(m => {
                 if (!m || !m.data || m.data !== data) return false;
+                if (m.status === 'excluida') return false; // Excluir minutas marcadas como excluídas
                 
                 if (assessorId) {
                     return m.assessorId === assessorId || 
@@ -609,6 +615,7 @@
             
             return Object.values(minutas).filter(m => {
                 if (!m || !m.data || m.data < inicioStr || m.data > fimStr) return false;
+                if (m.status === 'excluida') return false; // Excluir minutas marcadas como excluídas
                 
                 const isAssessor = m.assessorId === assessorId || 
                                  (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
@@ -724,9 +731,10 @@
             const inicioAno = new Date(hoje.getFullYear(), 0, 1);
             const fimAno = new Date(hoje.getFullYear(), 11, 31);
             
-            // Obter todas as minutas SEEU da Laíse no ano
+            // Obter todas as minutas SEEU da Laíse no ano (excluindo as marcadas como excluídas)
             const minutasSEEU = Object.values(minutas).filter(m => {
                 if (!m || !m.data) return false;
+                if (m.status === 'excluida') return false; // Excluir minutas marcadas como excluídas
                 
                 const dataMinuta = new Date(m.data);
                 if (dataMinuta < inicioAno || dataMinuta > fimAno) return false;
@@ -1174,7 +1182,7 @@
                         } else if (categoria === 'seeu') {
                             showNotification('🛡️ Acesso ao SEEU registrado! Meta de 10 dias cumprida!', 'success');
                         } else if (categoria === 'alem_meta') {
-                            showNotification('➕ Minuta "Além da Meta" registrada! Produtividade adicional contabilizada.', 'success');
+                            showNotification('➕ Minuta "Além da Meta" registrada! Produtividade adicional contabilizada (não conta para meta diária).', 'success');
                         } else {
                             showNotification('Minuta registrada com sucesso!', 'success');
                         }
@@ -1204,7 +1212,7 @@
             } else if (minuta.categoria === 'seeu') {
                 showNotification('🛡️ Acesso ao SEEU registrado localmente!', 'warning');
             } else if (minuta.categoria === 'alem_meta') {
-                showNotification('➕ Minuta "Além da Meta" registrada localmente!', 'warning');
+                showNotification('➕ Minuta "Além da Meta" registrada localmente! (não conta para meta diária)', 'warning');
             } else {
                 showNotification('Minuta registrada localmente!', 'warning');
             }
@@ -1239,8 +1247,8 @@
                         ${renderAssessoresCards()}
                     `;
                 } else {
-                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString()).length;
-                    const minutasParaMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria !== 'alem_meta').length;
+                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
+                    const minutasParaMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria !== 'alem_meta' && m.status !== 'excluida').length;
                     const minutasAlemMeta = totalMinutasHoje - minutasParaMeta;
                     const metaTotal = 20; // Meta total do gabinete (10 por assessor)
 
@@ -1260,13 +1268,31 @@
                                 </div>
                                 <div class="text-right">
                                     <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
-                                    <div class="text-blue-100">minutas para metas</div>
+                                    <div class="text-blue-100 text-sm">minutas para metas oficiais</div>
                                     ${minutasAlemMeta > 0 ? `
-                                        <div class="text-lg font-medium mt-1">+${minutasAlemMeta} além da meta</div>
-                                        <div class="text-blue-200 text-sm">Total: ${totalMinutasHoje} minutas</div>
+                                        <div class="text-lg font-medium mt-2 text-blue-200">+${minutasAlemMeta} além da meta</div>
+                                        <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
+                                        <div class="text-xs text-blue-300 mt-1">
+                                            ➕ Minutas "Além da Meta" são produtividade adicional
+                                        </div>
                                     ` : ''}
                                 </div>
                             </div>
+                            
+                            ${minutasAlemMeta > 0 ? `
+                                <div class="mt-4 pt-4 border-t border-blue-500">
+                                    <div class="grid grid-cols-2 gap-4 text-center">
+                                        <div>
+                                            <div class="text-xl font-bold">${minutasParaMeta}</div>
+                                            <div class="text-blue-100 text-sm">Minutas para Metas CNJ</div>
+                                        </div>
+                                        <div>
+                                            <div class="text-xl font-bold text-blue-200">${minutasAlemMeta}</div>
+                                            <div class="text-blue-200 text-sm">Produtividade Adicional</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
                         </div>
                         ${renderAssessoresCards()}
                     `;
@@ -1526,10 +1552,16 @@
 
         function renderAssessorNormalCard(assessorId, assessor, progressoTotal, minutasHoje) {
             let categoriasHtml = '';
-            Object.entries(categorias).forEach(([key, cat]) => {
+            
+            // Definir ordem específica das categorias
+            const ordemCategorias = ['meta1', 'meta2', 'meta10', 'seeu', 'sem_movimento', 'outros', 'alem_meta'];
+            
+            ordemCategorias.forEach(key => {
+                if (!categorias[key]) return;
                 if (key === 'meta10' && assessorId !== 'gilbert') return; // Meta 10 é só do Gilbert
                 if (key === 'seeu' && assessorId !== 'laise') return; // SEEU é só da Laíse
                 
+                const cat = categorias[key];
                 const progresso = getProgressoCategoria(assessorId, key);
                 
                 let metaText = '';
@@ -1538,21 +1570,29 @@
                 } else if (key === 'seeu') {
                     metaText = `${progresso.atual}/${progresso.meta} (a cada 10 dias)`;
                 } else if (key === 'alem_meta') {
-                    metaText = `${progresso.atual} (sem limite)`;
+                    metaText = `${progresso.atual} (sem limite de meta)`;
                 } else {
                     metaText = `${progresso.atual}/${progresso.meta}`;
                 }
                 
+                // Destacar categoria "Além da Meta"
+                const isAlemMeta = key === 'alem_meta';
+                
                 categoriasHtml += `
-                    <div class="mb-3">
+                    <div class="mb-3 ${isAlemMeta ? 'border-l-4 border-gray-400 pl-3 bg-gray-50 rounded-r-lg py-2' : ''}">
                         <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>${cat.nome}</span>
-                            <span class="font-medium">${metaText}</span>
+                            <span class="${isAlemMeta ? 'font-medium text-gray-700' : ''}">${cat.nome}</span>
+                            <span class="font-medium ${isAlemMeta ? 'text-gray-800' : ''}">${metaText}</span>
                         </div>
                         ${progresso.semMeta ? `
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: 100%"></div>
+                                <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.atual > 0 ? '100%' : '0%'}"></div>
                             </div>
+                            ${isAlemMeta && progresso.atual > 0 ? `
+                                <div class="text-xs text-gray-500 mt-1 text-center">
+                                    ➕ Produtividade adicional (não conta para meta diária)
+                                </div>
+                            ` : ''}
                         ` : `
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="${cat.cor} h-2 rounded-full transition-all duration-300" style="width: ${progresso.percentual}%"></div>
@@ -1599,11 +1639,11 @@
                             <div class="px-3 py-1 rounded-full text-sm font-medium ${
                                 progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                             }">
-                                ${progressoTotal.atual}/10 minutas (meta)
+                                ${progressoTotal.atual}/10 minutas oficiais
                             </div>
                             ${progressoTotal.alemDaMeta > 0 ? `
                                 <div class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 mt-1">
-                                    +${progressoTotal.alemDaMeta} além da meta
+                                    +${progressoTotal.alemDaMeta} produtividade adicional
                                 </div>
                             ` : ''}
                         </div>
@@ -1611,7 +1651,7 @@
                     
                     <div class="mb-4">
                         <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Progresso Diário (Metas Oficiais)</span>
+                            <span>Progresso Diário (Apenas Metas CNJ)</span>
                             <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-3">
@@ -1619,7 +1659,7 @@
                         </div>
                         ${progressoTotal.alemDaMeta > 0 ? `
                             <div class="text-xs text-gray-500 mt-1 text-center">
-                                Total produzido hoje: ${progressoTotal.totalGeral} minutas
+                                Total geral produzido: ${progressoTotal.totalGeral} minutas (${progressoTotal.atual} oficiais + ${progressoTotal.alemDaMeta} adicionais)
                             </div>
                         ` : ''}
                     </div>
@@ -1686,8 +1726,8 @@
                 const isOutroMes = dataAtual.getMonth() !== calendarioData.mesAtual;
                 const isSelecionado = dataString === calendarioData.diaSelecionado;
                 
-                // Obter minutas do dia
-                const minutasDia = getMinutasPorData(dataString);
+                // Obter minutas do dia (excluindo as marcadas como excluídas)
+                const minutasDia = getMinutasPorData(dataString).filter(m => m.status !== 'excluida');
                 const hasData = minutasDia.length > 0;
                 
                 // Verificar status da Meta 10 para a semana
@@ -1770,9 +1810,11 @@
             if (!detalhesDiv || !dataString) return;
 
             const data = new Date(dataString + 'T12:00:00');
-            const minutasDia = getMinutasPorData(dataString);
+            const todasMinutasDia = Object.values(minutas).filter(m => m?.data === dataString);
+            const minutasDia = todasMinutasDia.filter(m => m.status !== 'excluida'); // Apenas as que contam para produtividade
+            const minutasExcluidas = todasMinutasDia.filter(m => m.status === 'excluida'); // Separar excluídas
             
-            if (minutasDia.length === 0) {
+            if (todasMinutasDia.length === 0) {
                 detalhesDiv.innerHTML = `
                     <div class="text-center text-gray-500 py-8">
                         <i data-lucide="calendar-x" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
@@ -1791,7 +1833,7 @@
                 return;
             }
 
-            // Agrupar minutas por assessor
+            // Agrupar minutas por assessor (apenas as válidas para produtividade)
             const minutasPorAssessor = {
                 gilbert: minutasDia.filter(m => 
                     m.assessorId === 'gilbert' || 
@@ -1818,8 +1860,14 @@
                         </h3>
                         <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg inline-flex items-center">
                             <i data-lucide="file-text" class="h-5 w-5 mr-2"></i>
-                            ${minutasDia.length} minutas produzidas
+                            ${minutasDia.length} minutas válidas para produtividade
                         </div>
+                        ${minutasExcluidas.length > 0 ? `
+                            <div class="bg-red-100 text-red-800 px-4 py-2 rounded-lg inline-flex items-center mt-2">
+                                <i data-lucide="x-circle" class="h-5 w-5 mr-2"></i>
+                                ${minutasExcluidas.length} minutas excluídas (não contam para produtividade)
+                            </div>
+                        ` : ''}
                     </div>
             `;
 
@@ -1906,6 +1954,42 @@
                     </div>
                 `;
             });
+
+            // Adicionar seção de minutas excluídas se existirem
+            if (minutasExcluidas.length > 0) {
+                detalhesHtml += `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h4 class="font-medium text-red-800 mb-3 flex items-center">
+                            <i data-lucide="x-circle" class="h-4 w-4 mr-2"></i>
+                            Minutas Excluídas (${minutasExcluidas.length})
+                        </h4>
+                        <div class="text-xs text-red-700 mb-3">
+                            ⚠️ Estas minutas foram excluídas pelo juiz e não contam para a produtividade
+                        </div>
+                        <div class="space-y-2 max-h-32 overflow-y-auto">
+                            ${minutasExcluidas.map(minuta => {
+                                const categoria = categorias[minuta.categoria];
+                                const assessorNome = minuta.assessorNome || 
+                                    (minuta.assessorId === 'gilbert' || minuta.assessorId === 'assessor1' ? 'Gilbert Juliano' :
+                                     minuta.assessorId === 'laise' || minuta.assessorId === 'assessor2' ? 'Laíse Vital' : 'Assessor');
+                                
+                                return `
+                                    <div class="bg-white p-2 rounded border border-red-200 text-xs opacity-75">
+                                        <div class="font-medium text-red-800 flex items-center gap-1">
+                                            ${minuta.numeroProcesso || 'Sem número'} - ${assessorNome}
+                                            <span class="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">EXCLUÍDA</span>
+                                        </div>
+                                        <div class="flex justify-between items-center mt-1">
+                                            <span class="text-red-600">${minuta.tipoMinuta} - ${categoria?.nome}</span>
+                                        </div>
+                                        ${minuta.timestamp ? `<div class="text-red-500 mt-1">${minuta.timestamp}</div>` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
 
             detalhesHtml += '</div>';
             detalhesDiv.innerHTML = detalhesHtml;
@@ -2087,23 +2171,41 @@
         function atualizarStatus(minutaId, novoStatus) {
             if (!currentUser.isJuiz) return;
 
+            const minuta = minutas[minutaId];
+            const statusAnterior = minuta?.status || 'pendente';
+
             try {
                 if (database) {
                     database.ref(`minutas/${minutaId}/status`).set(novoStatus)
                         .then(() => {
                             minutas[minutaId].status = novoStatus;
                             renderHistorico();
-                            showNotification(`Status atualizado para: ${statusOptions[novoStatus].nome}`, 'success');
+                            renderDashboard(); // Atualizar dashboard para recalcular produtividade
+                            
+                            let mensagem = `Status atualizado para: ${statusOptions[novoStatus].nome}`;
+                            let tipo = 'success';
+                            
+                            if (novoStatus === 'excluida' && statusAnterior !== 'excluida') {
+                                mensagem = `✖️ Minuta excluída - removida da contagem de produtividade`;
+                                tipo = 'warning';
+                            } else if (statusAnterior === 'excluida' && novoStatus !== 'excluida') {
+                                mensagem = `✅ Minuta reativada - incluída novamente na produtividade`;
+                                tipo = 'success';
+                            }
+                            
+                            showNotification(mensagem, tipo);
                             log('Status atualizado', `${minutaId} -> ${novoStatus}`);
                         });
                 } else {
                     minutas[minutaId].status = novoStatus;
                     renderHistorico();
+                    renderDashboard();
                     showNotification('Status atualizado localmente!', 'warning');
                 }
             } catch (error) {
                 minutas[minutaId].status = novoStatus;
                 renderHistorico();
+                renderDashboard();
                 showNotification('Status atualizado localmente!', 'warning');
             }
         }
@@ -2135,7 +2237,7 @@
                         <option value="seeu">SEEU - Execução Penal</option>
                         <option value="sem_movimento">Sem movimentação 100+ dias</option>
                         <option value="outros">Pedidos/Atos/Urgentes</option>
-                        <option value="alem_meta">Além da Meta</option>
+                        <option value="alem_meta">Além da Meta (adicional)</option>
                     </select>
                 `;
             } else {
@@ -2198,7 +2300,7 @@
                                 const status = statusOptions[minuta.status || 'pendente'];
                                 
                                 return `
-                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${minuta.categoria === 'meta10' ? 'border-purple-300 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-pink-300 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-teal-300 bg-teal-50' : minuta.categoria === 'alem_meta' ? 'border-gray-300 bg-gray-100' : ''}">
+                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${minuta.categoria === 'meta10' ? 'border-purple-300 bg-purple-50' : minuta.categoria === 'meta2' ? 'border-pink-300 bg-pink-50' : minuta.categoria === 'seeu' ? 'border-teal-300 bg-teal-50' : minuta.categoria === 'alem_meta' ? 'border-gray-300 bg-gray-100' : ''} ${minuta.status === 'excluida' ? 'opacity-60 border-red-300 bg-red-50' : ''}">
                                         <div class="flex items-start justify-between">
                                             <div class="flex-1">
                                                 <div class="flex items-center gap-2 mb-2">
@@ -2207,6 +2309,7 @@
                                                         ${categoria?.nome || 'Categoria'}
                                                     </span>
                                                     <span class="status-badge ${status.cor}">${status.nome}</span>
+                                                    ${minuta.status === 'excluida' ? '<span class="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full font-medium">⚠️ NÃO CONTA PARA PRODUTIVIDADE</span>' : ''}
                                                     ${minuta.categoria === 'meta10' ? '<span class="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">Meta 10 🎯</span>' : ''}
                                                     ${minuta.categoria === 'meta2' ? '<span class="text-xs text-pink-600 bg-pink-100 px-2 py-1 rounded-full">Meta 2 ⚖️</span>' : ''}
                                                     ${minuta.categoria === 'seeu' ? '<span class="text-xs text-teal-600 bg-teal-100 px-2 py-1 rounded-full">SEEU 🛡️</span>' : ''}
@@ -2292,7 +2395,11 @@
                 }
 
                 const minutasPeriodo = Object.values(minutas).filter(m => 
-                    m?.data && m.data >= dataInicio && m.data <= dataFim
+                    m?.data && m.data >= dataInicio && m.data <= dataFim && m.status !== 'excluida'
+                );
+
+                const minutasExcluidasPeriodo = Object.values(minutas).filter(m => 
+                    m?.data && m.data >= dataInicio && m.data <= dataFim && m.status === 'excluida'
                 );
 
                 const estatisticas = {};
@@ -2550,7 +2657,7 @@
                             <div class="grid md:grid-cols-6 gap-4 text-center">
                                 <div class="bg-white rounded-lg p-4">
                                     <div class="text-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
-                                    <div class="text-sm text-gray-600">Total de Minutas</div>
+                                    <div class="text-sm text-gray-600">Minutas Válidas</div>
                                 </div>
                                 <div class="bg-white rounded-lg p-4">
                                     <div class="text-2xl font-bold text-pink-600">${minutasPeriodo.filter(m => m.categoria === 'meta2').length}</div>
@@ -2573,6 +2680,31 @@
                                     <div class="text-sm text-gray-600">Precisam Correção</div>
                                 </div>
                             </div>
+                            ${minutasExcluidasPeriodo.length > 0 ? `
+                                <div class="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 class="font-medium text-red-800 mb-2 flex items-center">
+                                        <i data-lucide="x-circle" class="h-4 w-4 mr-2"></i>
+                                        Minutas Excluídas no Período
+                                    </h4>
+                                    <div class="grid md:grid-cols-3 gap-4 text-center">
+                                        <div class="bg-white rounded-lg p-3">
+                                            <div class="text-xl font-bold text-red-600">${minutasExcluidasPeriodo.length}</div>
+                                            <div class="text-sm text-gray-600">Total Excluídas</div>
+                                        </div>
+                                        <div class="bg-white rounded-lg p-3">
+                                            <div class="text-xl font-bold text-red-600">${minutasExcluidasPeriodo.filter(m => m.assessorId === 'gilbert' || m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert'))).length}</div>
+                                            <div class="text-sm text-gray-600">Gilbert</div>
+                                        </div>
+                                        <div class="bg-white rounded-lg p-3">
+                                            <div class="text-xl font-bold text-red-600">${minutasExcluidasPeriodo.filter(m => m.assessorId === 'laise' || m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))).length}</div>
+                                            <div class="text-sm text-gray-600">Laíse</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-red-700 mt-2 text-center">
+                                        ⚠️ Minutas excluídas não contam para as metas de produtividade
+                                    </div>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
