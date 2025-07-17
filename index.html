@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">  
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -229,39 +229,39 @@
                         </div>
                         
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Categorias que esta minuta atende *</label>
-                            <div class="text-xs text-gray-500 mb-2">
-                                📋 Selecione todas as categorias que esta minuta cumpre (uma minuta pode atender múltiplas metas)
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Categorias/Metas Aplicáveis *</label>
+                            <div class="text-xs text-gray-600 mb-2">
+                                ℹ️ Selecione todas as categorias que se aplicam a esta minuta. Para a meta diária, contará como 1 única minuta.
                             </div>
-                            <div class="space-y-2 border border-gray-300 rounded-md p-3 bg-gray-50">
-                                <div class="flex items-center">
-                                    <input type="checkbox" id="categoria-meta1" value="meta1" class="mr-2 categoria-checkbox">
-                                    <label for="categoria-meta1" class="text-sm">Meta 1 CNJ (2/dia)</label>
-                                </div>
-                                <div class="flex items-center">
-                                    <input type="checkbox" id="categoria-meta2" value="meta2" class="mr-2 categoria-checkbox" disabled>
-                                    <label for="categoria-meta2" class="text-sm text-gray-400">Meta 2 CNJ (1 sentença/semana) - Apenas para Sentenças</label>
-                                </div>
-                                <div class="flex items-center hidden" id="categoria-meta10-container">
-                                    <input type="checkbox" id="categoria-meta10" value="meta10" class="mr-2 categoria-checkbox">
-                                    <label for="categoria-meta10" class="text-sm">Meta 10 CNJ (1/semana)</label>
-                                </div>
-                                <div class="flex items-center hidden" id="categoria-seeu-container">
-                                    <input type="checkbox" id="categoria-seeu" value="seeu" class="mr-2 categoria-checkbox">
-                                    <label for="categoria-seeu" class="text-sm">SEEU - Execução Penal (controle de acesso)</label>
-                                </div>
-                                <div class="flex items-center">
-                                    <input type="checkbox" id="categoria-sem-movimento" value="sem_movimento" class="mr-2 categoria-checkbox">
-                                    <label for="categoria-sem-movimento" class="text-sm">Sem movimentação 100+ dias (5/dia)</label>
-                                </div>
-                                <div class="flex items-center">
-                                    <input type="checkbox" id="categoria-outros" value="outros" class="mr-2 categoria-checkbox">
-                                    <label for="categoria-outros" class="text-sm">Pedidos/Atos/Urgentes (3/dia)</label>
-                                </div>
-                                <div class="flex items-center">
-                                    <input type="checkbox" id="categoria-alem-meta" value="alem_meta" class="mr-2 categoria-checkbox">
-                                    <label for="categoria-alem-meta" class="text-sm">Além da Meta (produtividade adicional)</label>
-                                </div>
+                            <div class="space-y-2 border border-gray-300 rounded-md p-3 bg-gray-50" id="categorias-container">
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="categorias" value="meta1" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="text-sm">Meta 1 CNJ (2/dia)</span>
+                                </label>
+                                <label class="flex items-center" id="meta2-checkbox" style="display: none;">
+                                    <input type="checkbox" name="categorias" value="meta2" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="text-sm">Meta 2 CNJ (1 sentença/semana)</span>
+                                </label>
+                                <label class="flex items-center" id="meta10-checkbox" style="display: none;">
+                                    <input type="checkbox" name="categorias" value="meta10" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="text-sm">Meta 10 CNJ (1/semana)</span>
+                                </label>
+                                <label class="flex items-center" id="seeu-checkbox" style="display: none;">
+                                    <input type="checkbox" name="categorias" value="seeu" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="text-sm">SEEU - Execução Penal (controle de acesso)</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="categorias" value="sem_movimento" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="text-sm">Sem movimentação 100+ dias (5/dia)</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="categorias" value="outros" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="text-sm">Pedidos/Atos/Urgentes (3/dia)</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="categorias" value="alem_meta" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="text-sm">Além da Meta (produtividade adicional)</span>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -540,7 +540,7 @@
         const categorias = {
             'meta1': { nome: 'Meta 1 CNJ', cor: 'bg-red-500', meta: 2 },
             'meta2': { nome: 'Meta 2 CNJ', cor: 'bg-pink-500', meta: 1, semanal: true, requerSentenca: true },
-            'meta10': { nome: 'Meta 10 CNJ', cor: 'bg-purple-500', meta: 1, semanal: true, totalAnual: 9 },
+            'meta10': { nome: 'Meta 10 CNJ (minutar semanalmente nos 9 processos)', cor: 'bg-purple-500', meta: 1, semanal: true, totalProcessos: 9 },
             'seeu': { nome: 'SEEU - Execução Penal (controle de acesso)', cor: 'bg-teal-500', meta: 1, prazo: 10, naoContaParaMeta: true },
             'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
             'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 },
@@ -659,34 +659,29 @@
 
         function validarTipoMinuta() {
             const tipoMinuta = document.getElementById('tipo-minuta').value;
-            const meta2Checkbox = document.getElementById('categoria-meta2');
-            const meta2Label = document.querySelector('label[for="categoria-meta2"]');
+            const meta2Checkbox = document.getElementById('meta2-checkbox');
             
             if (tipoMinuta === 'Sentença') {
-                meta2Checkbox.disabled = false;
-                meta2Label.classList.remove('text-gray-400');
-                meta2Label.classList.add('text-gray-700');
-                meta2Label.textContent = 'Meta 2 CNJ (1 sentença/semana)';
+                meta2Checkbox.style.display = 'block';
             } else {
-                meta2Checkbox.disabled = true;
-                meta2Checkbox.checked = false;
-                meta2Label.classList.add('text-gray-400');
-                meta2Label.classList.remove('text-gray-700');
-                meta2Label.textContent = 'Meta 2 CNJ (1 sentença/semana) - Apenas para Sentenças';
+                meta2Checkbox.style.display = 'none';
+                // Desmarcar meta2 se não for sentença
+                const meta2Input = meta2Checkbox.querySelector('input[value="meta2"]');
+                if (meta2Input) meta2Input.checked = false;
             }
         }
 
         function validarTipoMinutaEdicao() {
             const tipoMinuta = document.getElementById('edit-tipo-minuta').value;
-            const categoriaSelect = document.getElementById('edit-categoria-minuta');
-            const meta2Option = categoriaSelect.querySelector('option[value="meta2"]');
+            const meta2Option = document.getElementById('edit-categoria-minuta').querySelector('option[value="meta2"]');
             
             if (tipoMinuta === 'Sentença') {
                 meta2Option.style.display = 'block';
             } else {
                 meta2Option.style.display = 'none';
-                if (categoriaSelect.value === 'meta2') {
-                    categoriaSelect.value = 'meta1';
+                const selectCategoria = document.getElementById('edit-categoria-minuta');
+                if (selectCategoria.value === 'meta2') {
+                    selectCategoria.value = 'meta1';
                 }
             }
         }
@@ -735,9 +730,9 @@
                 if (!isAssessor) return false;
                 
                 if (categoria) {
-                    // Verificar se a minuta tem esta categoria (seja como categoria principal ou em categorias array)
-                    const cats = m.categorias && Array.isArray(m.categorias) ? m.categorias : [m.categoria];
-                    return cats.includes(categoria);
+                    // Verificar se a categoria está no array de categorias
+                    const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                    return categorias.includes(categoria);
                 }
                 
                 return true;
@@ -860,9 +855,9 @@
                 
                 if (!isLaise) return false;
                 
-                // Verificar se a minuta inclui SEEU
-                const cats = m.categorias && Array.isArray(m.categorias) ? m.categorias : [m.categoria];
-                return cats.includes('seeu');
+                // Verificar se SEEU está nas categorias
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes('seeu');
             }).sort((a, b) => new Date(a.data) - new Date(b.data));
             
             // Última minuta SEEU
@@ -941,12 +936,9 @@
             }
             
             const minutasHoje = getMinutasHoje(assessorId);
-            // Contar minutas que incluem esta categoria (seja como categoria principal ou em categorias array)
             const count = minutasHoje.filter(m => {
-                if (m.categorias && Array.isArray(m.categorias)) {
-                    return m.categorias.includes(categoria);
-                }
-                return m.categoria === categoria;
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes(categoria);
             }).length;
             
             const categoriaInfo = categorias[categoria];
@@ -972,26 +964,26 @@
 
         function getProgressoTotal(assessorId) {
             const minutasHoje = getMinutasHoje(assessorId);
-            
-            // Contar minutas únicas que atendem metas CNJ (não duplicar se uma minuta tem múltiplas categorias)
+            // Excluir minutas "Além da Meta" e "SEEU" do cálculo da meta diária
+            // Para minutas com múltiplas categorias, verificar se TODAS as categorias são não-contáveis
             const minutasParaMeta = minutasHoje.filter(m => {
-                const cats = m.categorias && Array.isArray(m.categorias) ? m.categorias : [m.categoria];
-                // Verificar se tem pelo menos uma categoria que conta para meta
-                return cats.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                // Se tem pelo menos uma categoria que conta para meta, incluir
+                return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
             });
             
             const total = minutasParaMeta.length;
             const meta = 10;
             
-            // Contar minutas especiais
+            // Contar minutas por categoria
             const alemDaMeta = minutasHoje.filter(m => {
-                const cats = m.categorias && Array.isArray(m.categorias) ? m.categorias : [m.categoria];
-                return cats.includes('alem_meta');
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes('alem_meta');
             }).length;
             
             const seeu = minutasHoje.filter(m => {
-                const cats = m.categorias && Array.isArray(m.categorias) ? m.categorias : [m.categoria];
-                return cats.includes('seeu');
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes('seeu');
             }).length;
             
             return { 
@@ -1085,27 +1077,27 @@
 
         function setupMeta10Options() {
             // Mostrar opção Meta 10 apenas para Gilbert
-            const meta10Container = document.getElementById('categoria-meta10-container');
+            const meta10Checkbox = document.getElementById('meta10-checkbox');
             const editMeta10Option = document.getElementById('edit-meta10-option');
             
             // Mostrar opção SEEU apenas para Laíse
-            const seuContainer = document.getElementById('categoria-seeu-container');
+            const seuCheckbox = document.getElementById('seeu-checkbox');
             const editSeuOption = document.getElementById('edit-seeu-option');
             
             if (currentUser.assessorId === 'gilbert') {
-                meta10Container?.classList.remove('hidden');
+                meta10Checkbox?.style.setProperty('display', 'block');
                 editMeta10Option?.classList.remove('hidden');
-                seuContainer?.classList.add('hidden');
+                seuCheckbox?.style.setProperty('display', 'none');
                 editSeuOption?.classList.add('hidden');
             } else if (currentUser.assessorId === 'laise') {
-                meta10Container?.classList.add('hidden');
+                meta10Checkbox?.style.setProperty('display', 'none');
                 editMeta10Option?.classList.add('hidden');
-                seuContainer?.classList.remove('hidden');
+                seuCheckbox?.style.setProperty('display', 'block');
                 editSeuOption?.classList.remove('hidden');
             } else {
-                meta10Container?.classList.add('hidden');
+                meta10Checkbox?.style.setProperty('display', 'none');
                 editMeta10Option?.classList.add('hidden');
-                seuContainer?.classList.add('hidden');
+                seuCheckbox?.style.setProperty('display', 'none');
                 editSeuOption?.classList.add('hidden');
             }
         }
@@ -1280,30 +1272,30 @@
             const numeroProcesso = document.getElementById('numero-processo').value.trim();
             const tipoMinuta = document.getElementById('tipo-minuta').value;
             const observacoes = document.getElementById('observacoes-minuta').value.trim();
-
+            
             // Obter categorias selecionadas
-            const checkboxes = document.querySelectorAll('.categoria-checkbox:checked');
-            const categorias = Array.from(checkboxes).map(cb => cb.value);
+            const categoriasCheckboxes = document.querySelectorAll('input[name="categorias"]:checked');
+            const categoriasSelecionadas = Array.from(categoriasCheckboxes).map(cb => cb.value);
 
-            if (!numeroProcesso || !tipoMinuta || categorias.length === 0) {
+            if (!numeroProcesso || !tipoMinuta || categoriasSelecionadas.length === 0) {
                 showNotification('Por favor, preencha todos os campos obrigatórios e selecione pelo menos uma categoria.', 'warning');
                 return;
             }
 
             // Validação especial para Meta 2 - só aceita Sentença
-            if (categorias.includes('meta2') && tipoMinuta !== 'Sentença') {
+            if (categoriasSelecionadas.includes('meta2') && tipoMinuta !== 'Sentença') {
                 showNotification('Meta 2 CNJ aceita apenas minutas de Sentença.', 'error');
                 return;
             }
 
             // Validação especial para Meta 10
-            if (categorias.includes('meta10') && currentUser.assessorId !== 'gilbert') {
+            if (categoriasSelecionadas.includes('meta10') && currentUser.assessorId !== 'gilbert') {
                 showNotification('Apenas Gilbert pode registrar minutas da Meta 10 CNJ.', 'error');
                 return;
             }
 
             // Validação especial para SEEU
-            if (categorias.includes('seeu') && currentUser.assessorId !== 'laise') {
+            if (categoriasSelecionadas.includes('seeu') && currentUser.assessorId !== 'laise') {
                 showNotification('Apenas Laíse pode registrar minutas do SEEU.', 'error');
                 return;
             }
@@ -1313,8 +1305,7 @@
                 assessorNome: currentUser.nome,
                 numeroProcesso,
                 tipoMinuta,
-                categorias: categorias, // Array de categorias
-                categoria: categorias[0], // Manter compatibilidade com código existente
+                categorias: categoriasSelecionadas, // Array de categorias
                 observacoes,
                 status: 'pendente',
                 data: getHojeString(),
@@ -1331,24 +1322,27 @@
                     }).then(() => {
                         limparFormularioRegistro();
                         
-                        let mensagem = '';
-                        if (categorias.includes('meta2')) {
-                            mensagem = '🎯 Sentença registrada! Conta para Meta 2 CNJ (meta semanal cumprida)';
-                        } else if (categorias.includes('meta10')) {
-                            mensagem = '✨ Processo registrado! Conta para Meta 10 CNJ (meta semanal cumprida)';
-                        } else if (categorias.includes('seeu')) {
-                            mensagem = '🛡️ Acesso ao SEEU registrado! Controle de 10 dias cumprido';
-                        } else {
-                            mensagem = 'Minuta registrada com sucesso!';
+                        // Mensagem personalizada baseada nas categorias
+                        let mensagem = 'Minuta registrada com sucesso!';
+                        let tipo = 'success';
+                        
+                        if (categoriasSelecionadas.includes('meta2')) {
+                            mensagem = '🎯 Sentença da Meta 2 CNJ registrada! Meta semanal cumprida!';
+                        } else if (categoriasSelecionadas.includes('meta10')) {
+                            mensagem = '✨ Processo da Meta 10 CNJ registrado! Meta semanal cumprida!';
+                        } else if (categoriasSelecionadas.includes('seeu')) {
+                            mensagem = '🛡️ Acesso ao SEEU registrado! Controle de 10 dias cumprido (não conta para meta diária).';
+                        } else if (categoriasSelecionadas.includes('alem_meta')) {
+                            mensagem = '➕ Minuta "Além da Meta" registrada! Produtividade adicional contabilizada (não conta para meta diária).';
                         }
                         
-                        if (categorias.length > 1) {
-                            mensagem += ` • Atende ${categorias.length} categorias: ${categorias.map(c => categorias[c]?.nome || c).join(', ')}`;
+                        if (categoriasSelecionadas.length > 1) {
+                            mensagem += ` Aplicada a ${categoriasSelecionadas.length} categorias.`;
                         }
                         
-                        showNotification(mensagem, 'success');
+                        showNotification(mensagem, tipo);
                         showView('dashboard');
-                        log('Minuta registrada no Firebase', `${numeroProcesso} - ${categorias.length} categorias`);
+                        log('Minuta registrada no Firebase', numeroProcesso + ' - Categorias: ' + categoriasSelecionadas.join(', '));
                     }).catch(() => {
                         salvarMinutaLocal(novaMinuta);
                     });
@@ -1386,12 +1380,11 @@
             document.getElementById('tipo-minuta').value = '';
             document.getElementById('observacoes-minuta').value = '';
             
-            // Limpar todos os checkboxes
-            document.querySelectorAll('.categoria-checkbox').forEach(cb => {
-                cb.checked = false;
-            });
+            // Desmarcar todas as categorias
+            const categoriasCheckboxes = document.querySelectorAll('input[name="categorias"]');
+            categoriasCheckboxes.forEach(cb => cb.checked = false);
             
-            // Resetar validação da Meta 2
+            // Esconder meta2 se não for sentença
             validarTipoMinuta();
         }
 
@@ -1476,9 +1469,24 @@
                     `;
                 } else {
                     const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
-                    const minutasParaMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria !== 'alem_meta' && m.categoria !== 'seeu' && m.status !== 'excluida').length;
-                    const minutasAlemMeta = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria === 'alem_meta' && m.status !== 'excluida').length;
-                    const minutasSEEU = Object.values(minutas).filter(m => m?.data === getHojeString() && m.categoria === 'seeu' && m.status !== 'excluida').length;
+                    const minutasParaMeta = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
+                    }).length;
+                    
+                    const minutasAlemMeta = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.includes('alem_meta');
+                    }).length;
+                    
+                    const minutasSEEU = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.includes('seeu');
+                    }).length;
+                    
                     const metaTotal = 20; // Meta total do gabinete (10 por assessor)
 
                     content += `
@@ -1909,28 +1917,42 @@
                         <h4 class="text-sm font-medium text-gray-700 mb-2">Últimas minutas</h4>
                         <div class="space-y-2 max-h-32 overflow-y-auto">
                             ${ultimasMinutas.map(minuta => {
-                                const categoriasPrincipal = minuta.categorias && Array.isArray(minuta.categorias) ? minuta.categorias : [minuta.categoria];
-                                const categoriasNome = categoriasPrincipal.map(cat => categorias[cat]?.nome || cat).join(' + ');
+                                const categorias = Array.isArray(minuta.categorias) ? minuta.categorias : [minuta.categoria || minuta.categorias];
+                                const isMultipleCategories = categorias.length > 1;
+                                
+                                // Determinar cor da borda baseada na categoria principal
+                                let borderClass = '';
+                                if (categorias.includes('meta10')) borderClass = 'border-l-2 border-purple-400 bg-purple-50';
+                                else if (categorias.includes('meta2')) borderClass = 'border-l-2 border-pink-400 bg-pink-50';
+                                else if (categorias.includes('seeu')) borderClass = 'border-l-2 border-teal-400 bg-teal-50';
+                                else if (categorias.includes('alem_meta')) borderClass = 'border-l-2 border-gray-400 bg-gray-100';
+                                
+                                const statusClass = minuta.status === 'correcao' ? 'border-l-4 border-blue-500 bg-blue-50 animate-pulse shadow-md' : borderClass;
                                 
                                 return `
-                                    <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${categoriasPrincipal.includes('meta10') ? 'border-l-2 border-purple-400 bg-purple-50' : categoriasPrincipal.includes('meta2') ? 'border-l-2 border-pink-400 bg-pink-50' : categoriasPrincipal.includes('seeu') ? 'border-l-2 border-teal-400 bg-teal-50' : categoriasPrincipal.includes('alem_meta') ? 'border-l-2 border-gray-400 bg-gray-100' : ''} ${minuta.status === 'correcao' ? 'border-l-4 border-blue-500 bg-blue-50 animate-pulse shadow-md' : ''}">
+                                    <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded ${minuta.editadaEm ? 'border-l-2 border-orange-400' : ''} ${statusClass}">
                                         <div class="font-medium flex items-center gap-1">
                                             ${minuta.numeroProcesso || 'Sem número'}
-                                            ${categoriasPrincipal.includes('meta10') ? '<span class="text-purple-600">🎯</span>' : ''}
-                                            ${categoriasPrincipal.includes('meta2') ? '<span class="text-pink-600">⚖️</span>' : ''}
-                                            ${categoriasPrincipal.includes('seeu') ? '<span class="text-teal-600">🛡️</span>' : ''}
-                                            ${categoriasPrincipal.includes('alem_meta') ? '<span class="text-gray-600">➕</span>' : ''}
+                                            ${categorias.includes('meta10') ? '<span class="text-purple-600">🎯</span>' : ''}
+                                            ${categorias.includes('meta2') ? '<span class="text-pink-600">⚖️</span>' : ''}
+                                            ${categorias.includes('seeu') ? '<span class="text-teal-600">🛡️</span>' : ''}
+                                            ${categorias.includes('alem_meta') ? '<span class="text-gray-600">➕</span>' : ''}
                                             ${minuta.editadaEm ? '<span class="text-orange-600" title="Editada">✏️</span>' : ''}
                                             ${minuta.status === 'correcao' ? '<span class="text-blue-600 font-bold" title="Correção Solicitada">🔴📝</span>' : ''}
-                                            ${categoriasPrincipal.length > 1 ? '<span class="text-green-600" title="Múltiplas Categorias">🔗</span>' : ''}
+                                            ${isMultipleCategories ? '<span class="text-blue-500" title="Múltiplas categorias">📋</span>' : ''}
                                         </div>
                                         <div class="flex justify-between items-center">
-                                            <span class="text-xs">${minuta.tipoMinuta} - ${categoriasNome}</span>
+                                            <span class="text-xs">
+                                                ${minuta.tipoMinuta} - ${isMultipleCategories ? 
+                                                    `${categorias.length} categorias` : 
+                                                    categorias.map(cat => categorias[cat]?.nome || cat).join(', ')
+                                                }
+                                            </span>
                                             <span class="status-badge ${statusOptions[minuta.status]?.cor || 'status-pendente'}">${statusOptions[minuta.status]?.nome || 'Pendente'}</span>
                                         </div>
-                                        ${categoriasPrincipal.length > 1 ? `
-                                            <div class="mt-1 text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
-                                                🔗 Atende ${categoriasPrincipal.length} categorias
+                                        ${isMultipleCategories ? `
+                                            <div class="mt-1 text-xs text-blue-600 bg-blue-50 p-1 rounded">
+                                                📋 Categorias: ${categorias.map(cat => categorias[cat]?.nome || cat).join(', ')}
                                             </div>
                                         ` : ''}
                                         ${minuta.status === 'correcao' && minuta.correcaoSolicitada ? `
@@ -1977,7 +1999,11 @@
             }
 
             // Verificar alertas específicos por categoria
-            const minutasSEEU = minutasHoje.filter(m => m.categoria === 'seeu').length;
+            const minutasSEEU = minutasHoje.filter(m => {
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes('seeu');
+            }).length;
+            
             let alertasExtras = '';
             
             if (minutasSEEU > 0) {
