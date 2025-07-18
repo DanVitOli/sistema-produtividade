@@ -3124,6 +3124,26 @@
                             <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumo Geral</h3>
                             <div class="grid md:grid-cols-6 gap-4 text-center">
                                 <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
+                                    <div class="text-sm text-gray-600">Minutas Válidas</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-pink-600">${minutasPeriodo.filter(m => m.categoria === 'meta2').length}</div>
+                                    <div class="text-sm text-gray-600">Sentenças Meta 2</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-gray-600">${minutasPeriodo.filter(m => m.categoria === 'alem_meta').length}</div>
+                                    <div class="text-sm text-gray-600">Além da Meta</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-green-600">${minutasPeriodo.filter(m => m.status === 'assinada').length}</div>
+                                    <div class="text-sm text-gray-600">Minutas Assinadas</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-yellow-600">${minutasPeriodo.filter(m => (m.status || 'pendente') === 'pendente').length}</div>
+                                    <div class="text-sm text-gray-600">Minutas Pendentes</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
                                     <div class="text-2xl font-bold text-red-600">${minutasPeriodo.filter(m => m.status === 'correcao').length}</div>
                                     <div class="text-sm text-gray-600">Precisam Correção</div>
                                 </div>
@@ -3199,24 +3219,4 @@
         });
     </script>
 </body>
-</html>-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
-                                    <div class="text-sm text-gray-600">Minutas Válidas</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-pink-600">${minutasPeriodo.filter(m => m.categoria === 'meta2').length}</div>
-                                    <div class="text-sm text-gray-600">Sentenças Meta 2</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-gray-600">${minutasPeriodo.filter(m => m.categoria === 'alem_meta').length}</div>
-                                    <div class="text-sm text-gray-600">Além da Meta</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-green-600">${minutasPeriodo.filter(m => m.status === 'assinada').length}</div>
-                                    <div class="text-sm text-gray-600">Minutas Assinadas</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-yellow-600">${minutasPeriodo.filter(m => (m.status || 'pendente') === 'pendente').length}</div>
-                                    <div class="text-sm text-gray-600">Minutas Pendentes</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text
+</html>
