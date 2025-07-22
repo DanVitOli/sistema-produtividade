@@ -1031,6 +1031,14 @@
                     firebase = window.firebase;
                     firebase.initializeApp(firebaseConfig);
                     database = firebase.database();
+                    // Autenticação automática
+firebase.auth().signInAnonymously()
+    .then(() => {
+        console.log('✅ Firebase autenticado com sucesso');
+    })
+    .catch((error) => {
+        console.error('❌ Erro na autenticação:', error);
+    });
                 } catch (error) {
                     log('Firebase não disponível - modo offline', error);
                     database = null;
