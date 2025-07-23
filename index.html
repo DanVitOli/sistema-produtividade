@@ -8,7 +8,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <!-- Lucide Icons com fallbacks -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js" 
+            onerror="this.onerror=null;this.src='https://unpkg.com/lucide@latest/dist/umd/lucide.js'"></script>
     <style>
         .loading-spinner {
             border: 4px solid #f3f3f3;
@@ -594,6 +596,19 @@
             
             return categorias.filter(cat => cat && cat.trim()); // Remove vazios
         }
+
+        // ===== FUNÇÃO PARA CRIAR ÍCONES COM FALLBACK =====
+        function criarIcones() {
+            try {
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons();
+                } else {
+                    console.warn('Lucide não disponível - sistema funcionará sem ícones');
+                }
+            } catch (error) {
+                console.warn('Erro ao criar ícones:', error);
+            }
+        }
         
         function isDiaUtil(data) {
             const dataParaVerificar = data || getDataHoraBrasilia();
@@ -1153,7 +1168,7 @@
             }
 
             nav.innerHTML = buttons;
-            lucide.createIcons();
+            criarIcones();
         }
 
         function showView(view) {
@@ -1481,7 +1496,7 @@
                 dashboard.innerHTML = content;
                 dashboard.classList.remove('hidden');
                 
-                setTimeout(() => lucide.createIcons(), 100);
+                setTimeout(() => criarIcones(), 100);
                 log('Dashboard renderizado');
                 
             } catch (error) {
@@ -1661,7 +1676,7 @@
                 document.getElementById('historico-content').innerHTML = content;
                 historico.classList.remove('hidden');
                 
-                setTimeout(() => lucide.createIcons(), 100);
+                setTimeout(() => criarIcones(), 100);
                 log('Histórico renderizado com correção');
                 
             } catch (error) {
@@ -1686,7 +1701,7 @@
                 `;
 
                 calendarioView.classList.remove('hidden');
-                setTimeout(() => lucide.createIcons(), 100);
+                setTimeout(() => criarIcones(), 100);
                 log('Calendário renderizado');
                 
             } catch (error) {
@@ -1897,7 +1912,7 @@
                 </button>
             `;
             
-            setTimeout(() => lucide.createIcons(), 100);
+            setTimeout(() => criarIcones(), 100);
         }
 
         function gerarRelatorio(tipo) {
@@ -2178,7 +2193,11 @@
         
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                lucide.createIcons();
+                // Aguardar um pouco para garantir que o Lucide carregue
+                setTimeout(() => {
+                    criarIcones();
+                }, 200);
+                
                 log('Aplicação carregada');
                 
                 document.addEventListener('keydown', function(e) {
