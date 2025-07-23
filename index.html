@@ -630,12 +630,30 @@
         }
 
         function getDataHoraBrasilia() {
-            const agora = new Date();
-            const brasiliaOffset = -3;
-            const utc = agora.getTime() + (agora.getTimezoneOffset() * 60000);
-            const brasilia = new Date(utc + (brasiliaOffset * 3600000));
-            
-            return brasilia;
+            try {
+                const agora = new Date();
+                
+                // Verificar se a data é válida
+                if (isNaN(agora.getTime())) {
+                    console.warn('Data inválida detectada, usando fallback');
+                    return new Date(2024, 11, 23); // Fallback para uma data conhecida
+                }
+                
+                const brasiliaOffset = -3;
+                const utc = agora.getTime() + (agora.getTimezoneOffset() * 60000);
+                const brasilia = new Date(utc + (brasiliaOffset * 3600000));
+                
+                // Verificar se a data convertida é válida
+                if (isNaN(brasilia.getTime())) {
+                    console.warn('Data convertida inválida, usando UTC');
+                    return agora;
+                }
+                
+                return brasilia;
+            } catch (error) {
+                console.error('Erro ao obter data/hora de Brasília:', error);
+                return new Date(); // Fallback para data atual do sistema
+            }
         }
 
         function getInicioSemana(data) {
@@ -661,7 +679,24 @@
         function log(message, data = null) {
             const brasilia = getDataHoraBrasilia();
             const timestamp = brasilia.toLocaleTimeString('pt-BR');
+            
+            // Log padrão
             console.log(`[${timestamp} BRT] ${message}`, data || '');
+            
+            // Se for um erro, adicionar stack trace
+            if (message.toLowerCase().includes('erro') && data instanceof Error) {
+                console.error('Stack trace:', data.stack);
+            }
+            
+            // Debug adicional para relatórios
+            if (message.includes('relatório') || message.includes('gráfico')) {
+                console.group(`📊 Debug Relatório - ${timestamp}`);
+                console.log('Mensagem:', message);
+                if (data) console.log('Dados:', data);
+                console.log('Total minutas no sistema:', Object.keys(minutas).length);
+                console.log('Usuário atual:', currentUser?.nome);
+                console.groupEnd();
+            }
         }
 
         function showNotification(message, type = 'info') {
@@ -1648,34 +1683,98 @@
         function renderRelatorios() {
             try {
                 const relatoriosView = document.getElementById('relatorios-view');
-                if (!relatoriosView) return;
+                if (!relatoriosView) {
+                    throw new Error('Elemento relatorios-view não encontrado');
+                }
 
+                const relatorioContent = document.getElementById('relatorio-content');
+                if (!relatorioContent) {
+                    throw new Error('Elemento relatorio-content não encontrado');
+                }
+
+                // Verificar se há minutas para gerar relatórios
+                const totalMinutas = Object.keys(minutas).length;
+                
                 // Inicializar com uma mensagem de boas-vindas e instruções
-                document.getElementById('relatorio-content').innerHTML = `
+                relatorioContent.innerHTML = `
                     <div class="text-center py-12">
                         <i data-lucide="bar-chart-3" class="mx-auto h-16 w-16 text-gray-300 mb-4"></i>
                         <h3 class="text-xl font-semibold text-gray-800 mb-2">Relatórios de Produtividade</h3>
                         <p class="text-gray-600 mb-6">Selecione o tipo de relatório que deseja gerar</p>
+                        
+                        ${totalMinutas > 0 ? `
+                            <div class="mb-6 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg p-3 max-w-md mx-auto">
+                                📊 ${totalMinutas} minuta${totalMinutas !== 1 ? 's' : ''} disponível${totalMinutas !== 1 ? 'is' : ''} para análise
+                            </div>
+                        ` : `
+                            <div class="mb-6 text-sm text-yellow-600 bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-w-md mx-auto">
+                                ⚠️ Nenhuma minuta encontrada. Registre algumas minutas primeiro para gerar relatórios.
+                            </div>
+                        `}
+                        
                         <div class="space-y-4">
                             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left max-w-md mx-auto">
                                 <h4 class="font-semibold text-blue-800 mb-2">📅 Relatório Semanal</h4>
-                                <p class="text-sm text-blue-700">Análise detalhada da semana atual com produtividade diária e metas cumpridas.</p>
+                                <p class="text-sm text-blue-700 mb-3">Análise detalhada da semana atual com produtividade diária e metas cumpridas.</p>
+                                <button onclick="gerarRelatorio('semanal')" 
+                                        class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm font-medium"
+                                        ${totalMinutas === 0 ? 'disabled' : ''}>
+                                    <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
+                                    Gerar Relatório Semanal
+                                </button>
                             </div>
+                            
                             <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-left max-w-md mx-auto">
                                 <h4 class="font-semibold text-green-800 mb-2">📊 Relatório Mensal</h4>
-                                <p class="text-sm text-green-700">Visão completa do mês com gráficos de performance e comparativos semanais.</p>
+                                <p class="text-sm text-green-700 mb-3">Visão completa do mês com gráficos de performance e comparativos semanais.</p>
+                                <button onclick="gerarRelatorio('mensal')" 
+                                        class="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm font-medium"
+                                        ${totalMinutas === 0 ? 'disabled' : ''}>
+                                    <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
+                                    Gerar Relatório Mensal
+                                </button>
                             </div>
+                        </div>
+                        
+                        ${totalMinutas === 0 ? `
+                            <div class="mt-6">
+                                <button onclick="showView('registro')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm">
+                                    <i data-lucide="plus" class="h-4 w-4 mr-1 inline"></i>
+                                    Registrar Primeira Minuta
+                                </button>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="mt-8 text-xs text-gray-500">
+                            <p>💡 <strong>Dica:</strong> Os relatórios são gerados em tempo real com base nas minutas registradas.</p>
+                            <p>📝 Para melhores resultados, registre minutas regularmente e mantenha os dados atualizados.</p>
                         </div>
                     </div>
                 `;
 
                 relatoriosView.classList.remove('hidden');
                 setTimeout(() => criarIcones(), 100);
-                log('Tela de relatórios renderizada');
+                log('Tela de relatórios renderizada com sucesso');
                 
             } catch (error) {
-                log('Erro ao renderizar tela de relatórios', error);
-                showNotification('Erro ao carregar relatórios', 'error');
+                log('Erro ao renderizar tela de relatórios:', error);
+                showNotification('Erro ao carregar página de relatórios', 'error');
+                
+                // Fallback básico
+                const relatorioContent = document.getElementById('relatorio-content');
+                if (relatorioContent) {
+                    relatorioContent.innerHTML = `
+                        <div class="text-center py-12">
+                            <i data-lucide="alert-triangle" class="mx-auto h-16 w-16 text-red-300 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-red-800 mb-2">Erro ao Carregar Relatórios</h3>
+                            <p class="text-red-600 mb-4">Ocorreu um erro ao inicializar a página de relatórios</p>
+                            <button onclick="showView('dashboard')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors">
+                                Voltar ao Dashboard
+                            </button>
+                        </div>
+                    `;
+                }
+                setTimeout(() => criarIcones(), 100);
             }
         }
 
@@ -2362,7 +2461,9 @@
         function gerarRelatorio(tipo) {
             try {
                 const relatorioContent = document.getElementById('relatorio-content');
-                if (!relatorioContent) return;
+                if (!relatorioContent) {
+                    throw new Error('Elemento relatorio-content não encontrado');
+                }
 
                 const hoje = getDataHoraBrasilia();
                 let inicio, fim, titulo;
@@ -2375,15 +2476,21 @@
                     inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
                     fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
                     titulo = `Relatório Mensal - ${inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`;
+                } else {
+                    throw new Error(`Tipo de relatório inválido: ${tipo}`);
                 }
 
                 const inicioStr = inicio.toISOString().split('T')[0];
                 const fimStr = fim.toISOString().split('T')[0];
 
+                log(`Gerando relatório ${tipo} para período ${inicioStr} a ${fimStr}`);
+
                 const minutasRelatorio = Object.values(minutas).filter(m => {
                     if (!m || !m.data) return false;
                     return m.data >= inicioStr && m.data <= fimStr && m.status !== 'excluida';
                 });
+
+                log(`Encontradas ${minutasRelatorio.length} minutas no período`);
 
                 const estatisticas = {
                     gilbert: { 
@@ -2397,28 +2504,32 @@
                 };
 
                 minutasRelatorio.forEach(m => {
-                    let assessorId = m.assessorId;
-                    
-                    // Normalizar IDs antigos
-                    if (assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert'))) {
-                        assessorId = 'gilbert';
-                    } else if (assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))) {
-                        assessorId = 'laise';
-                    }
-                    
-                    if (estatisticas[assessorId]) {
-                        estatisticas[assessorId].total++;
+                    try {
+                        let assessorId = m.assessorId;
                         
-                        // Contar por status
-                        if (m.status === 'pendente') estatisticas[assessorId].pendentes++;
-                        if (m.status === 'assinada') estatisticas[assessorId].assinadas++;
+                        // Normalizar IDs antigos
+                        if (assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert'))) {
+                            assessorId = 'gilbert';
+                        } else if (assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))) {
+                            assessorId = 'laise';
+                        }
                         
-                        const categorias = normalizarCategorias(m);
-                        categorias.forEach(cat => {
-                            if (estatisticas[assessorId][cat] !== undefined) {
-                                estatisticas[assessorId][cat]++;
-                            }
-                        });
+                        if (estatisticas[assessorId]) {
+                            estatisticas[assessorId].total++;
+                            
+                            // Contar por status
+                            if (m.status === 'pendente') estatisticas[assessorId].pendentes++;
+                            if (m.status === 'assinada') estatisticas[assessorId].assinadas++;
+                            
+                            const categorias = normalizarCategorias(m);
+                            categorias.forEach(cat => {
+                                if (estatisticas[assessorId][cat] !== undefined) {
+                                    estatisticas[assessorId][cat]++;
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        log(`Erro ao processar minuta:`, err);
                     }
                 });
 
@@ -2428,7 +2539,7 @@
                 const mediaLaise = diasUteis > 0 ? (estatisticas.laise.total / diasUteis).toFixed(1) : '0';
                 const mediaTotal = diasUteis > 0 ? ((estatisticas.gilbert.total + estatisticas.laise.total) / diasUteis).toFixed(1) : '0';
 
-                relatorioContent.innerHTML = `
+                let relatorioHtml = `
                     <div class="space-y-6">
                         <div class="text-center border-b pb-4">
                             <h3 class="text-2xl font-bold text-gray-800 mb-2">${titulo}</h3>
@@ -2561,10 +2672,28 @@
                                 </div>
                             </div>
                         </div>
+                `;
 
-                        <!-- Gráfico de Performance Semanal (se for relatório mensal) -->
-                        ${tipo === 'mensal' ? renderGraficoSemanal(inicio, fim) : ''}
+                // Adicionar gráfico semanal apenas para relatório mensal
+                if (tipo === 'mensal') {
+                    try {
+                        const graficoSemanal = renderGraficoSemanal(inicio, fim);
+                        relatorioHtml += graficoSemanal;
+                    } catch (graficoError) {
+                        log('Erro ao gerar gráfico semanal:', graficoError);
+                        // Continuar sem o gráfico
+                        relatorioHtml += `
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <div class="text-yellow-800 text-sm">
+                                    ⚠️ Gráfico de performance semanal temporariamente indisponível
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
                         
+                // Finalizar HTML
+                relatorioHtml += `
                         <!-- Observações -->
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
                             <h4 class="text-lg font-semibold text-gray-800 mb-3">📝 Observações</h4>
@@ -2579,84 +2708,186 @@
                     </div>
                 `;
 
+                relatorioContent.innerHTML = relatorioHtml;
+
                 // Mostrar a seção de relatórios
                 document.getElementById('relatorios-view').classList.remove('hidden');
                 
-                log(`Relatório ${tipo} gerado com ${minutasRelatorio.length} minutas`);
+                log(`Relatório ${tipo} gerado com sucesso - ${minutasRelatorio.length} minutas processadas`);
                 showNotification(`Relatório ${tipo} gerado com sucesso!`, 'success');
                 
             } catch (error) {
-                log(`Erro ao gerar relatório ${tipo}:`, error);
-                showNotification(`Erro ao gerar relatório ${tipo}`, 'error');
+                log(`Erro detalhado ao gerar relatório ${tipo}:`, error);
+                console.error('Stack trace completo:', error);
+                
+                // Mostrar erro mais detalhado para o usuário
+                const relatorioContent = document.getElementById('relatorio-content');
+                if (relatorioContent) {
+                    relatorioContent.innerHTML = `
+                        <div class="text-center py-12">
+                            <i data-lucide="alert-triangle" class="mx-auto h-16 w-16 text-red-300 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-red-800 mb-2">Erro ao Gerar Relatório</h3>
+                            <p class="text-red-600 mb-4">Ocorreu um erro ao processar o relatório ${tipo}</p>
+                            <div class="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md mx-auto">
+                                <div class="text-sm text-red-700">
+                                    <strong>Detalhes técnicos:</strong><br>
+                                    ${error.message || 'Erro desconhecido'}
+                                </div>
+                            </div>
+                            <button onclick="renderRelatorios()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors">
+                                Voltar
+                            </button>
+                        </div>
+                    `;
+                    setTimeout(() => criarIcones(), 100);
+                }
+                
+                showNotification(`Erro ao gerar relatório ${tipo}: ${error.message}`, 'error');
             }
         }
 
         function calcularDiasUteis(inicio, fim) {
-            let diasUteis = 0;
-            let data = new Date(inicio);
-            
-            while (data <= fim) {
-                if (isDiaUtil(data)) {
-                    diasUteis++;
+            try {
+                if (!inicio || !fim) {
+                    log('Erro: datas inválidas para cálculo de dias úteis');
+                    return 0;
                 }
-                data.setDate(data.getDate() + 1);
+
+                let diasUteis = 0;
+                let data = new Date(inicio);
+                const dataFim = new Date(fim);
+                
+                // Proteção contra loop infinito
+                let contador = 0;
+                const maxIteracoes = 366; // Máximo de 1 ano
+                
+                while (data <= dataFim && contador < maxIteracoes) {
+                    if (isDiaUtil(data)) {
+                        diasUteis++;
+                    }
+                    data.setDate(data.getDate() + 1);
+                    contador++;
+                }
+                
+                if (contador >= maxIteracoes) {
+                    log('Aviso: Cálculo de dias úteis interrompido para evitar loop infinito');
+                }
+                
+                log(`Calculados ${diasUteis} dias úteis entre ${inicio.toISOString().split('T')[0]} e ${fim.toISOString().split('T')[0]}`);
+                return diasUteis;
+                
+            } catch (error) {
+                log('Erro ao calcular dias úteis:', error);
+                return 0;
             }
-            
-            return diasUteis;
         }
 
         function renderGraficoSemanal(inicio, fim) {
-            // Dividir o mês em semanas e calcular produtividade por semana
-            const semanas = [];
-            let inicioSemana = new Date(inicio);
-            
-            while (inicioSemana <= fim) {
-                const fimSemana = new Date(inicioSemana);
-                fimSemana.setDate(fimSemana.getDate() + 6);
-                if (fimSemana > fim) fimSemana = new Date(fim);
+            try {
+                if (!inicio || !fim) {
+                    throw new Error('Parâmetros de data inválidos');
+                }
+
+                log(`Gerando gráfico semanal para período ${inicio.toISOString().split('T')[0]} a ${fim.toISOString().split('T')[0]}`);
+
+                // Dividir o mês em semanas e calcular produtividade por semana
+                const semanas = [];
+                let inicioSemana = new Date(inicio);
                 
-                const minutasSemana = Object.values(minutas).filter(m => {
-                    if (!m || !m.data || m.status === 'excluida') return false;
-                    const data = new Date(m.data);
-                    return data >= inicioSemana && data <= fimSemana;
-                });
+                while (inicioSemana <= fim) {
+                    const fimSemana = new Date(inicioSemana);
+                    fimSemana.setDate(fimSemana.getDate() + 6);
+                    if (fimSemana > fim) {
+                        fimSemana.setTime(fim.getTime());
+                    }
+                    
+                    const inicioStr = inicioSemana.toISOString().split('T')[0];
+                    const fimStr = fimSemana.toISOString().split('T')[0];
+                    
+                    const minutasSemana = Object.values(minutas).filter(m => {
+                        if (!m || !m.data || m.status === 'excluida') return false;
+                        return m.data >= inicioStr && m.data <= fimStr;
+                    });
+                    
+                    semanas.push({
+                        inicio: new Date(inicioSemana),
+                        fim: new Date(fimSemana),
+                        total: minutasSemana.length,
+                        semana: semanas.length + 1
+                    });
+                    
+                    inicioSemana.setDate(inicioSemana.getDate() + 7);
+                    
+                    // Proteção contra loop infinito
+                    if (semanas.length > 10) {
+                        log('Aviso: Muitas semanas detectadas, limitando a 10');
+                        break;
+                    }
+                }
                 
-                semanas.push({
-                    inicio: new Date(inicioSemana),
-                    fim: new Date(fimSemana),
-                    total: minutasSemana.length,
-                    semana: semanas.length + 1
-                });
-                
-                inicioSemana.setDate(inicioSemana.getDate() + 7);
-            }
-            
-            const maxMinutas = Math.max(...semanas.map(s => s.total), 50); // Mínimo 50 para escala
-            
-            return `
-                <div class="bg-white border border-gray-200 rounded-lg p-6">
-                    <h4 class="text-lg font-semibold text-gray-800 mb-4">📈 Performance Semanal</h4>
-                    <div class="space-y-3">
-                        ${semanas.map(semana => `
-                            <div class="flex items-center space-x-4">
-                                <div class="w-20 text-sm font-medium text-gray-600">
-                                    Sem ${semana.semana}
-                                </div>
-                                <div class="flex-1 bg-gray-200 rounded-full h-6 relative">
-                                    <div class="bg-blue-500 h-6 rounded-full transition-all duration-300" 
-                                         style="width: ${(semana.total / maxMinutas) * 100}%"></div>
-                                    <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white">
-                                        ${semana.total} minutas
-                                    </div>
-                                </div>
-                                <div class="w-24 text-sm text-gray-500">
-                                    ${semana.inicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - ${semana.fim.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                                </div>
+                if (semanas.length === 0) {
+                    return `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-yellow-800 mb-3">📈 Performance Semanal</h4>
+                            <div class="text-yellow-700 text-center py-4">
+                                Não há dados suficientes para gerar o gráfico semanal
                             </div>
-                        `).join('')}
+                        </div>
+                    `;
+                }
+                
+                const maxMinutas = Math.max(...semanas.map(s => s.total), 10); // Mínimo 10 para escala visível
+                
+                log(`Gráfico semanal: ${semanas.length} semanas, máximo ${maxMinutas} minutas`);
+                
+                return `
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">📈 Performance Semanal</h4>
+                        <div class="space-y-3">
+                            ${semanas.map((semana, index) => {
+                                const porcentagem = maxMinutas > 0 ? (semana.total / maxMinutas) * 100 : 0;
+                                const cor = semana.total >= 50 ? 'bg-green-500' : 
+                                           semana.total >= 25 ? 'bg-yellow-500' : 'bg-red-500';
+                                
+                                return `
+                                    <div class="flex items-center space-x-4">
+                                        <div class="w-20 text-sm font-medium text-gray-600">
+                                            Sem ${semana.semana}
+                                        </div>
+                                        <div class="flex-1 bg-gray-200 rounded-full h-6 relative">
+                                            <div class="${cor} h-6 rounded-full transition-all duration-300" 
+                                                 style="width: ${Math.max(porcentagem, 5)}%"></div>
+                                            <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white">
+                                                ${semana.total} minutas
+                                            </div>
+                                        </div>
+                                        <div class="w-24 text-sm text-gray-500">
+                                            ${semana.inicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - ${semana.fim.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div class="mt-4 text-xs text-gray-500 text-center">
+                            Total de ${semanas.reduce((acc, s) => acc + s.total, 0)} minutas em ${semanas.length} semana${semanas.length !== 1 ? 's' : ''}
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+                
+            } catch (error) {
+                log('Erro ao renderizar gráfico semanal:', error);
+                
+                return `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+                        <h4 class="text-lg font-semibold text-red-800 mb-3">📈 Performance Semanal</h4>
+                        <div class="text-red-700 text-center py-4">
+                            <i data-lucide="alert-triangle" class="mx-auto h-8 w-8 mb-2"></i>
+                            <div>Erro ao gerar gráfico: ${error.message}</div>
+                            <div class="text-sm mt-2">Os dados do relatório estão completos, apenas o gráfico não pôde ser exibido.</div>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         // ==================== MODAIS ====================
@@ -2904,7 +3135,65 @@
                 console.log('🎯 View atual:', currentView);
                 console.log('🔥 Firebase ativo:', !!database);
                 console.log('📅 Data atual:', getHojeString());
+                console.log('🕐 Data/hora Brasília:', getDataHoraBrasilia());
                 console.groupEnd();
+            }
+        }
+
+        // Função específica para debug de relatórios
+        function debugRelatorios(tipo) {
+            try {
+                console.group(`📊 Debug Relatório ${tipo}`);
+                
+                const hoje = getDataHoraBrasilia();
+                console.log('Data atual:', hoje);
+                
+                let inicio, fim;
+                if (tipo === 'semanal') {
+                    inicio = getInicioSemana(hoje);
+                    fim = getFimSemana(hoje);
+                } else if (tipo === 'mensal') {
+                    inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+                    fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+                }
+                
+                console.log('Período:', {
+                    inicio: inicio?.toISOString(),
+                    fim: fim?.toISOString()
+                });
+                
+                const minutasNoSistema = Object.values(minutas);
+                console.log('Minutas no sistema:', minutasNoSistema.length);
+                
+                if (minutasNoSistema.length > 0) {
+                    console.log('Primeira minuta:', minutasNoSistema[0]);
+                    console.log('Última minuta:', minutasNoSistema[minutasNoSistema.length - 1]);
+                }
+                
+                const inicioStr = inicio?.toISOString().split('T')[0];
+                const fimStr = fim?.toISOString().split('T')[0];
+                
+                const minutasFiltradas = minutasNoSistema.filter(m => {
+                    if (!m || !m.data) return false;
+                    const dentroPeríodo = m.data >= inicioStr && m.data <= fimStr;
+                    const naoExcluida = m.status !== 'excluida';
+                    return dentroPeríodo && naoExcluida;
+                });
+                
+                console.log('Minutas no período:', minutasFiltradas.length);
+                console.log('Minutas filtradas:', minutasFiltradas);
+                
+                console.groupEnd();
+                
+                return {
+                    totalMinutas: minutasNoSistema.length,
+                    minutasPeríodo: minutasFiltradas.length,
+                    período: { inicio, fim }
+                };
+                
+            } catch (error) {
+                console.error('Erro no debug de relatórios:', error);
+                return null;
             }
         }
 
@@ -2933,11 +3222,39 @@
         // Tornar funções de debug disponíveis globalmente (apenas em desenvolvimento)
         if (typeof window !== 'undefined') {
             window.debugSystem = debugSystem;
+            window.debugRelatorios = debugRelatorios;
             window.limparDados = limparDados;
+            
+            // Função de teste para relatórios
+            window.testarRelatorio = function(tipo = 'mensal') {
+                console.log(`🧪 Testando relatório ${tipo}...`);
+                const debug = debugRelatorios(tipo);
+                if (debug && debug.totalMinutas > 0) {
+                    console.log('✅ Dados disponíveis, gerando relatório...');
+                    gerarRelatorio(tipo);
+                } else {
+                    console.log('❌ Sem dados suficientes para o relatório');
+                    console.log('💡 Executando inicializarDadosDemo()...');
+                    inicializarDadosDemo();
+                    setTimeout(() => {
+                        console.log('🔄 Tentando novamente...');
+                        gerarRelatorio(tipo);
+                    }, 1000);
+                }
+            };
         }
 
         // Log final
-        log('📋 Sistema de Produtividade Judicial v2.0 - Pronto para uso!');
+        log('📋 Sistema de Produtividade Judicial v2.1 - Relatório Mensal CORRIGIDO! ✅');
+        
+        // Aviso sobre funções de debug disponíveis
+        if (typeof console !== 'undefined') {
+            console.log('🛠️  Funções de debug disponíveis:');
+            console.log('   • debugSystem() - Estado geral do sistema');
+            console.log('   • debugRelatorios(tipo) - Debug específico de relatórios');
+            console.log('   • testarRelatorio(tipo) - Testar geração de relatórios');
+            console.log('   • limparDados() - Limpar todos os dados');
+        }
     </script>
 </body>
 </html>
