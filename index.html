@@ -6,6 +6,7 @@
     <title>Sistema de Produtividade Judicial</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <style>
@@ -1070,6 +1071,127 @@
     }
 }
 
+        function setupUserInfo() {
+            document.getElementById('user-info').textContent = `Logado como: ${currentUser.nome}`;
+        }
+
+        function setupMeta10Options() {
+            const meta10Checkbox = document.getElementById('meta10-checkbox');
+            const editMeta10Option = document.getElementById('edit-meta10-option');
+            
+            const seuCheckbox = document.getElementById('seeu-checkbox');
+            const editSeuOption = document.getElementById('edit-seeu-option');
+            
+            if (currentUser.assessorId === 'gilbert') {
+                meta10Checkbox?.style.setProperty('display', 'block');
+                editMeta10Option?.classList.remove('hidden');
+                seuCheckbox?.style.setProperty('display', 'none');
+                editSeuOption?.classList.add('hidden');
+            } else if (currentUser.assessorId === 'laise') {
+                meta10Checkbox?.style.setProperty('display', 'none');
+                editMeta10Option?.classList.add('hidden');
+                seuCheckbox?.style.setProperty('display', 'block');
+                editSeuOption?.classList.remove('hidden');
+            } else {
+                meta10Checkbox?.style.setProperty('display', 'none');
+                editMeta10Option?.classList.add('hidden');
+                seuCheckbox?.style.setProperty('display', 'none');
+                editSeuOption?.classList.add('hidden');
+            }
+        }
+
+        function setupNavigation() {
+            const nav = document.getElementById('navigation');
+            let buttons = '';
+
+            buttons += `
+                <button onclick="showView('dashboard')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
+                    <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2"></i>
+                    Dashboard
+                </button>
+            `;
+
+            if (!currentUser.isJuiz) {
+                buttons += `
+                    <button onclick="showView('registro')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
+                        Registrar Minuta
+                    </button>
+                `;
+            }
+
+            buttons += `
+                <button onclick="showView('historico')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    <i data-lucide="clock" class="h-4 w-4 mr-2"></i>
+                    Histórico
+                </button>
+            `;
+
+            if (currentUser.isJuiz) {
+                buttons += `
+                    <button onclick="showView('calendario')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <i data-lucide="calendar-days" class="h-4 w-4 mr-2"></i>
+                        Calendário
+                    </button>
+                    <button onclick="showView('relatorios')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <i data-lucide="bar-chart" class="h-4 w-4 mr-2"></i>
+                        Relatórios
+                    </button>
+                `;
+            }
+
+            nav.innerHTML = buttons;
+            lucide.createIcons();
+        }
+
+        function showView(view) {
+            try {
+                log(`Navegando para: ${view}`);
+                
+                document.querySelectorAll('[id$="-view"]').forEach(el => {
+                    if (el) el.classList.add('hidden');
+                });
+
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    if (btn) {
+                        btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
+                    }
+                });
+
+                const activeBtn = event?.target?.closest('button');
+                if (activeBtn) {
+                    activeBtn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white';
+                }
+
+                currentView = view;
+
+                switch(view) {
+                    case 'dashboard':
+                        renderDashboard();
+                        break;
+                    case 'registro':
+                        document.getElementById('registro-view')?.classList.remove('hidden');
+                        break;
+                    case 'historico':
+                        setupHistoricoFilters();
+                        renderHistorico();
+                        break;
+                    case 'calendario':
+                        renderCalendario();
+                        break;
+                    case 'relatorios':
+                        document.getElementById('relatorios-view')?.classList.remove('hidden');
+                        break;
+                }
+
+                log(`View ${view} carregada`);
+                
+            } catch (error) {
+                log(`Erro ao carregar view ${view}`, error);
+                showNotification(`Erro ao carregar ${view}`, 'error');
+            }
+        }
+
         // ==================== FIREBASE ====================
         
         function setupFirebaseListeners() {
@@ -1288,275 +1410,7 @@
                                                 <strong>Correção solicitada:</strong><br>
                                                 "${minuta.correcaoSolicitada}"
                                             </div>
-                                            <div class="text-xs text-red-600 mt-1 flex items-center">
-                                                <i data-lucide="clock" class="h-3 w-3 mr-1"></i>
-                                                Solicitado em ${minuta.correcaoSolicitadaEm}
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                    ${correcoesPendentes.length > 2 ? `
-                                        <div class="text-center bg-white border border-red-200 rounded-lg p-2">
-                                            <span class="text-red-700 font-medium">
-                                                +${correcoesPendentes.length - 2} correções adicionais no histórico
-                                            </span>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                                <div class="mt-4 bg-yellow-50 border border-yellow-300 rounded p-3">
-                                    <div class="text-yellow-800 text-sm font-medium flex items-center">
-                                        <i data-lucide="info" class="h-4 w-4 mr-2"></i>
-                                        <strong>Próximos passos:</strong> Acesse o histórico, faça as correções e clique em "Marcar como Corrigida"
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-
-                if (!isDiaUtil(hoje)) {
-                    content += `
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
-                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
-                            <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
-                        </div>
-                        ${renderAssessoresCards()}
-                    `;
-                } else {
-                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
-                    const minutasParaMeta = Object.values(minutas).filter(m => {
-                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
-                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
-                        return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
-                    }).length;
-                    
-                    const minutasAlemMeta = Object.values(minutas).filter(m => {
-                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
-                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
-                        return categorias.includes('alem_meta');
-                    }).length;
-                    
-                    const minutasSEEU = Object.values(minutas).filter(m => {
-                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
-                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
-                        return categorias.includes('seeu');
-                    }).length;
-                    
-                    const metaTotal = 20;
-
-                    content += `
-                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
-                                    <p class="text-blue-100">
-                                        ${hoje.toLocaleDateString('pt-BR', { 
-                                            weekday: 'long', 
-                                            year: 'numeric', 
-                                            month: 'long', 
-                                            day: 'numeric' 
-                                        })}
-                                    </p>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
-                                    <div class="text-blue-100 text-sm">minutas para metas CNJ</div>
-                                    ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
-                                        <div class="text-lg font-medium mt-2 text-blue-200">
-                                            ${minutasAlemMeta > 0 ? `+${minutasAlemMeta} além da meta` : ''}
-                                            ${minutasAlemMeta > 0 && minutasSEEU > 0 ? ' • ' : ''}
-                                            ${minutasSEEU > 0 ? `${minutasSEEU} SEEU` : ''}
-                                        </div>
-                                        <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
-                                        <div class="text-xs text-blue-300 mt-1">
-                                            📊 Apenas minutas das metas CNJ contam para produtividade diária
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            
-                            ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
-                                <div class="mt-4 pt-4 border-t border-blue-500">
-                                    <div class="grid grid-cols-${minutasAlemMeta > 0 && minutasSEEU > 0 ? '3' : '2'} gap-4 text-center">
-                                        <div>
-                                            <div class="text-xl font-bold">${minutasParaMeta}</div>
-                                            <div class="text-blue-100 text-sm">Metas CNJ</div>
-                                        </div>
-                                        ${minutasAlemMeta > 0 ? `
-                                            <div>
-                                                <div class="text-xl font-bold text-blue-200">${minutasAlemMeta}</div>
-                                                <div class="text-blue-200 text-sm">Além da Meta</div>
-                                            </div>
-                                        ` : ''}
-                                        ${minutasSEEU > 0 ? `
-                                            <div>
-                                                <div class="text-xl font-bold text-teal-200">${minutasSEEU}</div>
-                                                <div class="text-teal-200 text-sm">Acessos SEEU</div>
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            ` : ''}
-                        </div>
-                        ${renderAssessoresCards()}
-                    `;
-                }
-
-                dashboard.innerHTML = content;
-                dashboard.classList.remove('hidden');
-                
-                setTimeout(() => lucide.createIcons(), 100);
-                log('Dashboard renderizado');
-                
-            } catch (error) {
-                log('Erro ao renderizar dashboard', error);
-                showNotification('Erro ao carregar dashboard', 'error');
-            }
-        }
-
-        function renderAssessoresCards() {
-            if (!currentUser) return '';
-
-            if (currentUser.isJuiz) {
-                return `
-                    <div class="grid md:grid-cols-2 gap-6">
-                        ${renderAssessorCard('gilbert')}
-                        ${renderAssessorCard('laise')}
-                    </div>
-                `;
-            } else {
-                const correcoesPendentes = Object.values(minutas).filter(m => {
-                    if (!m || m.status !== 'correcao') return false;
-                    
-                    return m.assessorId === currentUser.assessorId || 
-                           (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
-                           (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
-                });
-
-                let alertaCorrecoes = '';
-                if (correcoesPendentes.length > 0) {
-                    alertaCorrecoes = `
-                        <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 mb-6 animate-pulse">
-                            <div class="flex items-center">
-                                <i data-lucide="alert-circle" class="h-6 w-6 text-blue-600 mr-3"></i>
-                                <div>
-                                    <h3 class="text-lg font-semibold text-blue-800">
-                                        ⚠️ ${correcoesPendentes.length} Correç${correcoesPendentes.length === 1 ? 'ão Pendente' : 'ões Pendentes'}
-                                    </h3>
-                                    <p class="text-blue-700 text-sm">
-                                        O juiz solicitou correções em algumas de suas minutas. Verifique o histórico para detalhes.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                return `
-                    ${alertaCorrecoes}
-                    <div class="max-w-md mx-auto">
-                        ${renderAssessorCard(currentUser.assessorId)}
-                    </div>
-                `;
-            }
-        }
-
-        function renderAssessorCard(assessorId) {
-            try {
-                const assessor = assessores[assessorId];
-                if (!assessor) return `<div class="text-red-500">Assessor ${assessorId} não encontrado</div>`;
-
-                const progressoTotal = getProgressoTotal(assessorId);
-                const minutasHoje = getMinutasHoje(assessorId);
-                const meta2Status = getMeta2Status(assessorId);
-
-                let meta2Card = `
-                    <div class="bg-gradient-to-r from-pink-600 to-pink-700 text-white rounded-lg p-6 mb-6 ${meta2Status.status === 'atrasada' ? 'meta2-alert' : meta2Status.status === 'em_dia' ? 'meta2-success' : ''}">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center">
-                                <i data-lucide="gavel" class="h-8 w-8 mr-3"></i>
-                                <div>
-                                    <h3 class="text-xl font-bold">Meta 2 CNJ</h3>
-                                    <p class="text-pink-100">Sentenças Semanais</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-3xl font-bold">${meta2Status.totalSentencas}</div>
-                                <div class="text-pink-100">sentenças no ano</div>
-                            </div>
-                        </div>
-                        
-                        <div class="space-y-3">
-                            <div>
-                                <div class="flex justify-between text-sm text-pink-100 mb-1">
-                                    <span>Cumprimento Anual</span>
-                                    <span>${meta2Status.percentualCumprimento}%</span>
-                                </div>
-                                <div class="w-full bg-pink-800 rounded-full h-3">
-                                    <div class="bg-white h-3 rounded-full transition-all duration-300" style="width: ${meta2Status.percentualCumprimento}%"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="flex justify-between items-center pt-2 border-t border-pink-500">
-                                <div class="text-center">
-                                    <div class="text-2xl font-bold">${meta2Status.semanasCumpridas}</div>
-                                    <div class="text-xs text-pink-100">semanas cumpridas</div>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-2xl font-bold ${meta2Status.metaSemanaCumprida ? '✅' : '❌'}">${meta2Status.metaSemanaCumprida ? '✅' : '❌'}</div>
-                                    <div class="text-xs text-pink-100">esta semana</div>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-2xl font-bold">${meta2Status.semanasPassadas}</div>
-                                    <div class="text-xs text-pink-100">semanas do ano</div>
-                                </div>
-                            </div>
-                            
-                            ${meta2Status.status === 'atrasada' ? `
-                                <div class="bg-red-500 text-white p-3 rounded-lg text-center text-sm font-medium">
-                                    ⚠️ Meta semanal não cumprida! Registre uma sentença da Meta 2 esta semana.
-                                </div>
-                            ` : meta2Status.metaSemanaCumprida ? `
-                                <div class="bg-green-500 text-white p-3 rounded-lg text-center text-sm font-medium">
-                                    🎯 Meta semanal cumprida! Parabéns!
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-
-                if (assessorId === 'gilbert') {
-                    const meta10Status = getMeta10Status();
-                    
-                    let meta10Card = `
-                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg p-6 mb-6 ${meta10Status.status === 'atrasada' ? 'meta10-alert' : 'meta10-success'}">
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="flex items-center">
-                                    <i data-lucide="target" class="h-8 w-8 mr-3"></i>
-                                    <div>
-                                        <h3 class="text-xl font-bold">Meta 10 CNJ</h3>
-                                        <p class="text-purple-100">Minutar semanalmente nos 9 processos mais antigos</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-4xl font-bold">${meta10Status.metaSemanaCumprida ? '✅' : '❌'}</div>
-                                    <div class="text-purple-100">esta semana</div>
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-3">
-                                <div class="flex justify-between items-center pt-2 border-t border-purple-500">
-                                    <div class="text-center">
-                                        <div class="text-2xl font-bold">${meta10Status.semanasComMeta10}</div>
-                                        <div class="text-xs text-purple-100">semanas cumpridas</div>
-                                    </div>
-                                    <div class="text-center">
-                                        <div class="text-2xl font-bold">${meta10Status.totalSemanas}</div>
-                                        <div class="text-xs text-purple-100">semanas no ano</div>
-                                    </div>
-                                    <div class="text-center">
-                                        <div class="text-2xl font-bold">${meta10Status.percentualCumprimento}%</div>
-                                        <div class="text-xs text-purple-100">regularidade</div>
+                                            <div class="text-xs text-purple-100">regularidade</div>
                                     </div>
                                 </div>
                                 
@@ -3023,14 +2877,6 @@
                             <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumo Geral</h3>
                             <div class="grid md:grid-cols-6 gap-4 text-center">
                                 <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-blue-600">${minutasPeriodo.length}</div>
-                                    <div class="text-sm text-gray-600">Minutas Válidas</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
-                                    <div class="text-2xl font-bold text-pink-600">${minutasPeriodo.filter(m => m.categoria === 'meta2').length}</div>
-                                    <div class="text-sm text-gray-600">Sentenças Meta 2</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-4">
                                     <div class="text-2xl font-bold text-gray-600">${minutasPeriodo.filter(m => m.categoria === 'alem_meta').length}</div>
                                     <div class="text-sm text-gray-600">Além da Meta</div>
                                 </div>
@@ -3118,4 +2964,280 @@
         });
     </script>
 </body>
-</html>
+</html>blue-600">${minutasPeriodo.length}</div>
+                                    <div class="text-sm text-gray-600">Minutas Válidas</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-pink-600">${minutasPeriodo.filter(m => m.categoria === 'meta2').length}</div>
+                                    <div class="text-sm text-gray-600">Sentenças Meta 2</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-2xl font-bold text-red-600 mt-1 flex items-center">
+                                                <i data-lucide="clock" class="h-3 w-3 mr-1"></i>
+                                                Solicitado em ${minuta.correcaoSolicitadaEm}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                    ${correcoesPendentes.length > 2 ? `
+                                        <div class="text-center bg-white border border-red-200 rounded-lg p-2">
+                                            <span class="text-red-700 font-medium">
+                                                +${correcoesPendentes.length - 2} correções adicionais no histórico
+                                            </span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <div class="mt-4 bg-yellow-50 border border-yellow-300 rounded p-3">
+                                    <div class="text-yellow-800 text-sm font-medium flex items-center">
+                                        <i data-lucide="info" class="h-4 w-4 mr-2"></i>
+                                        <strong>Próximos passos:</strong> Acesse o histórico, faça as correções e clique em "Marcar como Corrigida"
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                if (!isDiaUtil(hoje)) {
+                    content += `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
+                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
+                            <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
+                        </div>
+                        ${renderAssessoresCards()}
+                    `;
+                } else {
+                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
+                    const minutasParaMeta = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
+                    }).length;
+                    
+                    const minutasAlemMeta = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.includes('alem_meta');
+                    }).length;
+                    
+                    const minutasSEEU = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.includes('seeu');
+                    }).length;
+                    
+                    const metaTotal = 20;
+
+                    content += `
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
+                                    <p class="text-blue-100">
+                                        ${hoje.toLocaleDateString('pt-BR', { 
+                                            weekday: 'long', 
+                                            year: 'numeric', 
+                                            month: 'long', 
+                                            day: 'numeric' 
+                                        })}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
+                                    <div class="text-blue-100 text-sm">minutas para metas CNJ</div>
+                                    ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
+                                        <div class="text-lg font-medium mt-2 text-blue-200">
+                                            ${minutasAlemMeta > 0 ? `+${minutasAlemMeta} além da meta` : ''}
+                                            ${minutasAlemMeta > 0 && minutasSEEU > 0 ? ' • ' : ''}
+                                            ${minutasSEEU > 0 ? `${minutasSEEU} SEEU` : ''}
+                                        </div>
+                                        <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
+                                        <div class="text-xs text-blue-300 mt-1">
+                                            📊 Apenas minutas das metas CNJ contam para produtividade diária
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
+                                <div class="mt-4 pt-4 border-t border-blue-500">
+                                    <div class="grid grid-cols-${minutasAlemMeta > 0 && minutasSEEU > 0 ? '3' : '2'} gap-4 text-center">
+                                        <div>
+                                            <div class="text-xl font-bold">${minutasParaMeta}</div>
+                                            <div class="text-blue-100 text-sm">Metas CNJ</div>
+                                        </div>
+                                        ${minutasAlemMeta > 0 ? `
+                                            <div>
+                                                <div class="text-xl font-bold text-blue-200">${minutasAlemMeta}</div>
+                                                <div class="text-blue-200 text-sm">Além da Meta</div>
+                                            </div>
+                                        ` : ''}
+                                        ${minutasSEEU > 0 ? `
+                                            <div>
+                                                <div class="text-xl font-bold text-teal-200">${minutasSEEU}</div>
+                                                <div class="text-teal-200 text-sm">Acessos SEEU</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        ${renderAssessoresCards()}
+                    `;
+                }
+
+                dashboard.innerHTML = content;
+                dashboard.classList.remove('hidden');
+                
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Dashboard renderizado');
+                
+            } catch (error) {
+                log('Erro ao renderizar dashboard', error);
+                showNotification('Erro ao carregar dashboard', 'error');
+            }
+        }
+
+        function renderAssessoresCards() {
+            if (!currentUser) return '';
+
+            if (currentUser.isJuiz) {
+                return `
+                    <div class="grid md:grid-cols-2 gap-6">
+                        ${renderAssessorCard('gilbert')}
+                        ${renderAssessorCard('laise')}
+                    </div>
+                `;
+            } else {
+                const correcoesPendentes = Object.values(minutas).filter(m => {
+                    if (!m || m.status !== 'correcao') return false;
+                    
+                    return m.assessorId === currentUser.assessorId || 
+                           (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                           (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+                });
+
+                let alertaCorrecoes = '';
+                if (correcoesPendentes.length > 0) {
+                    alertaCorrecoes = `
+                        <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 mb-6 animate-pulse">
+                            <div class="flex items-center">
+                                <i data-lucide="alert-circle" class="h-6 w-6 text-blue-600 mr-3"></i>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-blue-800">
+                                        ⚠️ ${correcoesPendentes.length} Correç${correcoesPendentes.length === 1 ? 'ão Pendente' : 'ões Pendentes'}
+                                    </h3>
+                                    <p class="text-blue-700 text-sm">
+                                        O juiz solicitou correções em algumas de suas minutas. Verifique o histórico para detalhes.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                return `
+                    ${alertaCorrecoes}
+                    <div class="max-w-md mx-auto">
+                        ${renderAssessorCard(currentUser.assessorId)}
+                    </div>
+                `;
+            }
+        }
+
+        function renderAssessorCard(assessorId) {
+            try {
+                const assessor = assessores[assessorId];
+                if (!assessor) return `<div class="text-red-500">Assessor ${assessorId} não encontrado</div>`;
+
+                const progressoTotal = getProgressoTotal(assessorId);
+                const minutasHoje = getMinutasHoje(assessorId);
+                const meta2Status = getMeta2Status(assessorId);
+
+                let meta2Card = `
+                    <div class="bg-gradient-to-r from-pink-600 to-pink-700 text-white rounded-lg p-6 mb-6 ${meta2Status.status === 'atrasada' ? 'meta2-alert' : meta2Status.status === 'em_dia' ? 'meta2-success' : ''}">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <i data-lucide="gavel" class="h-8 w-8 mr-3"></i>
+                                <div>
+                                    <h3 class="text-xl font-bold">Meta 2 CNJ</h3>
+                                    <p class="text-pink-100">Sentenças Semanais</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold">${meta2Status.totalSentencas}</div>
+                                <div class="text-pink-100">sentenças no ano</div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm text-pink-100 mb-1">
+                                    <span>Cumprimento Anual</span>
+                                    <span>${meta2Status.percentualCumprimento}%</span>
+                                </div>
+                                <div class="w-full bg-pink-800 rounded-full h-3">
+                                    <div class="bg-white h-3 rounded-full transition-all duration-300" style="width: ${meta2Status.percentualCumprimento}%"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center pt-2 border-t border-pink-500">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold">${meta2Status.semanasCumpridas}</div>
+                                    <div class="text-xs text-pink-100">semanas cumpridas</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold ${meta2Status.metaSemanaCumprida ? '✅' : '❌'}">${meta2Status.metaSemanaCumprida ? '✅' : '❌'}</div>
+                                    <div class="text-xs text-pink-100">esta semana</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold">${meta2Status.semanasPassadas}</div>
+                                    <div class="text-xs text-pink-100">semanas do ano</div>
+                                </div>
+                            </div>
+                            
+                            ${meta2Status.status === 'atrasada' ? `
+                                <div class="bg-red-500 text-white p-3 rounded-lg text-center text-sm font-medium">
+                                    ⚠️ Meta semanal não cumprida! Registre uma sentença da Meta 2 esta semana.
+                                </div>
+                            ` : meta2Status.metaSemanaCumprida ? `
+                                <div class="bg-green-500 text-white p-3 rounded-lg text-center text-sm font-medium">
+                                    🎯 Meta semanal cumprida! Parabéns!
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+                if (assessorId === 'gilbert') {
+                    const meta10Status = getMeta10Status();
+                    
+                    let meta10Card = `
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg p-6 mb-6 ${meta10Status.status === 'atrasada' ? 'meta10-alert' : 'meta10-success'}">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <i data-lucide="target" class="h-8 w-8 mr-3"></i>
+                                    <div>
+                                        <h3 class="text-xl font-bold">Meta 10 CNJ</h3>
+                                        <p class="text-purple-100">Minutar semanalmente nos 9 processos mais antigos</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-4xl font-bold">${meta10Status.metaSemanaCumprida ? '✅' : '❌'}</div>
+                                    <div class="text-purple-100">esta semana</div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center pt-2 border-t border-purple-500">
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold">${meta10Status.semanasComMeta10}</div>
+                                        <div class="text-xs text-purple-100">semanas cumpridas</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold">${meta10Status.totalSemanas}</div>
+                                        <div class="text-xs text-purple-100">semanas no ano</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold">${meta10Status.percentualCumprimento}%</div>
+                                        <div class="text-xs text-
