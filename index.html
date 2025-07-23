@@ -1207,7 +1207,7 @@
                         renderCalendario();
                         break;
                     case 'relatorios':
-                        document.getElementById('relatorios-view')?.classList.remove('hidden');
+                        renderRelatorios();
                         break;
                 }
 
@@ -1227,6 +1227,7 @@
                     minutas = snapshot.val() || {};
                     log(`Minutas carregadas: ${Object.keys(minutas).length}`);
                     
+                    // Atualizar todas as views quando os dados mudarem
                     if (currentView === 'dashboard') renderDashboard();
                     if (currentView === 'historico') renderHistorico();
                     if (currentView === 'calendario') renderCalendario();
@@ -1237,6 +1238,9 @@
                     if (assessoresFirebase) {
                         assessores = { ...assessores, ...assessoresFirebase };
                         log('Assessores atualizados');
+                        
+                        // Atualizar dashboard se necessário
+                        if (currentView === 'dashboard') renderDashboard();
                     }
                 });
 
@@ -1276,7 +1280,65 @@
                         </div>
                     `;
                 }
+                
+                // Simular dados locais para demonstração se não houver minutas
+                if (Object.keys(minutas).length === 0) {
+                    inicializarDadosDemo();
+                }
             }
+        }
+
+        // Função para inicializar dados de demonstração
+        function inicializarDadosDemo() {
+            const hoje = getHojeString();
+            const ontem = new Date();
+            ontem.setDate(ontem.getDate() - 1);
+            const ontemStr = ontem.toISOString().split('T')[0];
+            
+            // Dados de exemplo para demonstração
+            minutas = {
+                'demo_1': {
+                    assessorId: 'gilbert',
+                    assessorNome: 'Gilbert Juliano',
+                    numeroProcesso: '1234567-89.2024.8.12.3456',
+                    tipoMinuta: 'Decisão',
+                    categorias: ['meta1'],
+                    observacoes: 'Minuta de exemplo - Gilbert',
+                    status: 'pendente',
+                    data: hoje,
+                    timestamp: '09:30:00',
+                    createdAt: Date.now() - 1000
+                },
+                'demo_2': {
+                    assessorId: 'laise',
+                    assessorNome: 'Laíse Vital',
+                    numeroProcesso: '7654321-10.2024.8.12.7890',
+                    tipoMinuta: 'Despacho',
+                    categorias: ['meta1', 'sem_movimento'],
+                    observacoes: 'Minuta de exemplo - Laíse',
+                    status: 'assinada',
+                    data: hoje,
+                    timestamp: '10:15:00',
+                    createdAt: Date.now() - 500
+                },
+                'demo_3': {
+                    assessorId: 'gilbert',
+                    assessorNome: 'Gilbert Juliano',
+                    numeroProcesso: '9876543-21.2024.8.12.1357',
+                    tipoMinuta: 'Sentença',
+                    categorias: ['meta2'],
+                    observacoes: 'Sentença da Meta 2 CNJ',
+                    status: 'pendente',
+                    data: ontemStr,
+                    timestamp: '14:20:00',
+                    createdAt: Date.now() - 2000
+                }
+            };
+            
+            log('Dados de demonstração inicializados');
+            
+            // Atualizar views após carregar dados demo
+            if (currentView === 'dashboard') renderDashboard();
         }
 
         // ==================== REGISTRO DE MINUTAS ====================
@@ -1393,6 +1455,7 @@
                 const hoje = getDataHoraBrasilia();
                 let content = '';
 
+                // Alertas de correção para assessores
                 if (!currentUser.isJuiz) {
                     const correcoesPendentes = Object.values(minutas).filter(m => {
                         if (!m || m.status !== 'correcao') return false;
@@ -1412,14 +1475,8 @@
                                             🚨 ATENÇÃO: ${correcoesPendentes.length} Correç${correcoesPendentes.length === 1 ? 'ão Pendente' : 'ões Pendentes'}!
                                         </h2>
                                         <p class="text-red-700 font-medium">
-                                            O juiz solicitou correções em suas minutas. Veja abaixo os detalhes e no histórico as instruções completas.
+                                            O juiz solicitou correções em suas minutas. Veja no histórico as instruções completas.
                                         </p>
-                                    </div>
-                                </div>
-                                <div class="mt-4 bg-yellow-50 border border-yellow-300 rounded p-3">
-                                    <div class="text-yellow-800 text-sm font-medium flex items-center">
-                                        <i data-lucide="info" class="h-4 w-4 mr-2"></i>
-                                        <strong>Próximos passos:</strong> Acesse o histórico, faça as correções e clique em "Marcar como Corrigida"
                                     </div>
                                 </div>
                             </div>
@@ -1427,70 +1484,76 @@
                     }
                 }
 
+                // Verificar se é dia útil
                 if (!isDiaUtil(hoje)) {
                     content += `
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center mb-6">
                             <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
                             <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
                             <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
                         </div>
-                        ${renderAssessoresCards()}
                     `;
-                } else {
-                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
-                    const minutasParaMeta = Object.values(minutas).filter(m => {
-                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
-                        const categorias = normalizarCategorias(m);
-                        return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
-                    }).length;
-                    
-                    const minutasAlemMeta = Object.values(minutas).filter(m => {
-                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
-                        const categorias = normalizarCategorias(m);
-                        return categorias.includes('alem_meta');
-                    }).length;
-                    
-                    const minutasSEEU = Object.values(minutas).filter(m => {
-                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
-                        const categorias = normalizarCategorias(m);
-                        return categorias.includes('seeu');
-                    }).length;
-                    
-                    const metaTotal = 20;
+                }
 
-                    content += `
-                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
-                                    <p class="text-blue-100">
-                                        ${hoje.toLocaleDateString('pt-BR', { 
-                                            weekday: 'long', 
-                                            year: 'numeric', 
-                                            month: 'long', 
-                                            day: 'numeric' 
-                                        })}
-                                    </p>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
-                                    <div class="text-blue-100 text-sm">minutas para metas CNJ</div>
-                                    ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
-                                        <div class="text-lg font-medium mt-2 text-blue-200">
-                                            ${minutasAlemMeta > 0 ? `+${minutasAlemMeta} além da meta` : ''}
-                                            ${minutasAlemMeta > 0 && minutasSEEU > 0 ? ' • ' : ''}
-                                            ${minutasSEEU > 0 ? `${minutasSEEU} SEEU` : ''}
-                                        </div>
-                                        <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
-                                        <div class="text-xs text-blue-300 mt-1">
-                                            📊 Apenas minutas das metas CNJ contam para produtividade diária
-                                        </div>
-                                    ` : ''}
-                                </div>
+                // Resumo geral do dia
+                const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
+                const minutasParaMeta = Object.values(minutas).filter(m => {
+                    if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                    const categorias = normalizarCategorias(m);
+                    return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
+                }).length;
+                
+                const minutasAlemMeta = Object.values(minutas).filter(m => {
+                    if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                    const categorias = normalizarCategorias(m);
+                    return categorias.includes('alem_meta');
+                }).length;
+                
+                const minutasSEEU = Object.values(minutas).filter(m => {
+                    if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                    const categorias = normalizarCategorias(m);
+                    return categorias.includes('seeu');
+                }).length;
+                
+                const metaTotal = 20;
+
+                // Card resumo do dia
+                content += `
+                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
+                                <p class="text-blue-100">
+                                    ${hoje.toLocaleDateString('pt-BR', { 
+                                        weekday: 'long', 
+                                        year: 'numeric', 
+                                        month: 'long', 
+                                        day: 'numeric' 
+                                    })}
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
+                                <div class="text-blue-100 text-sm">minutas para metas CNJ</div>
+                                ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
+                                    <div class="text-lg font-medium mt-2 text-blue-200">
+                                        ${minutasAlemMeta > 0 ? `+${minutasAlemMeta} além da meta` : ''}
+                                        ${minutasAlemMeta > 0 && minutasSEEU > 0 ? ' • ' : ''}
+                                        ${minutasSEEU > 0 ? `${minutasSEEU} SEEU` : ''}
+                                    </div>
+                                    <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
+                                ` : ''}
                             </div>
                         </div>
-                        ${renderAssessoresCards()}
-                    `;
+                    </div>
+                `;
+
+                // Cards dos assessores
+                content += renderAssessoresCards();
+
+                // Metas semanais especiais
+                if (currentUser.isJuiz) {
+                    content += renderMetasSemanais();
                 }
 
                 dashboard.innerHTML = content;
@@ -1505,19 +1568,130 @@
             }
         }
 
+        function renderMetasSemanais() {
+            const meta2Gilbert = getMeta2Status('gilbert');
+            const meta2Laise = getMeta2Status('laise');
+            const meta10Status = getMeta10Status();
+            const seuStatus = getSEEUStatus();
+
+            return `
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                    <!-- Meta 2 Gilbert -->
+                    <div class="bg-white rounded-lg shadow-md p-4 ${meta2Gilbert.metaSemanaCumprida ? 'meta2-success' : 'meta2-alert'}">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-sm text-gray-700">Meta 2 CNJ - Gilbert</h4>
+                            <span class="text-xs px-2 py-1 rounded-full ${meta2Gilbert.metaSemanaCumprida ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${meta2Gilbert.metaSemanaCumprida ? 'OK' : 'Pendente'}
+                            </span>
+                        </div>
+                        <div class="text-2xl font-bold ${meta2Gilbert.metaSemanaCumprida ? 'text-green-600' : 'text-red-600'}">
+                            ${meta2Gilbert.metaSemanaCumprida ? '1/1' : '0/1'}
+                        </div>
+                        <div class="text-xs text-gray-600">Sentença/semana</div>
+                    </div>
+
+                    <!-- Meta 2 Laise -->
+                    <div class="bg-white rounded-lg shadow-md p-4 ${meta2Laise.metaSemanaCumprida ? 'meta2-success' : 'meta2-alert'}">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-sm text-gray-700">Meta 2 CNJ - Laíse</h4>
+                            <span class="text-xs px-2 py-1 rounded-full ${meta2Laise.metaSemanaCumprida ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${meta2Laise.metaSemanaCumprida ? 'OK' : 'Pendente'}
+                            </span>
+                        </div>
+                        <div class="text-2xl font-bold ${meta2Laise.metaSemanaCumprida ? 'text-green-600' : 'text-red-600'}">
+                            ${meta2Laise.metaSemanaCumprida ? '1/1' : '0/1'}
+                        </div>
+                        <div class="text-xs text-gray-600">Sentença/semana</div>
+                    </div>
+
+                    <!-- Meta 10 -->
+                    <div class="bg-white rounded-lg shadow-md p-4 ${meta10Status.metaSemanaCumprida ? 'meta10-success' : 'meta10-alert'}">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-sm text-gray-700">Meta 10 CNJ</h4>
+                            <span class="text-xs px-2 py-1 rounded-full ${meta10Status.metaSemanaCumprida ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${meta10Status.metaSemanaCumprida ? 'OK' : 'Pendente'}
+                            </span>
+                        </div>
+                        <div class="text-2xl font-bold ${meta10Status.metaSemanaCumprida ? 'text-green-600' : 'text-red-600'}">
+                            ${meta10Status.metaSemanaCumprida ? '1/1' : '0/1'}
+                        </div>
+                        <div class="text-xs text-gray-600">Minuta/semana</div>
+                    </div>
+
+                    <!-- SEEU Status -->
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-sm text-gray-700">SEEU Status</h4>
+                            <span class="text-xs px-2 py-1 rounded-full ${
+                                seuStatus.status === 'em_dia' ? 'bg-green-100 text-green-800' :
+                                seuStatus.status === 'atencao' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                            }">
+                                ${seuStatus.status === 'em_dia' ? 'Em dia' :
+                                  seuStatus.status === 'atencao' ? 'Atenção' :
+                                  seuStatus.status === 'atrasado' ? 'Atrasado' : 'Nunca'}
+                            </span>
+                        </div>
+                        <div class="text-2xl font-bold ${
+                            seuStatus.status === 'em_dia' ? 'text-green-600' :
+                            seuStatus.status === 'atencao' ? 'text-yellow-600' :
+                            'text-red-600'
+                        }">
+                            ${seuStatus.diasSemSEEU}
+                        </div>
+                        <div class="text-xs text-gray-600">dias sem acesso</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderRelatorios() {
+            try {
+                const relatoriosView = document.getElementById('relatorios-view');
+                if (!relatoriosView) return;
+
+                // Inicializar com uma mensagem de boas-vindas e instruções
+                document.getElementById('relatorio-content').innerHTML = `
+                    <div class="text-center py-12">
+                        <i data-lucide="bar-chart-3" class="mx-auto h-16 w-16 text-gray-300 mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Relatórios de Produtividade</h3>
+                        <p class="text-gray-600 mb-6">Selecione o tipo de relatório que deseja gerar</p>
+                        <div class="space-y-4">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left max-w-md mx-auto">
+                                <h4 class="font-semibold text-blue-800 mb-2">📅 Relatório Semanal</h4>
+                                <p class="text-sm text-blue-700">Análise detalhada da semana atual com produtividade diária e metas cumpridas.</p>
+                            </div>
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-left max-w-md mx-auto">
+                                <h4 class="font-semibold text-green-800 mb-2">📊 Relatório Mensal</h4>
+                                <p class="text-sm text-green-700">Visão completa do mês com gráficos de performance e comparativos semanais.</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                relatoriosView.classList.remove('hidden');
+                setTimeout(() => criarIcones(), 100);
+                log('Tela de relatórios renderizada');
+                
+            } catch (error) {
+                log('Erro ao renderizar tela de relatórios', error);
+                showNotification('Erro ao carregar relatórios', 'error');
+            }
+        }
+
         function renderAssessoresCards() {
             if (!currentUser) return '';
 
             if (currentUser.isJuiz) {
                 return `
-                    <div class="grid md:grid-cols-2 gap-6">
+                    <div class="grid md:grid-cols-2 gap-6 mt-6">
                         ${renderAssessorCard('gilbert')}
                         ${renderAssessorCard('laise')}
                     </div>
                 `;
             } else {
                 return `
-                    <div class="max-w-md mx-auto">
+                    <div class="max-w-2xl mx-auto mt-6">
                         ${renderAssessorCard(currentUser.assessorId)}
                     </div>
                 `;
@@ -1527,18 +1701,47 @@
         function renderAssessorCard(assessorId) {
             try {
                 const assessor = assessores[assessorId];
-                if (!assessor) return `<div class="text-red-500">Assessor ${assessorId} não encontrado</div>`;
+                if (!assessor) {
+                    log(`Assessor ${assessorId} não encontrado em assessores:`, assessores);
+                    return `<div class="bg-red-50 p-4 rounded-lg text-red-800">Erro: Assessor ${assessorId} não encontrado</div>`;
+                }
 
                 const progressoTotal = getProgressoTotal(assessorId);
                 const minutasHoje = getMinutasHoje(assessorId);
 
+                // Detalhamento por categoria
+                const detalhamentoHtml = Object.entries(categorias).filter(([catId, catInfo]) => {
+                    // Filtrar categorias relevantes para cada assessor
+                    if (assessorId === 'gilbert' && catId === 'seeu') return false;
+                    if (assessorId === 'laise' && catId === 'meta10') return false;
+                    return true;
+                }).map(([catId, catInfo]) => {
+                    const progresso = getProgressoCategoria(assessorId, catId);
+                    if (catInfo.naoContaParaMeta) return ''; // Não mostrar categorias que não contam
+                    
+                    return `
+                        <div class="flex justify-between items-center text-sm py-1">
+                            <span class="text-gray-600">${catInfo.nome}:</span>
+                            <span class="font-medium ${progresso.atual >= (progresso.meta || 0) ? 'text-green-600' : 'text-gray-800'}">
+                                ${progresso.atual}${progresso.meta > 0 ? `/${progresso.meta}` : ''}
+                                ${progresso.semanal ? ' (semanal)' : ''}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+
                 return `
-                    <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="bg-white rounded-lg shadow-md p-6 border-l-4 ${progressoTotal.atual >= 10 ? 'border-green-500' : 'border-yellow-500'}">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
+                                <p class="text-sm text-gray-600">Assessor do Gabinete</p>
+                            </div>
                             <div class="text-right">
                                 <div class="px-3 py-1 rounded-full text-sm font-medium ${
-                                    progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                    progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 
+                                    progressoTotal.atual >= 5 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
                                 }">
                                     ${progressoTotal.atual}/10 minutas CNJ
                                 </div>
@@ -1546,30 +1749,68 @@
                         </div>
                         
                         <div class="mb-4">
-                            <div class="flex justify-between text-sm text-gray-600 mb-1">
-                                <span>Progresso Diário (Metas CNJ Apenas)</span>
+                            <div class="flex justify-between text-sm text-gray-600 mb-2">
+                                <span>Progresso Diário (Metas CNJ)</span>
                                 <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-3">
-                                <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
+                                <div class="${
+                                    progressoTotal.atual >= 10 ? 'bg-green-500' : 
+                                    progressoTotal.atual >= 5 ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                } h-3 rounded-full transition-all duration-300" style="width: ${Math.min(progressoTotal.percentual, 100)}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Detalhamento por categoria -->
+                        <div class="border-t pt-3 mb-4">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Detalhamento por Categoria:</h4>
+                            <div class="space-y-1">
+                                ${detalhamentoHtml || '<div class="text-sm text-gray-500">Nenhuma categoria aplicável</div>'}
                             </div>
                         </div>
                         
-                        <div class="text-center">
-                            <p class="text-sm text-gray-600">
-                                Total de minutas hoje: ${minutasHoje.length}
-                            </p>
+                        <div class="grid grid-cols-3 gap-4 text-center text-sm border-t pt-3">
+                            <div>
+                                <div class="font-semibold text-gray-800">${minutasHoje.length}</div>
+                                <div class="text-gray-600">Total Hoje</div>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-blue-600">${progressoTotal.alemDaMeta || 0}</div>
+                                <div class="text-gray-600">Além Meta</div>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-teal-600">${progressoTotal.seeu || 0}</div>
+                                <div class="text-gray-600">SEEU</div>
+                            </div>
                         </div>
+
+                        ${!currentUser.isJuiz && progressoTotal.atual < 10 ? `
+                            <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div class="text-blue-800 text-sm font-medium">
+                                    <i data-lucide="target" class="h-4 w-4 mr-1 inline"></i>
+                                    Faltam ${10 - progressoTotal.atual} minutas para completar a meta diária
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${!currentUser.isJuiz && progressoTotal.atual >= 10 ? `
+                            <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <div class="text-green-800 text-sm font-medium">
+                                    <i data-lucide="check-circle" class="h-4 w-4 mr-1 inline"></i>
+                                    🎯 Meta diária cumprida! Parabéns!
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 `;
                 
             } catch (error) {
-                log(`Erro ao renderizar card ${assessorId}`, error);
-                return `<div class="bg-red-50 p-4 rounded-lg text-red-800">Erro ao carregar ${assessorId}</div>`;
+                log(`Erro ao renderizar card ${assessorId}:`, error);
+                return `<div class="bg-red-50 p-4 rounded-lg text-red-800">Erro ao carregar dados de ${assessorId}: ${error.message}</div>`;
             }
         }
 
-        // ===== CORREÇÃO PRINCIPAL APLICADA =====
         function renderHistorico() {
             try {
                 const historico = document.getElementById('historico-view');
@@ -1582,6 +1823,7 @@
 
                 let minutasFiltradas = minutasArray;
 
+                // Filtro por usuário (se não for juiz)
                 if (!currentUser.isJuiz) {
                     minutasFiltradas = minutasFiltradas.filter(m => {
                         return m.assessorId === currentUser.assessorId || 
@@ -1590,16 +1832,36 @@
                     });
                 }
 
+                // Aplicar filtros se existirem
+                const filtroStatus = document.getElementById('filtro-status')?.value;
+                const filtroCategoria = document.getElementById('filtro-categoria')?.value;
+
+                if (filtroStatus) {
+                    minutasFiltradas = minutasFiltradas.filter(m => m.status === filtroStatus);
+                }
+
+                if (filtroCategoria) {
+                    minutasFiltradas = minutasFiltradas.filter(m => {
+                        const categorias = normalizarCategorias(m);
+                        return categorias.includes(filtroCategoria);
+                    });
+                }
+
                 let content = '';
                 if (minutasFiltradas.length === 0) {
                     content = `
                         <div class="text-center text-gray-500 py-12">
                             <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
-                            <p>Nenhuma minuta encontrada.</p>
+                            <p>Nenhuma minuta encontrada com os filtros aplicados.</p>
+                            ${filtroStatus || filtroCategoria ? '<button onclick="limparFiltros()" class="mt-4 text-blue-600 hover:text-blue-800 text-sm">Limpar filtros</button>' : ''}
                         </div>
                     `;
                 } else {
                     content = `
+                        <div class="mb-4 text-sm text-gray-600">
+                            Mostrando ${minutasFiltradas.length} de ${minutasArray.length} minutas
+                            ${filtroStatus || filtroCategoria ? ' (filtros aplicados)' : ''}
+                        </div>
                         <div class="space-y-3">
                             ${minutasFiltradas.map(minuta => {
                                 // ===== CORREÇÃO AQUI =====
@@ -1636,13 +1898,21 @@
                                                 </div>
                                                 ${currentUser.isJuiz ? `
                                                     <div class="flex gap-2 mt-3">
-                                                        <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">
-                                                            <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>
-                                                            Assinar
-                                                        </button>
-                                                        <button onclick="solicitarCorrecao('${minuta.id}')" class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
-                                                            <i data-lucide="edit" class="h-3 w-3 mr-1 inline"></i>
-                                                            Correção
+                                                        ${minuta.status !== 'assinada' ? `
+                                                            <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">
+                                                                <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>
+                                                                Assinar
+                                                            </button>
+                                                        ` : ''}
+                                                        ${minuta.status !== 'correcao' ? `
+                                                            <button onclick="solicitarCorrecao('${minuta.id}')" class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
+                                                                <i data-lucide="edit" class="h-3 w-3 mr-1 inline"></i>
+                                                                Correção
+                                                            </button>
+                                                        ` : ''}
+                                                        <button onclick="editarMinuta('${minuta.id}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                                                            <i data-lucide="edit-2" class="h-3 w-3 mr-1 inline"></i>
+                                                            Editar
                                                         </button>
                                                         <button onclick="excluirMinuta('${minuta.id}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">
                                                             <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>
@@ -1656,6 +1926,7 @@
                                                             <strong>Correção solicitada:</strong> ${minuta.correcaoDetalhes || 'Detalhes não especificados'}
                                                         </div>
                                                         <button onclick="marcarComoCorrigida('${minuta.id}')" class="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                                                            <i data-lucide="check-circle" class="h-3 w-3 mr-1 inline"></i>
                                                             Marcar como Corrigida
                                                         </button>
                                                     </div>
@@ -1685,20 +1956,63 @@
             }
         }
 
+        function limparFiltros() {
+            const filtroStatus = document.getElementById('filtro-status');
+            const filtroCategoria = document.getElementById('filtro-categoria');
+            
+            if (filtroStatus) filtroStatus.value = '';
+            if (filtroCategoria) filtroCategoria.value = '';
+            
+            renderHistorico();
+            showNotification('Filtros limpos', 'info');
+        }
+
         function renderCalendario() {
             try {
                 const calendarioView = document.getElementById('calendario-view');
                 if (!calendarioView) return;
 
-                calendarioView.innerHTML = `
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <h2 class="text-xl font-semibold mb-4">Calendário de Produtividade</h2>
-                        <div class="text-center text-gray-500 py-8">
-                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
-                            <p>Calendário em desenvolvimento</p>
+                const mesAtual = calendarioData.mesAtual;
+                const anoAtual = calendarioData.anoAtual;
+                
+                // Atualizar cabeçalho do mês/ano
+                document.getElementById('calendario-mes-ano').textContent = 
+                    new Date(anoAtual, mesAtual).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+                // Gerar dias do calendário
+                const diasCalendario = gerarDiasCalendario(anoAtual, mesAtual);
+                
+                document.getElementById('calendario-dias').innerHTML = diasCalendario.map(dia => {
+                    const minutasDoDia = getMinutasPorData(dia.data);
+                    const isToday = dia.data === getHojeString();
+                    const isSelected = dia.data === calendarioData.diaSelecionado;
+                    const isOtherMonth = dia.outroMes;
+
+                    let classes = 'calendar-day';
+                    if (isToday) classes += ' today';
+                    if (isSelected) classes += ' selected';
+                    if (minutasDoDia.length > 0) classes += ' has-data';
+                    if (isOtherMonth) classes += ' other-month';
+
+                    // Indicadores especiais
+                    let indicadores = '';
+                    if (minutasDoDia.length > 0) {
+                        indicadores += '<div class="productivity-indicator"></div>';
+                    }
+
+                    return `
+                        <div class="${classes}" onclick="selecionarDia('${dia.data}')">
+                            <div class="day-number">${dia.numero}</div>
+                            ${minutasDoDia.length > 0 ? `<div class="day-count">${minutasDoDia.length}</div>` : ''}
+                            ${indicadores}
                         </div>
-                    </div>
-                `;
+                    `;
+                }).join('');
+
+                // Renderizar detalhes se um dia estiver selecionado
+                if (calendarioData.diaSelecionado) {
+                    renderDetalhesDoDia();
+                }
 
                 calendarioView.classList.remove('hidden');
                 setTimeout(() => criarIcones(), 100);
@@ -1708,6 +2022,136 @@
                 log('Erro ao renderizar calendário', error);
                 showNotification('Erro ao carregar calendário', 'error');
             }
+        }
+
+        function gerarDiasCalendario(ano, mes) {
+            const dias = [];
+            const primeiroDiaDoMes = new Date(ano, mes, 1);
+            const ultimoDiaDoMes = new Date(ano, mes + 1, 0);
+            const primeiroDiaSemana = primeiroDiaDoMes.getDay();
+            
+            // Dias do mês anterior
+            const diasMesAnterior = new Date(ano, mes, 0).getDate();
+            for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
+                const dia = diasMesAnterior - i;
+                const data = new Date(ano, mes - 1, dia);
+                dias.push({
+                    numero: dia,
+                    data: data.toISOString().split('T')[0],
+                    outroMes: true
+                });
+            }
+            
+            // Dias do mês atual
+            for (let dia = 1; dia <= ultimoDiaDoMes.getDate(); dia++) {
+                const data = new Date(ano, mes, dia);
+                dias.push({
+                    numero: dia,
+                    data: data.toISOString().split('T')[0],
+                    outroMes: false
+                });
+            }
+            
+            // Dias do próximo mês para completar a grade
+            const diasRestantes = 42 - dias.length; // 6 semanas × 7 dias
+            for (let dia = 1; dia <= diasRestantes; dia++) {
+                const data = new Date(ano, mes + 1, dia);
+                dias.push({
+                    numero: dia,
+                    data: data.toISOString().split('T')[0],
+                    outroMes: true
+                });
+            }
+            
+            return dias;
+        }
+
+        function renderDetalhesDoDia() {
+            const data = calendarioData.diaSelecionado;
+            if (!data) return;
+
+            const minutasDoDia = getMinutasPorData(data);
+            const dataObj = new Date(data);
+            const dataFormatada = dataObj.toLocaleDateString('pt-BR', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+
+            let detalhesHtml = `
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 capitalize">${dataFormatada}</h3>
+            `;
+
+            if (minutasDoDia.length === 0) {
+                detalhesHtml += `
+                    <div class="text-center text-gray-500 py-8">
+                        <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                        <p>Nenhuma minuta registrada neste dia</p>
+                    </div>
+                `;
+            } else {
+                // Estatísticas do dia
+                const estatisticas = {};
+                minutasDoDia.forEach(minuta => {
+                    const cats = normalizarCategorias(minuta);
+                    cats.forEach(cat => {
+                        if (!estatisticas[cat]) estatisticas[cat] = 0;
+                        estatisticas[cat]++;
+                    });
+                });
+
+                detalhesHtml += `
+                    <div class="mb-6">
+                        <h4 class="text-md font-medium text-gray-700 mb-3">Resumo do Dia</h4>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-blue-50 p-3 rounded">
+                                <div class="font-semibold text-blue-800">${minutasDoDia.length}</div>
+                                <div class="text-blue-600">Total de minutas</div>
+                            </div>
+                            ${Object.entries(estatisticas).map(([cat, count]) => {
+                                const categoria = categorias[cat];
+                                if (!categoria) return '';
+                                return `
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <div class="font-semibold text-gray-800">${count}</div>
+                                        <div class="text-gray-600 text-xs">${categoria.nome}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-md font-medium text-gray-700 mb-3">Minutas do Dia</h4>
+                        <div class="space-y-2 max-h-64 overflow-y-auto">
+                            ${minutasDoDia.map(minuta => {
+                                const cats = normalizarCategorias(minuta);
+                                const status = statusOptions[minuta.status || 'pendente'];
+                                
+                                return `
+                                    <div class="border border-gray-200 rounded p-3 text-sm">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <div class="font-medium text-gray-800">${minuta.numeroProcesso}</div>
+                                            <span class="status-badge ${status.cor} text-xs">${status.nome}</span>
+                                        </div>
+                                        <div class="text-gray-600">
+                                            <div><strong>Assessor:</strong> ${minuta.assessorNome}</div>
+                                            <div><strong>Tipo:</strong> ${minuta.tipoMinuta}</div>
+                                            ${cats.length > 0 ? `<div><strong>Categorias:</strong> ${cats.map(c => categorias[c]?.nome || c).join(', ')}</div>` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            detalhesHtml += '</div>';
+            document.getElementById('calendario-detalhes').innerHTML = detalhesHtml;
+            setTimeout(() => criarIcones(), 100);
         }
 
         // ==================== FUNÇÕES DE AÇÃO (IMPLEMENTADAS) ====================
@@ -1889,14 +2333,14 @@
             if (!filters) return;
 
             filters.innerHTML = `
-                <select id="filtro-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filtro-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
                     <option value="">Todos os status</option>
                     <option value="pendente">Pendentes</option>
                     <option value="assinada">Assinadas</option>
                     <option value="correcao">Precisam Correção</option>
                     <option value="excluida">Excluídas</option>
                 </select>
-                <select id="filtro-categoria" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filtro-categoria" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
                     <option value="">Todas as categorias</option>
                     <option value="meta1">Meta 1 CNJ</option>
                     <option value="meta2">Meta 2 CNJ</option>
@@ -1906,9 +2350,9 @@
                     <option value="outros">Pedidos/Atos</option>
                     <option value="alem_meta">Além da Meta</option>
                 </select>
-                <button onclick="renderHistorico()" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-sm">
-                    <i data-lucide="filter" class="h-3 w-3 mr-1 inline"></i>
-                    Filtrar
+                <button onclick="limparFiltros()" class="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors text-sm">
+                    <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
+                    Limpar
                 </button>
             `;
             
@@ -1933,118 +2377,286 @@
                     titulo = `Relatório Mensal - ${inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`;
                 }
 
+                const inicioStr = inicio.toISOString().split('T')[0];
+                const fimStr = fim.toISOString().split('T')[0];
+
                 const minutasRelatorio = Object.values(minutas).filter(m => {
                     if (!m || !m.data) return false;
-                    const dataMinuta = new Date(m.data);
-                    return dataMinuta >= inicio && dataMinuta <= fim && m.status !== 'excluida';
+                    return m.data >= inicioStr && m.data <= fimStr && m.status !== 'excluida';
                 });
 
                 const estatisticas = {
-                    gilbert: { total: 0, meta1: 0, meta2: 0, meta10: 0, outros: 0 },
-                    laise: { total: 0, meta1: 0, seeu: 0, outros: 0 }
+                    gilbert: { 
+                        total: 0, meta1: 0, meta2: 0, meta10: 0, sem_movimento: 0, 
+                        outros: 0, alem_meta: 0, pendentes: 0, assinadas: 0 
+                    },
+                    laise: { 
+                        total: 0, meta1: 0, seeu: 0, sem_movimento: 0, 
+                        outros: 0, alem_meta: 0, pendentes: 0, assinadas: 0 
+                    }
                 };
 
                 minutasRelatorio.forEach(m => {
-                    const assessorId = m.assessorId === 'assessor1' ? 'gilbert' : 
-                                     m.assessorId === 'assessor2' ? 'laise' : m.assessorId;
+                    let assessorId = m.assessorId;
+                    
+                    // Normalizar IDs antigos
+                    if (assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert'))) {
+                        assessorId = 'gilbert';
+                    } else if (assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))) {
+                        assessorId = 'laise';
+                    }
                     
                     if (estatisticas[assessorId]) {
                         estatisticas[assessorId].total++;
+                        
+                        // Contar por status
+                        if (m.status === 'pendente') estatisticas[assessorId].pendentes++;
+                        if (m.status === 'assinada') estatisticas[assessorId].assinadas++;
                         
                         const categorias = normalizarCategorias(m);
                         categorias.forEach(cat => {
                             if (estatisticas[assessorId][cat] !== undefined) {
                                 estatisticas[assessorId][cat]++;
-                            } else if (cat !== 'alem_meta' && cat !== 'sem_movimento') {
-                                estatisticas[assessorId].outros++;
                             }
                         });
                     }
                 });
 
+                // Calcular dias úteis no período
+                const diasUteis = calcularDiasUteis(inicio, fim);
+                const mediaGilbert = diasUteis > 0 ? (estatisticas.gilbert.total / diasUteis).toFixed(1) : '0';
+                const mediaLaise = diasUteis > 0 ? (estatisticas.laise.total / diasUteis).toFixed(1) : '0';
+                const mediaTotal = diasUteis > 0 ? ((estatisticas.gilbert.total + estatisticas.laise.total) / diasUteis).toFixed(1) : '0';
+
                 relatorioContent.innerHTML = `
                     <div class="space-y-6">
-                        <div class="text-center">
+                        <div class="text-center border-b pb-4">
                             <h3 class="text-2xl font-bold text-gray-800 mb-2">${titulo}</h3>
                             <p class="text-gray-600">Gerado em ${hoje.toLocaleString('pt-BR')}</p>
+                            <p class="text-sm text-gray-500">Período: ${diasUteis} dias úteis</p>
                         </div>
                         
+                        <!-- Resumo Executivo -->
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-blue-800 mb-4">📊 Resumo Executivo</h4>
+                            <div class="grid md:grid-cols-4 gap-4 text-center">
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-blue-600">${estatisticas.gilbert.total + estatisticas.laise.total}</div>
+                                    <div class="text-sm text-gray-600">Total de Minutas</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-green-600">${mediaTotal}</div>
+                                    <div class="text-sm text-gray-600">Média Diária</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-orange-600">${estatisticas.gilbert.assinadas + estatisticas.laise.assinadas}</div>
+                                    <div class="text-sm text-gray-600">Assinadas</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-red-600">${estatisticas.gilbert.pendentes + estatisticas.laise.pendentes}</div>
+                                    <div class="text-sm text-gray-600">Pendentes</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes por Assessor -->
                         <div class="grid md:grid-cols-2 gap-6">
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <h4 class="text-lg font-semibold text-blue-800 mb-3">Gilbert Juliano</h4>
-                                <div class="space-y-2 text-sm">
-                                    <div class="flex justify-between">
-                                        <span>Total de minutas:</span>
-                                        <span class="font-medium">${estatisticas.gilbert.total}</span>
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                                <h4 class="text-lg font-semibold text-blue-800 mb-4">👨‍💼 Gilbert Juliano</h4>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium">Total de minutas:</span>
+                                        <span class="text-lg font-bold text-blue-600">${estatisticas.gilbert.total}</span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span>Meta 1 CNJ:</span>
-                                        <span class="font-medium">${estatisticas.gilbert.meta1}</span>
+                                        <span class="text-sm">Média diária:</span>
+                                        <span class="font-medium">${mediaGilbert}/dia</span>
                                     </div>
-                                    <div class="flex justify-between">
-                                        <span>Meta 2 CNJ:</span>
-                                        <span class="font-medium">${estatisticas.gilbert.meta2}</span>
+                                    <hr class="border-blue-200">
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span>Meta 1 CNJ:</span>
+                                            <span class="font-medium">${estatisticas.gilbert.meta1}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Meta 2 CNJ:</span>
+                                            <span class="font-medium">${estatisticas.gilbert.meta2}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Meta 10 CNJ:</span>
+                                            <span class="font-medium">${estatisticas.gilbert.meta10}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Sem movimentação:</span>
+                                            <span class="font-medium">${estatisticas.gilbert.sem_movimento}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Pedidos/Atos:</span>
+                                            <span class="font-medium">${estatisticas.gilbert.outros}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Além da Meta:</span>
+                                            <span class="font-medium">${estatisticas.gilbert.alem_meta}</span>
+                                        </div>
                                     </div>
-                                    <div class="flex justify-between">
-                                        <span>Meta 10 CNJ:</span>
-                                        <span class="font-medium">${estatisticas.gilbert.meta10}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>Outros:</span>
-                                        <span class="font-medium">${estatisticas.gilbert.outros}</span>
+                                    <hr class="border-blue-200">
+                                    <div class="grid grid-cols-2 gap-4 text-sm">
+                                        <div class="text-center">
+                                            <div class="text-lg font-bold text-green-600">${estatisticas.gilbert.assinadas}</div>
+                                            <div class="text-gray-600">Assinadas</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-lg font-bold text-yellow-600">${estatisticas.gilbert.pendentes}</div>
+                                            <div class="text-gray-600">Pendentes</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <h4 class="text-lg font-semibold text-green-800 mb-3">Laíse Vital</h4>
-                                <div class="space-y-2 text-sm">
-                                    <div class="flex justify-between">
-                                        <span>Total de minutas:</span>
-                                        <span class="font-medium">${estatisticas.laise.total}</span>
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                                <h4 class="text-lg font-semibold text-green-800 mb-4">👩‍💼 Laíse Vital</h4>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium">Total de minutas:</span>
+                                        <span class="text-lg font-bold text-green-600">${estatisticas.laise.total}</span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span>Meta 1 CNJ:</span>
-                                        <span class="font-medium">${estatisticas.laise.meta1}</span>
+                                        <span class="text-sm">Média diária:</span>
+                                        <span class="font-medium">${mediaLaise}/dia</span>
                                     </div>
-                                    <div class="flex justify-between">
-                                        <span>SEEU:</span>
-                                        <span class="font-medium">${estatisticas.laise.seeu}</span>
+                                    <hr class="border-green-200">
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span>Meta 1 CNJ:</span>
+                                            <span class="font-medium">${estatisticas.laise.meta1}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>SEEU:</span>
+                                            <span class="font-medium">${estatisticas.laise.seeu}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Sem movimentação:</span>
+                                            <span class="font-medium">${estatisticas.laise.sem_movimento}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Pedidos/Atos:</span>
+                                            <span class="font-medium">${estatisticas.laise.outros}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Além da Meta:</span>
+                                            <span class="font-medium">${estatisticas.laise.alem_meta}</span>
+                                        </div>
                                     </div>
-                                    <div class="flex justify-between">
-                                        <span>Outros:</span>
-                                        <span class="font-medium">${estatisticas.laise.outros}</span>
+                                    <hr class="border-green-200">
+                                    <div class="grid grid-cols-2 gap-4 text-sm">
+                                        <div class="text-center">
+                                            <div class="text-lg font-bold text-green-600">${estatisticas.laise.assinadas}</div>
+                                            <div class="text-gray-600">Assinadas</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-lg font-bold text-yellow-600">${estatisticas.laise.pendentes}</div>
+                                            <div class="text-gray-600">Pendentes</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Gráfico de Performance Semanal (se for relatório mensal) -->
+                        ${tipo === 'mensal' ? renderGraficoSemanal(inicio, fim) : ''}
                         
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <h4 class="text-lg font-semibold text-gray-800 mb-3">Resumo Geral</h4>
-                            <div class="grid md:grid-cols-3 gap-4 text-center">
-                                <div>
-                                    <div class="text-2xl font-bold text-blue-600">${estatisticas.gilbert.total + estatisticas.laise.total}</div>
-                                    <div class="text-sm text-gray-600">Total de Minutas</div>
-                                </div>
-                                <div>
-                                    <div class="text-2xl font-bold text-green-600">${Math.round(((estatisticas.gilbert.total + estatisticas.laise.total) / (tipo === 'semanal' ? 5 : 22)) * 10) / 10}</div>
-                                    <div class="text-sm text-gray-600">Média Diária</div>
-                                </div>
-                                <div>
-                                    <div class="text-2xl font-bold text-purple-600">${estatisticas.gilbert.meta2 + estatisticas.gilbert.meta10}</div>
-                                    <div class="text-sm text-gray-600">Metas Especiais</div>
-                                </div>
+                        <!-- Observações -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-3">📝 Observações</h4>
+                            <div class="space-y-2 text-sm text-gray-700">
+                                <p>• Meta diária esperada: 10 minutas por assessor (20 total)</p>
+                                <p>• Meta 2 CNJ: 1 sentença por semana por assessor</p>
+                                <p>• Meta 10 CNJ: 1 minuta semanal (Gilbert)</p>
+                                <p>• SEEU: Controle de acesso a cada 10 dias (Laíse)</p>
+                                <p>• Minutas "Além da Meta" e "SEEU" não contam para produtividade diária</p>
                             </div>
                         </div>
                     </div>
                 `;
 
-                log(`Relatório ${tipo} gerado`);
+                // Mostrar a seção de relatórios
+                document.getElementById('relatorios-view').classList.remove('hidden');
+                
+                log(`Relatório ${tipo} gerado com ${minutasRelatorio.length} minutas`);
+                showNotification(`Relatório ${tipo} gerado com sucesso!`, 'success');
                 
             } catch (error) {
                 log(`Erro ao gerar relatório ${tipo}:`, error);
                 showNotification(`Erro ao gerar relatório ${tipo}`, 'error');
             }
+        }
+
+        function calcularDiasUteis(inicio, fim) {
+            let diasUteis = 0;
+            let data = new Date(inicio);
+            
+            while (data <= fim) {
+                if (isDiaUtil(data)) {
+                    diasUteis++;
+                }
+                data.setDate(data.getDate() + 1);
+            }
+            
+            return diasUteis;
+        }
+
+        function renderGraficoSemanal(inicio, fim) {
+            // Dividir o mês em semanas e calcular produtividade por semana
+            const semanas = [];
+            let inicioSemana = new Date(inicio);
+            
+            while (inicioSemana <= fim) {
+                const fimSemana = new Date(inicioSemana);
+                fimSemana.setDate(fimSemana.getDate() + 6);
+                if (fimSemana > fim) fimSemana = new Date(fim);
+                
+                const minutasSemana = Object.values(minutas).filter(m => {
+                    if (!m || !m.data || m.status === 'excluida') return false;
+                    const data = new Date(m.data);
+                    return data >= inicioSemana && data <= fimSemana;
+                });
+                
+                semanas.push({
+                    inicio: new Date(inicioSemana),
+                    fim: new Date(fimSemana),
+                    total: minutasSemana.length,
+                    semana: semanas.length + 1
+                });
+                
+                inicioSemana.setDate(inicioSemana.getDate() + 7);
+            }
+            
+            const maxMinutas = Math.max(...semanas.map(s => s.total), 50); // Mínimo 50 para escala
+            
+            return `
+                <div class="bg-white border border-gray-200 rounded-lg p-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">📈 Performance Semanal</h4>
+                    <div class="space-y-3">
+                        ${semanas.map(semana => `
+                            <div class="flex items-center space-x-4">
+                                <div class="w-20 text-sm font-medium text-gray-600">
+                                    Sem ${semana.semana}
+                                </div>
+                                <div class="flex-1 bg-gray-200 rounded-full h-6 relative">
+                                    <div class="bg-blue-500 h-6 rounded-full transition-all duration-300" 
+                                         style="width: ${(semana.total / maxMinutas) * 100}%"></div>
+                                    <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white">
+                                        ${semana.total} minutas
+                                    </div>
+                                </div>
+                                <div class="w-24 text-sm text-gray-500">
+                                    ${semana.inicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - ${semana.fim.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
         }
 
         // ==================== MODAIS ====================
@@ -2161,7 +2773,7 @@
             }
         }
 
-        // ==================== CALENDÁRIO (PLACEHOLDER) ====================
+        // ==================== CALENDÁRIO ====================
         
         function navegarMes(direcao) {
             calendarioData.mesAtual += direcao;
@@ -2173,57 +2785,159 @@
                 calendarioData.anoAtual--;
             }
             renderCalendario();
+            log(`Navegando para: ${calendarioData.mesAtual + 1}/${calendarioData.anoAtual}`);
         }
 
         function irParaHoje() {
             const hoje = getDataHoraBrasilia();
             calendarioData.mesAtual = hoje.getMonth();
             calendarioData.anoAtual = hoje.getFullYear();
-            calendarioData.diaSelecionado = hoje.getDate();
+            calendarioData.diaSelecionado = getHojeString();
             renderCalendario();
+            log('Navegando para hoje');
         }
 
         function selecionarDia(data) {
             calendarioData.diaSelecionado = data;
+            renderCalendario(); // Re-renderizar para atualizar seleção
             log(`Dia selecionado: ${data}`);
-            // Implementar detalhes do dia selecionado
         }
 
-        // ==================== EVENTOS ====================
+        // ==================== EVENTOS E INICIALIZAÇÃO FINAL ====================
         
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                // Aguardar um pouco para garantir que o Lucide carregue
+                log('🚀 Sistema de Produtividade Judicial iniciando...');
+                
+                // Aguardar um pouco para garantir que todos os scripts carreguem
                 setTimeout(() => {
                     criarIcones();
+                    log('✅ Interface inicializada');
                 }, 200);
                 
-                log('Aplicação carregada');
-                
+                // Configurar eventos de teclado
                 document.addEventListener('keydown', function(e) {
+                    // ESC para fechar modais
                     if (e.key === 'Escape') {
-                        if (!document.getElementById('modal-edicao').classList.contains('hidden')) {
+                        const modalEdicao = document.getElementById('modal-edicao');
+                        const modalCorrecao = document.getElementById('modal-correcao');
+                        
+                        if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             fecharModalEdicao();
                         }
-                        if (!document.getElementById('modal-correcao').classList.contains('hidden')) {
+                        if (modalCorrecao && !modalCorrecao.classList.contains('hidden')) {
                             fecharModalCorrecao();
                         }
                     }
                     
+                    // Ctrl+Enter para confirmar ações em modais
                     if (e.ctrlKey && e.key === 'Enter') {
-                        if (!document.getElementById('modal-edicao').classList.contains('hidden')) {
+                        const modalEdicao = document.getElementById('modal-edicao');
+                        const modalCorrecao = document.getElementById('modal-correcao');
+                        
+                        if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             salvarEdicao();
                         }
-                        if (!document.getElementById('modal-correcao').classList.contains('hidden')) {
+                        if (modalCorrecao && !modalCorrecao.classList.contains('hidden')) {
                             confirmarCorrecao();
+                        }
+                    }
+                    
+                    // Teclas de atalho para navegação (apenas para juiz)
+                    if (currentUser && currentUser.isJuiz && e.altKey) {
+                        switch(e.key) {
+                            case '1':
+                                showView('dashboard');
+                                e.preventDefault();
+                                break;
+                            case '2':
+                                showView('historico');
+                                e.preventDefault();
+                                break;
+                            case '3':
+                                showView('calendario');
+                                e.preventDefault();
+                                break;
+                            case '4':
+                                showView('relatorios');
+                                e.preventDefault();
+                                break;
                         }
                     }
                 });
                 
+                // Detectar quando a página perde o foco (para salvar dados se necessário)
+                window.addEventListener('beforeunload', function(e) {
+                    log('Página sendo fechada/recarregada');
+                    // Não fazer nada especial aqui por enquanto
+                });
+                
+                // Detectar mudanças de conectividade
+                window.addEventListener('online', function() {
+                    log('🌐 Conexão restaurada');
+                    showNotification('Conexão com a internet restaurada', 'success');
+                });
+                
+                window.addEventListener('offline', function() {
+                    log('🔌 Conexão perdida');
+                    showNotification('Conexão perdida - funcionando em modo offline', 'warning');
+                });
+                
+                log('✅ Sistema carregado e pronto para uso');
+                
             } catch (error) {
-                log('Erro na inicialização da página', error);
+                log('❌ Erro na inicialização da página:', error);
+                console.error('Erro detalhado:', error);
+                showNotification('Erro na inicialização do sistema', 'error');
             }
         });
+
+        // ==================== FUNÇÕES UTILITÁRIAS FINAIS ====================
+        
+        // Função para debug - mostrar estado atual do sistema
+        function debugSystem() {
+            if (typeof console !== 'undefined') {
+                console.group('🔍 Debug do Sistema');
+                console.log('👤 Usuário atual:', currentUser);
+                console.log('📄 Total de minutas:', Object.keys(minutas).length);
+                console.log('👥 Assessores:', assessores);
+                console.log('🎯 View atual:', currentView);
+                console.log('🔥 Firebase ativo:', !!database);
+                console.log('📅 Data atual:', getHojeString());
+                console.groupEnd();
+            }
+        }
+
+        // Função para limpar dados (apenas para desenvolvimento)
+        function limparDados() {
+            if (confirm('⚠️ ATENÇÃO: Isso irá limpar todos os dados! Confirma?')) {
+                minutas = {};
+                if (database) {
+                    database.ref('minutas').remove()
+                        .then(() => {
+                            showNotification('Dados limpos com sucesso', 'success');
+                            if (currentView === 'dashboard') renderDashboard();
+                        })
+                        .catch(() => {
+                            showNotification('Dados limpos localmente', 'warning');
+                            if (currentView === 'dashboard') renderDashboard();
+                        });
+                } else {
+                    showNotification('Dados limpos localmente', 'warning');
+                    if (currentView === 'dashboard') renderDashboard();
+                }
+                log('🗑️ Dados do sistema limpos');
+            }
+        }
+
+        // Tornar funções de debug disponíveis globalmente (apenas em desenvolvimento)
+        if (typeof window !== 'undefined') {
+            window.debugSystem = debugSystem;
+            window.limparDados = limparDados;
+        }
+
+        // Log final
+        log('📋 Sistema de Produtividade Judicial v2.0 - Pronto para uso!');
     </script>
 </body>
 </html>
