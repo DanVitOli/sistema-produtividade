@@ -1023,161 +1023,52 @@
             document.getElementById('login-senha').value = '';
         }
 
-        // ==================== INICIALIZAÇÃO ====================
+      function initializeApp() {
+    try {
+        try {
+            firebase = window.firebase;
+            firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            
+            // Autenticação automática - AGUARDAR ANTES DE CONTINUAR
+            firebase.auth().signInAnonymously()
+                .then(() => {
+                    console.log('✅ Firebase autenticado com sucesso');
+                    
+                    // MOVER TODAS ESSAS FUNÇÕES PARA DENTRO DO .then()
+                    setupUserInfo();
+                    setupNavigation();
+                    setupMeta10Options();
+                    if (database) setupFirebaseListeners();
+                    showView('dashboard');
+                    
+                    log('Aplicação inicializada com sucesso');
+                })
+                .catch((error) => {
+                    console.error('❌ Erro na autenticação:', error);
+                    // Em caso de erro de autenticação, ainda assim inicializar o básico
+                    setupUserInfo();
+                    setupNavigation();
+                    setupMeta10Options();
+                    showView('dashboard');
+                    log('Aplicação inicializada sem autenticação Firebase');
+                });
+                
+        } catch (error) {
+            log('Firebase não disponível - modo offline', error);
+            database = null;
+            // Se Firebase não estiver disponível, inicializar normalmente
+            setupUserInfo();
+            setupNavigation();
+            setupMeta10Options();
+            showView('dashboard');
+        }
         
-        function initializeApp() {
-            try {
-                try {
-                    firebase = window.firebase;
-                    firebase.initializeApp(firebaseConfig);
-                    database = firebase.database();
-                    // Autenticação automática
-firebase.auth().signInAnonymously()
-    .then(() => {
-        console.log('✅ Firebase autenticado com sucesso');
-    })
-    .catch((error) => {
-        console.error('❌ Erro na autenticação:', error);
-    });
-                } catch (error) {
-                    log('Firebase não disponível - modo offline', error);
-                    database = null;
-                }
-                
-                setupUserInfo();
-                setupNavigation();
-                setupMeta10Options();
-                if (database) setupFirebaseListeners();
-                showView('dashboard');
-                
-                log('Aplicação inicializada com sucesso');
-                
-            } catch (error) {
-                log('Erro na inicialização', error);
-                showNotification('Erro ao inicializar aplicação', 'error');
-            }
-        }
-
-        function setupUserInfo() {
-            document.getElementById('user-info').textContent = `Logado como: ${currentUser.nome}`;
-        }
-
-        function setupMeta10Options() {
-            const meta10Checkbox = document.getElementById('meta10-checkbox');
-            const editMeta10Option = document.getElementById('edit-meta10-option');
-            
-            const seuCheckbox = document.getElementById('seeu-checkbox');
-            const editSeuOption = document.getElementById('edit-seeu-option');
-            
-            if (currentUser.assessorId === 'gilbert') {
-                meta10Checkbox?.style.setProperty('display', 'block');
-                editMeta10Option?.classList.remove('hidden');
-                seuCheckbox?.style.setProperty('display', 'none');
-                editSeuOption?.classList.add('hidden');
-            } else if (currentUser.assessorId === 'laise') {
-                meta10Checkbox?.style.setProperty('display', 'none');
-                editMeta10Option?.classList.add('hidden');
-                seuCheckbox?.style.setProperty('display', 'block');
-                editSeuOption?.classList.remove('hidden');
-            } else {
-                meta10Checkbox?.style.setProperty('display', 'none');
-                editMeta10Option?.classList.add('hidden');
-                seuCheckbox?.style.setProperty('display', 'none');
-                editSeuOption?.classList.add('hidden');
-            }
-        }
-
-        function setupNavigation() {
-            const nav = document.getElementById('navigation');
-            let buttons = '';
-
-            buttons += `
-                <button onclick="showView('dashboard')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
-                    <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2"></i>
-                    Dashboard
-                </button>
-            `;
-
-            if (!currentUser.isJuiz) {
-                buttons += `
-                    <button onclick="showView('registro')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
-                        Registrar Minuta
-                    </button>
-                `;
-            }
-
-            buttons += `
-                <button onclick="showView('historico')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                    <i data-lucide="clock" class="h-4 w-4 mr-2"></i>
-                    Histórico
-                </button>
-            `;
-
-            if (currentUser.isJuiz) {
-                buttons += `
-                    <button onclick="showView('calendario')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                        <i data-lucide="calendar-days" class="h-4 w-4 mr-2"></i>
-                        Calendário
-                    </button>
-                    <button onclick="showView('relatorios')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                        <i data-lucide="bar-chart" class="h-4 w-4 mr-2"></i>
-                        Relatórios
-                    </button>
-                `;
-            }
-
-            nav.innerHTML = buttons;
-            lucide.createIcons();
-        }
-
-        function showView(view) {
-            try {
-                log(`Navegando para: ${view}`);
-                
-                document.querySelectorAll('[id$="-view"]').forEach(el => {
-                    if (el) el.classList.add('hidden');
-                });
-
-                document.querySelectorAll('.nav-btn').forEach(btn => {
-                    if (btn) {
-                        btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
-                    }
-                });
-
-                const activeBtn = event?.target?.closest('button');
-                if (activeBtn) {
-                    activeBtn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white';
-                }
-
-                currentView = view;
-
-                switch(view) {
-                    case 'dashboard':
-                        renderDashboard();
-                        break;
-                    case 'registro':
-                        document.getElementById('registro-view')?.classList.remove('hidden');
-                        break;
-                    case 'historico':
-                        setupHistoricoFilters();
-                        renderHistorico();
-                        break;
-                    case 'calendario':
-                        renderCalendario();
-                        break;
-                    case 'relatorios':
-                        document.getElementById('relatorios-view')?.classList.remove('hidden');
-                        break;
-                }
-
-                log(`View ${view} carregada`);
-                
-            } catch (error) {
-                log(`Erro ao carregar view ${view}`, error);
-                showNotification(`Erro ao carregar ${view}`, 'error');
-            }
-        }
+    } catch (error) {
+        log('Erro na inicialização', error);
+        showNotification('Erro ao inicializar aplicação', 'error');
+    }
+}
 
         // ==================== FIREBASE ====================
         
