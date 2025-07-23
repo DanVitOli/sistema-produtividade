@@ -683,6 +683,298 @@
             }
         }
 
+        // ==================== CÁLCULOS DE PRODUTIVIDADE ====================
+        
+        function getMinutasHoje(assessorId) {
+            const hoje = getHojeString();
+            return Object.values(minutas).filter(m => {
+                if (!m || !m.data || m.data !== hoje) return false;
+                if (m.status === 'excluida') return false;
+                
+                return m.assessorId === assessorId || 
+                       (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                       (assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+            });
+        }
+
+        function getMinutasPorData(data, assessorId = null) {
+            return Object.values(minutas).filter(m => {
+                if (!m || !m.data || m.data !== data) return false;
+                if (m.status === 'excluida') return false;
+                
+                if (assessorId) {
+                    return m.assessorId === assessorId || 
+                           (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                           (assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+                }
+                
+                return true;
+            });
+        }
+
+        function getMinutasSemana(inicioSemana, fimSemana, assessorId, categoria = null) {
+            const inicioStr = inicioSemana.toISOString().split('T')[0];
+            const fimStr = fimSemana.toISOString().split('T')[0];
+            
+            return Object.values(minutas).filter(m => {
+                if (!m || !m.data || m.data < inicioStr || m.data > fimStr) return false;
+                if (m.status === 'excluida') return false;
+                
+                const isAssessor = m.assessorId === assessorId || 
+                                 (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                                 (assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+                
+                if (!isAssessor) return false;
+                
+                if (categoria) {
+                    const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                    return categorias && categorias.includes(categoria);
+                }
+                
+                return true;
+            });
+        }
+
+        function getMeta2Status(assessorId) {
+            const hoje = getDataHoraBrasilia();
+            const inicioSemanaAtual = getInicioSemana(hoje);
+            const fimSemanaAtual = getFimSemana(hoje);
+            
+            const minutasMeta2Semana = getMinutasSemana(inicioSemanaAtual, fimSemanaAtual, assessorId, 'meta2');
+            const metaSemanaCumprida = minutasMeta2Semana.length > 0;
+            
+            const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+            const fimAno = new Date(hoje.getFullYear(), 11, 31);
+            const minutasMeta2Ano = getMinutasSemana(inicioAno, fimAno, assessorId, 'meta2');
+            
+            const semanas = [];
+            const inicioCalculo = new Date(hoje.getFullYear(), 0, 1);
+            let semanaAtual = getInicioSemana(inicioCalculo);
+            
+            while (semanaAtual <= hoje) {
+                const fimSemana = getFimSemana(semanaAtual);
+                const minutasSemana = getMinutasSemana(semanaAtual, fimSemana, assessorId, 'meta2');
+                
+                semanas.push({
+                    inicio: new Date(semanaAtual),
+                    fim: new Date(fimSemana),
+                    numero: getNumeroSemana(semanaAtual),
+                    cumprida: minutasSemana.length > 0,
+                    minutas: minutasSemana.length
+                });
+                
+                semanaAtual.setDate(semanaAtual.getDate() + 7);
+            }
+            
+            const semanasPassadas = semanas.filter(s => s.fim < hoje).length;
+            const semanasCumpridas = semanas.filter(s => s.cumprida && s.fim < hoje).length;
+            const percentualCumprimento = semanasPassadas > 0 ? (semanasCumpridas / semanasPassadas) * 100 : 0;
+            
+            return {
+                totalSentencas: minutasMeta2Ano.length,
+                metaSemanaCumprida,
+                semanas,
+                percentualCumprimento: Math.round(percentualCumprimento),
+                semanasPassadas,
+                semanasCumpridas,
+                status: metaSemanaCumprida ? 'em_dia' : 'atrasada'
+            };
+        }
+
+        function getMeta10Status() {
+            const hoje = getDataHoraBrasilia();
+            
+            const inicioSemanaAtual = getInicioSemana(hoje);
+            const fimSemanaAtual = getFimSemana(hoje);
+            const minutasSemanaAtual = getMinutasSemana(inicioSemanaAtual, fimSemanaAtual, 'gilbert', 'meta10');
+            const metaSemanaCumprida = minutasSemanaAtual.length > 0;
+            
+            const semanas = [];
+            const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+            let semanaAtual = getInicioSemana(inicioAno);
+            
+            let semanasComMeta10 = 0;
+            let totalSemanas = 0;
+            
+            while (semanaAtual <= hoje) {
+                const fimSemana = getFimSemana(semanaAtual);
+                const minutasSemana = getMinutasSemana(semanaAtual, fimSemana, 'gilbert', 'meta10');
+                const cumprida = minutasSemana.length > 0;
+                
+                semanas.push({
+                    inicio: new Date(semanaAtual),
+                    fim: new Date(fimSemana),
+                    numero: getNumeroSemana(semanaAtual),
+                    cumprida: cumprida,
+                    minutas: minutasSemana.length
+                });
+                
+                if (cumprida) semanasComMeta10++;
+                totalSemanas++;
+                
+                semanaAtual.setDate(semanaAtual.getDate() + 7);
+            }
+            
+            return {
+                metaSemanaCumprida,
+                semanasComMeta10,
+                totalSemanas,
+                percentualCumprimento: totalSemanas > 0 ? Math.round((semanasComMeta10 / totalSemanas) * 100) : 0,
+                semanas,
+                status: metaSemanaCumprida ? 'em_dia' : 'atrasada'
+            };
+        }
+
+        function getSEEUStatus() {
+            const hoje = getDataHoraBrasilia();
+            const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+            const fimAno = new Date(hoje.getFullYear(), 11, 31);
+            
+            const minutasSEEU = Object.values(minutas).filter(m => {
+                if (!m || !m.data) return false;
+                if (m.status === 'excluida') return false;
+                
+                const dataMinuta = new Date(m.data);
+                if (dataMinuta < inicioAno || dataMinuta > fimAno) return false;
+                
+                const isLaise = m.assessorId === 'laise' || 
+                              m.assessorId === 'assessor2' || 
+                              (m.assessorNome && m.assessorNome.includes('Laíse'));
+                
+                if (!isLaise) return false;
+                
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes('seeu');
+            }).sort((a, b) => new Date(a.data) - new Date(b.data));
+            
+            const ultimaMinutaSEEU = minutasSEEU.length > 0 ? minutasSEEU[minutasSEEU.length - 1] : null;
+            
+            let diasSemSEEU = 0;
+            let status = 'nunca_acessou';
+            let proximoVencimento = null;
+            
+            if (ultimaMinutaSEEU) {
+                const ultimaData = new Date(ultimaMinutaSEEU.data);
+                diasSemSEEU = Math.floor((hoje - ultimaData) / (1000 * 60 * 60 * 24));
+                
+                proximoVencimento = new Date(ultimaData);
+                proximoVencimento.setDate(proximoVencimento.getDate() + 10);
+                
+                if (diasSemSEEU <= 7) {
+                    status = 'em_dia';
+                } else if (diasSemSEEU <= 10) {
+                    status = 'atencao';
+                } else {
+                    status = 'atrasado';
+                }
+            } else {
+                diasSemSEEU = Math.floor((hoje - inicioAno) / (1000 * 60 * 60 * 24));
+                status = 'nunca_acessou';
+                proximoVencimento = new Date();
+            }
+            
+            const historico = minutasSEEU.slice(-10).map(minuta => ({
+                data: minuta.data,
+                numeroProcesso: minuta.numeroProcesso,
+                diasEntre: null
+            }));
+            
+            for (let i = 1; i < historico.length; i++) {
+                const dataAnterior = new Date(historico[i-1].data);
+                const dataAtual = new Date(historico[i].data);
+                historico[i].diasEntre = Math.floor((dataAtual - dataAnterior) / (1000 * 60 * 60 * 24));
+            }
+            
+            return {
+                totalAcessos: minutasSEEU.length,
+                ultimoAcesso: ultimaMinutaSEEU ? ultimaMinutaSEEU.data : null,
+                diasSemSEEU,
+                status,
+                proximoVencimento,
+                diasParaVencimento: proximoVencimento ? Math.ceil((proximoVencimento - hoje) / (1000 * 60 * 60 * 24)) : 0,
+                historico,
+                mediaIntervalo: historico.length > 1 ? 
+                    Math.round(historico.slice(1).reduce((acc, h) => acc + (h.diasEntre || 0), 0) / (historico.length - 1)) : 0
+            };
+        }
+
+        function getProgressoCategoria(assessorId, categoria) {
+            if (categoria === 'meta10') {
+                const meta10Status = getMeta10Status();
+                return {
+                    atual: meta10Status.metaSemanaCumprida ? 1 : 0,
+                    meta: 1,
+                    percentual: meta10Status.metaSemanaCumprida ? 100 : 0,
+                    semanal: true
+                };
+            }
+            
+            if (categoria === 'meta2') {
+                const meta2Status = getMeta2Status(assessorId);
+                return {
+                    atual: meta2Status.metaSemanaCumprida ? 1 : 0,
+                    meta: 1,
+                    percentual: meta2Status.metaSemanaCumprida ? 100 : 0,
+                    semanal: true
+                };
+            }
+            
+            const minutasHoje = getMinutasHoje(assessorId);
+            const count = minutasHoje.filter(m => {
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes(categoria);
+            }).length;
+            
+            const categoriaInfo = categorias[categoria];
+            
+            if (categoriaInfo && (categoriaInfo.semMeta || categoriaInfo.naoContaParaMeta)) {
+                return { 
+                    atual: count, 
+                    meta: categoriaInfo.meta || 0, 
+                    percentual: 0,
+                    semMeta: true,
+                    naoContaParaMeta: categoriaInfo.naoContaParaMeta
+                };
+            }
+            
+            const meta = categoriaInfo ? categoriaInfo.meta : 0;
+            return { 
+                atual: count, 
+                meta, 
+                percentual: meta > 0 ? Math.min((count / meta) * 100, 100) : 0
+            };
+        }
+
+        function getProgressoTotal(assessorId) {
+            const minutasHoje = getMinutasHoje(assessorId);
+            const minutasParaMeta = minutasHoje.filter(m => {
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
+            });
+            
+            const total = minutasParaMeta.length;
+            const meta = 10;
+            
+            const alemDaMeta = minutasHoje.filter(m => {
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes('alem_meta');
+            }).length;
+            
+            const seeu = minutasHoje.filter(m => {
+                const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                return categorias.includes('seeu');
+            }).length;
+            
+            return { 
+                atual: total, 
+                meta, 
+                percentual: Math.min((total / meta) * 100, 100),
+                totalGeral: minutasHoje.length,
+                alemDaMeta,
+                seeu
+            };
+        }
+
         // ==================== AUTENTICAÇÃO ====================
         
         function fazerLogin() {
@@ -1057,44 +1349,291 @@
             validarTipoMinuta();
         }
 
-        // ==================== RENDERIZAÇÃO (PLACEHOLDER) ====================
+        // ==================== RENDERIZAÇÃO ====================
         
         function renderDashboard() {
             try {
                 const dashboard = document.getElementById('dashboard-view');
                 if (!dashboard) return;
 
-                dashboard.innerHTML = `
+                const hoje = getDataHoraBrasilia();
+                let content = '';
+
+                if (!currentUser.isJuiz) {
+                    const correcoesPendentes = Object.values(minutas).filter(m => {
+                        if (!m || m.status !== 'correcao') return false;
+                        
+                        return m.assessorId === currentUser.assessorId || 
+                               (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                               (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+                    });
+
+                    if (correcoesPendentes.length > 0) {
+                        content += `
+                            <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-6 mb-6 shadow-lg animate-pulse">
+                                <div class="flex items-center">
+                                    <i data-lucide="alert-triangle" class="h-8 w-8 text-red-600 mr-3"></i>
+                                    <div>
+                                        <h2 class="text-xl font-bold text-red-800">
+                                            🚨 ATENÇÃO: ${correcoesPendentes.length} Correç${correcoesPendentes.length === 1 ? 'ão Pendente' : 'ões Pendentes'}!
+                                        </h2>
+                                        <p class="text-red-700 font-medium">
+                                            O juiz solicitou correções em suas minutas. Veja abaixo os detalhes e no histórico as instruções completas.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="mt-4 bg-yellow-50 border border-yellow-300 rounded p-3">
+                                    <div class="text-yellow-800 text-sm font-medium flex items-center">
+                                        <i data-lucide="info" class="h-4 w-4 mr-2"></i>
+                                        <strong>Próximos passos:</strong> Acesse o histórico, faça as correções e clique em "Marcar como Corrigida"
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                if (!isDiaUtil(hoje)) {
+                    content += `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-yellow-500 mb-4"></i>
+                            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Fim de Semana</h3>
+                            <p class="text-yellow-700">Hoje não é um dia útil. O controle de produtividade será retomado na próxima segunda-feira.</p>
+                        </div>
+                        ${renderAssessoresCards()}
+                    `;
+                } else {
+                    const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
+                    const minutasParaMeta = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
+                    }).length;
+                    
+                    const minutasAlemMeta = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.includes('alem_meta');
+                    }).length;
+                    
+                    const minutasSEEU = Object.values(minutas).filter(m => {
+                        if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                        const categorias = Array.isArray(m.categorias) ? m.categorias : [m.categoria || m.categorias];
+                        return categorias.includes('seeu');
+                    }).length;
+                    
+                    const metaTotal = 20;
+
+                    content += `
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
+                                    <p class="text-blue-100">
+                                        ${hoje.toLocaleDateString('pt-BR', { 
+                                            weekday: 'long', 
+                                            year: 'numeric', 
+                                            month: 'long', 
+                                            day: 'numeric' 
+                                        })}
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
+                                    <div class="text-blue-100 text-sm">minutas para metas CNJ</div>
+                                    ${(minutasAlemMeta > 0 || minutasSEEU > 0) ? `
+                                        <div class="text-lg font-medium mt-2 text-blue-200">
+                                            ${minutasAlemMeta > 0 ? `+${minutasAlemMeta} além da meta` : ''}
+                                            ${minutasAlemMeta > 0 && minutasSEEU > 0 ? ' • ' : ''}
+                                            ${minutasSEEU > 0 ? `${minutasSEEU} SEEU` : ''}
+                                        </div>
+                                        <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
+                                        <div class="text-xs text-blue-300 mt-1">
+                                            📊 Apenas minutas das metas CNJ contam para produtividade diária
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ${renderAssessoresCards()}
+                    `;
+                }
+
+                dashboard.innerHTML = content;
+                dashboard.classList.remove('hidden');
+                
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Dashboard renderizado');
+                
+            } catch (error) {
+                log('Erro ao renderizar dashboard', error);
+                showNotification('Erro ao carregar dashboard', 'error');
+            }
+        }
+
+        function renderAssessoresCards() {
+            if (!currentUser) return '';
+
+            if (currentUser.isJuiz) {
+                return `
+                    <div class="grid md:grid-cols-2 gap-6">
+                        ${renderAssessorCard('gilbert')}
+                        ${renderAssessorCard('laise')}
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="max-w-md mx-auto">
+                        ${renderAssessorCard(currentUser.assessorId)}
+                    </div>
+                `;
+            }
+        }
+
+        function renderAssessorCard(assessorId) {
+            try {
+                const assessor = assessores[assessorId];
+                if (!assessor) return `<div class="text-red-500">Assessor ${assessorId} não encontrado</div>`;
+
+                const progressoTotal = getProgressoTotal(assessorId);
+                const minutasHoje = getMinutasHoje(assessorId);
+
+                return `
                     <div class="bg-white rounded-lg shadow-md p-6">
-                        <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
-                        <p>Sistema funcionando! Firebase Auth carregado com sucesso.</p>
-                        <div class="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-                            <p class="text-green-800">✅ Firebase autenticado e funcionando</p>
-                            <p class="text-green-800">✅ Dados seguros com regras aplicadas</p>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">${assessor.nome}</h3>
+                            <div class="text-right">
+                                <div class="px-3 py-1 rounded-full text-sm font-medium ${
+                                    progressoTotal.atual >= 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                }">
+                                    ${progressoTotal.atual}/10 minutas CNJ
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Progresso Diário (Metas CNJ Apenas)</span>
+                                <span class="font-medium">${Math.round(progressoTotal.percentual)}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div class="${progressoTotal.atual >= 10 ? 'bg-green-500' : 'bg-blue-500'} h-3 rounded-full transition-all duration-300" style="width: ${progressoTotal.percentual}%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">
+                                Total de minutas hoje: ${minutasHoje.length}
+                            </p>
                         </div>
                     </div>
                 `;
                 
-                dashboard.classList.remove('hidden');
-                setTimeout(() => lucide.createIcons(), 100);
-                
             } catch (error) {
-                log('Erro ao renderizar dashboard', error);
+                log(`Erro ao renderizar card ${assessorId}`, error);
+                return `<div class="bg-red-50 p-4 rounded-lg text-red-800">Erro ao carregar ${assessorId}</div>`;
             }
         }
 
         function renderHistorico() {
-            const historico = document.getElementById('historico-view');
-            if (!historico) return;
-            
-            historico.classList.remove('hidden');
+            try {
+                const historico = document.getElementById('historico-view');
+                if (!historico) return;
+
+                const minutasArray = Object.entries(minutas).map(([key, minuta]) => ({
+                    ...minuta,
+                    id: key
+                })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+                let minutasFiltradas = minutasArray;
+
+                if (!currentUser.isJuiz) {
+                    minutasFiltradas = minutasFiltradas.filter(m => {
+                        return m.assessorId === currentUser.assessorId || 
+                               (currentUser.assessorId === 'gilbert' && (m.assessorId === 'assessor1' || m.assessorNome?.includes('Gilbert'))) ||
+                               (currentUser.assessorId === 'laise' && (m.assessorId === 'assessor2' || m.assessorNome?.includes('Laíse')));
+                    });
+                }
+
+                let content = '';
+                if (minutasFiltradas.length === 0) {
+                    content = `
+                        <div class="text-center text-gray-500 py-12">
+                            <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                            <p>Nenhuma minuta encontrada.</p>
+                        </div>
+                    `;
+                } else {
+                    content = `
+                        <div class="space-y-3">
+                            ${minutasFiltradas.map(minuta => {
+                                const categoria = categorias[minuta.categoria] || categorias[minuta.categorias] || {};
+                                const status = statusOptions[minuta.status || 'pendente'];
+                                
+                                return `
+                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                        <div class="flex items-start justify-between">
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-2 mb-2">
+                                                    <span class="font-medium text-gray-800">${minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor'}</span>
+                                                    <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor || 'bg-gray-500'} text-white">
+                                                        ${categoria.nome || 'Categoria'}
+                                                    </span>
+                                                    <span class="status-badge ${status.cor}">${status.nome}</span>
+                                                </div>
+                                                <div class="text-sm text-gray-600 mb-2">
+                                                    <div><strong>Processo:</strong> ${minuta.numeroProcesso || 'Não informado'}</div>
+                                                    <div><strong>Tipo:</strong> ${minuta.tipoMinuta || 'Não informado'}</div>
+                                                    ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="text-xs text-gray-500 text-right">
+                                                <div>${new Date(minuta.data || Date.now()).toLocaleDateString('pt-BR')}</div>
+                                                <div>${minuta.timestamp || ''}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                document.getElementById('historico-content').innerHTML = content;
+                historico.classList.remove('hidden');
+                
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Histórico renderizado');
+                
+            } catch (error) {
+                log('Erro ao renderizar histórico', error);
+                showNotification('Erro ao carregar histórico', 'error');
+            }
         }
 
         function renderCalendario() {
-            const calendario = document.getElementById('calendario-view');
-            if (!calendario) return;
-            
-            calendario.classList.remove('hidden');
+            try {
+                const calendarioView = document.getElementById('calendario-view');
+                if (!calendarioView) return;
+
+                calendarioView.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h2 class="text-xl font-semibold mb-4">Calendário de Produtividade</h2>
+                        <div class="text-center text-gray-500 py-8">
+                            <i data-lucide="calendar" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                            <p>Calendário em desenvolvimento</p>
+                        </div>
+                    </div>
+                `;
+
+                calendarioView.classList.remove('hidden');
+                setTimeout(() => lucide.createIcons(), 100);
+                log('Calendário renderizado');
+                
+            } catch (error) {
+                log('Erro ao renderizar calendário', error);
+                showNotification('Erro ao carregar calendário', 'error');
+            }
         }
 
         function setupHistoricoFilters() {
@@ -1103,6 +1642,7 @@
 
         function gerarRelatorio(tipo) {
             log(`Gerando relatório ${tipo}`);
+            showNotification(`Relatório ${tipo} em desenvolvimento`, 'info');
         }
 
         function editarMinuta(id) {
