@@ -2661,8 +2661,8 @@
                 const totalDias = Math.ceil((fim - inicio) / (24*60*60*1000)) + 1;
                 
                 // Calcular totais para média diária (excluindo "além da meta" e "SEEU")
-                const totalGilbertParaMedia = estatisticas.gilbert.total - estatisticas.gilbert.alem_meta - estatisticas.gilbert.seeu;
-                const totalLaiseParaMedia = estatisticas.laise.total - estatisticas.laise.alem_meta - estatisticas.laise.seeu;
+                const totalGilbertParaMedia = estatisticas.gilbert.total - (estatisticas.gilbert.alem_meta || 0) - (estatisticas.gilbert.seeu || 0);
+                const totalLaiseParaMedia = estatisticas.laise.total - (estatisticas.laise.alem_meta || 0) - (estatisticas.laise.seeu || 0);
                 
                 const mediaGilbert = diasUteis > 0 ? (totalGilbertParaMedia / diasUteis).toFixed(1) : '0';
                 const mediaLaise = diasUteis > 0 ? (totalLaiseParaMedia / diasUteis).toFixed(1) : '0';
@@ -2700,7 +2700,7 @@
                                 </div>
                                 <div class="bg-white rounded-lg p-4">
                                     <div class="text-3xl font-bold text-green-600">${mediaTotal}</div>
-                                    <div class="text-sm text-gray-600">Média Diária</div>
+                                    <div class="text-sm text-gray-600">Média Diária*</div>
                                 </div>
                                 <div class="bg-white rounded-lg p-4">
                                     <div class="text-3xl font-bold text-orange-600">${estatisticas.gilbert.assinadas + estatisticas.laise.assinadas}</div>
@@ -2710,6 +2710,9 @@
                                     <div class="text-3xl font-bold text-red-600">${estatisticas.gilbert.pendentes + estatisticas.laise.pendentes}</div>
                                     <div class="text-sm text-gray-600">Pendentes</div>
                                 </div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-2 text-center">
+                                * Média diária exclui minutas "Além da Meta" e "SEEU"
                             </div>
                         </div>
 
@@ -2751,7 +2754,7 @@
                                 <p>• <strong>Meta 10 CNJ:</strong> 1 minuta semanal dos processos mais antigos (Gilbert)</p>
                                 <p>• <strong>SEEU:</strong> Controle de acesso a cada 10 dias (Laíse)</p>
                                 <p>• <strong>Sem Movimento:</strong> Processos parados há 100+ dias (5 minutas/dia)</p>
-                                <p>• <strong>Minutas "Além da Meta" e "SEEU" não contam para a produtividade diária</strong></p>
+                                <p>• <strong>As minutas "Além da Meta" e "SEEU" aparecem nos detalhes mas não contam para a média diária</strong></p>
                             </div>
                         </div>
                     </div>
