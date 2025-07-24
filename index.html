@@ -396,6 +396,10 @@
                             <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
                             Relatório Mensal
                         </button>
+                        <button onclick="mostrarRelatorioPersonalizado()" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors text-sm">
+                            <i data-lucide="calendar-range" class="h-4 w-4 mr-1 inline"></i>
+                            Personalizado
+                        </button>
                         <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
                             <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
                             Imprimir
@@ -513,6 +517,63 @@
                 
                 <div class="text-xs text-gray-500 text-center">
                     <span class="mr-4">💡 Ctrl+Enter: Salvar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Relatório Personalizado -->
+    <div id="modal-relatorio-personalizado" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalRelatorioPersonalizado()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="calendar-range" class="h-5 w-5 text-purple-600 mr-2"></i>
+                    Relatório Personalizado
+                </h3>
+                <button onclick="fecharModalRelatorioPersonalizado()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                    <div class="text-sm text-purple-800">
+                        <div class="font-medium">📊 Gere relatórios para períodos específicos</div>
+                        <div class="text-xs mt-1">Selecione as datas de início e fim para análise detalhada</div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Início *</label>
+                        <input type="date" id="relatorio-data-inicio" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Fim *</label>
+                        <input type="date" id="relatorio-data-fim" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+                
+                <div class="text-xs text-gray-600 bg-gray-50 p-3 rounded">
+                    💡 <strong>Dicas:</strong><br>
+                    • Para relatório semanal: selecione segunda a domingo<br>
+                    • Para comparar meses: use primeiro e último dia<br>
+                    • Máximo recomendado: 3 meses por relatório
+                </div>
+                
+                <div class="flex gap-2 pt-4">
+                    <button onclick="gerarRelatorioPersonalizado()" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors">
+                        <i data-lucide="bar-chart" class="h-4 w-4 mr-1 inline"></i>
+                        Gerar Relatório
+                    </button>
+                    <button onclick="fecharModalRelatorioPersonalizado()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+                
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Gerar</span>
                     <span>ESC: Cancelar</span>
                 </div>
             </div>
@@ -1367,6 +1428,18 @@
                     data: ontemStr,
                     timestamp: '14:20:00',
                     createdAt: Date.now() - 2000
+                },
+                'demo_4': {
+                    assessorId: 'laise',
+                    assessorNome: 'Laíse Vital',
+                    numeroProcesso: '1111111-11.2024.8.12.1111',
+                    tipoMinuta: 'Sentença',
+                    categorias: ['meta2'],
+                    observacoes: 'Sentença da Meta 2 CNJ - Laíse',
+                    status: 'assinada',
+                    data: ontemStr,
+                    timestamp: '16:30:00',
+                    createdAt: Date.now() - 1500
                 }
             };
             
@@ -1712,26 +1785,37 @@
                             </div>
                         `}
                         
-                        <div class="space-y-4">
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left max-w-md mx-auto">
+                        <div class="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
                                 <h4 class="font-semibold text-blue-800 mb-2">📅 Relatório Semanal</h4>
                                 <p class="text-sm text-blue-700 mb-3">Análise detalhada da semana atual com produtividade diária e metas cumpridas.</p>
                                 <button onclick="gerarRelatorio('semanal')" 
                                         class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm font-medium"
                                         ${totalMinutas === 0 ? 'disabled' : ''}>
                                     <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
-                                    Gerar Relatório Semanal
+                                    Gerar Semanal
                                 </button>
                             </div>
                             
-                            <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-left max-w-md mx-auto">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
                                 <h4 class="font-semibold text-green-800 mb-2">📊 Relatório Mensal</h4>
                                 <p class="text-sm text-green-700 mb-3">Visão completa do mês com gráficos de performance e comparativos semanais.</p>
                                 <button onclick="gerarRelatorio('mensal')" 
                                         class="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm font-medium"
                                         ${totalMinutas === 0 ? 'disabled' : ''}>
                                     <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
-                                    Gerar Relatório Mensal
+                                    Gerar Mensal
+                                </button>
+                            </div>
+                            
+                            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 text-left">
+                                <h4 class="font-semibold text-purple-800 mb-2">🎯 Relatório Personalizado</h4>
+                                <p class="text-sm text-purple-700 mb-3">Escolha período específico e compare dados entre datas customizadas.</p>
+                                <button onclick="mostrarRelatorioPersonalizado()" 
+                                        class="w-full bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors text-sm font-medium"
+                                        ${totalMinutas === 0 ? 'disabled' : ''}>
+                                    <i data-lucide="calendar-range" class="h-4 w-4 mr-1 inline"></i>
+                                    Personalizar
                                 </button>
                             </div>
                         </div>
@@ -1748,6 +1832,7 @@
                         <div class="mt-8 text-xs text-gray-500">
                             <p>💡 <strong>Dica:</strong> Os relatórios são gerados em tempo real com base nas minutas registradas.</p>
                             <p>📝 Para melhores resultados, registre minutas regularmente e mantenha os dados atualizados.</p>
+                            <p>🎯 Use relatórios personalizados para análises específicas de períodos passados.</p>
                         </div>
                     </div>
                 `;
@@ -2458,7 +2543,63 @@
             setTimeout(() => criarIcones(), 100);
         }
 
-        function gerarRelatorio(tipo) {
+        // ==================== RELATÓRIOS PERSONALIZADOS ====================
+        
+        function mostrarRelatorioPersonalizado() {
+            // Pré-preencher com datas do mês atual
+            const hoje = getDataHoraBrasilia();
+            const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+            
+            document.getElementById('relatorio-data-inicio').value = inicioMes.toISOString().split('T')[0];
+            document.getElementById('relatorio-data-fim').value = fimMes.toISOString().split('T')[0];
+            
+            document.getElementById('modal-relatorio-personalizado').classList.remove('hidden');
+            document.getElementById('relatorio-data-inicio').focus();
+            
+            log('Modal de relatório personalizado aberto');
+        }
+
+        function fecharModalRelatorioPersonalizado() {
+            document.getElementById('modal-relatorio-personalizado').classList.add('hidden');
+        }
+
+        function gerarRelatorioPersonalizado() {
+            try {
+                const dataInicio = document.getElementById('relatorio-data-inicio').value;
+                const dataFim = document.getElementById('relatorio-data-fim').value;
+
+                if (!dataInicio || !dataFim) {
+                    showNotification('Por favor, selecione as datas de início e fim', 'warning');
+                    return;
+                }
+
+                if (dataInicio > dataFim) {
+                    showNotification('A data de início deve ser anterior à data de fim', 'error');
+                    return;
+                }
+
+                const inicio = new Date(dataInicio);
+                const fim = new Date(dataFim);
+                
+                // Verificar se o período não é muito longo (mais de 3 meses)
+                const diffMeses = (fim.getFullYear() - inicio.getFullYear()) * 12 + (fim.getMonth() - inicio.getMonth());
+                if (diffMeses > 3) {
+                    if (!confirm('O período selecionado é superior a 3 meses. Isso pode gerar um relatório muito extenso. Deseja continuar?')) {
+                        return;
+                    }
+                }
+
+                fecharModalRelatorioPersonalizado();
+                gerarRelatorio('personalizado', inicio, fim);
+                
+            } catch (error) {
+                log('Erro ao gerar relatório personalizado:', error);
+                showNotification('Erro ao gerar relatório personalizado', 'error');
+            }
+        }
+
+        function gerarRelatorio(tipo, dataInicioCustom = null, dataFimCustom = null) {
             try {
                 const relatorioContent = document.getElementById('relatorio-content');
                 if (!relatorioContent) {
@@ -2468,7 +2609,11 @@
                 const hoje = getDataHoraBrasilia();
                 let inicio, fim, titulo;
 
-                if (tipo === 'semanal') {
+                if (tipo === 'personalizado' && dataInicioCustom && dataFimCustom) {
+                    inicio = dataInicioCustom;
+                    fim = dataFimCustom;
+                    titulo = `Relatório Personalizado - ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}`;
+                } else if (tipo === 'semanal') {
                     inicio = getInicioSemana(hoje);
                     fim = getFimSemana(hoje);
                     titulo = `Relatório Semanal - ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}`;
@@ -2495,11 +2640,13 @@
                 const estatisticas = {
                     gilbert: { 
                         total: 0, meta1: 0, meta2: 0, meta10: 0, sem_movimento: 0, 
-                        outros: 0, alem_meta: 0, pendentes: 0, assinadas: 0 
+                        outros: 0, alem_meta: 0, seeu: 0, pendentes: 0, assinadas: 0,
+                        totalParaMeta: 0 // NOVO: total que conta para a meta diária
                     },
                     laise: { 
-                        total: 0, meta1: 0, seeu: 0, sem_movimento: 0, 
-                        outros: 0, alem_meta: 0, pendentes: 0, assinadas: 0 
+                        total: 0, meta1: 0, meta2: 0, seeu: 0, sem_movimento: 0, 
+                        outros: 0, alem_meta: 0, pendentes: 0, assinadas: 0,
+                        totalParaMeta: 0 // NOVO: total que conta para a meta diária
                     }
                 };
 
@@ -2522,22 +2669,34 @@
                             if (m.status === 'assinada') estatisticas[assessorId].assinadas++;
                             
                             const categorias = normalizarCategorias(m);
+                            let contaParaMeta = false;
+                            
                             categorias.forEach(cat => {
                                 if (estatisticas[assessorId][cat] !== undefined) {
                                     estatisticas[assessorId][cat]++;
                                 }
+                                
+                                // CORREÇÃO: Verificar se conta para a meta diária (excluir "alem_meta" e "seeu")
+                                if (cat !== 'alem_meta' && cat !== 'seeu') {
+                                    contaParaMeta = true;
+                                }
                             });
+                            
+                            // Incrementar contador de minutas que contam para a meta
+                            if (contaParaMeta) {
+                                estatisticas[assessorId].totalParaMeta++;
+                            }
                         }
                     } catch (err) {
                         log(`Erro ao processar minuta:`, err);
                     }
                 });
 
-                // Calcular dias úteis no período
+                // Calcular dias úteis no período - CORREÇÃO: usar minutas que contam para meta
                 const diasUteis = calcularDiasUteis(inicio, fim);
-                const mediaGilbert = diasUteis > 0 ? (estatisticas.gilbert.total / diasUteis).toFixed(1) : '0';
-                const mediaLaise = diasUteis > 0 ? (estatisticas.laise.total / diasUteis).toFixed(1) : '0';
-                const mediaTotal = diasUteis > 0 ? ((estatisticas.gilbert.total + estatisticas.laise.total) / diasUteis).toFixed(1) : '0';
+                const mediaGilbert = diasUteis > 0 ? (estatisticas.gilbert.totalParaMeta / diasUteis).toFixed(1) : '0';
+                const mediaLaise = diasUteis > 0 ? (estatisticas.laise.totalParaMeta / diasUteis).toFixed(1) : '0';
+                const mediaTotal = diasUteis > 0 ? ((estatisticas.gilbert.totalParaMeta + estatisticas.laise.totalParaMeta) / diasUteis).toFixed(1) : '0';
 
                 let relatorioHtml = `
                     <div class="space-y-6">
@@ -2545,6 +2704,7 @@
                             <h3 class="text-2xl font-bold text-gray-800 mb-2">${titulo}</h3>
                             <p class="text-gray-600">Gerado em ${hoje.toLocaleString('pt-BR')}</p>
                             <p class="text-sm text-gray-500">Período: ${diasUteis} dias úteis</p>
+                            ${tipo === 'personalizado' ? `<p class="text-xs text-purple-600 mt-1">📊 Relatório personalizado solicitado pelo usuário</p>` : ''}
                         </div>
                         
                         <!-- Resumo Executivo -->
@@ -2552,20 +2712,24 @@
                             <h4 class="text-lg font-semibold text-blue-800 mb-4">📊 Resumo Executivo</h4>
                             <div class="grid md:grid-cols-4 gap-4 text-center">
                                 <div class="bg-white rounded-lg p-4">
-                                    <div class="text-3xl font-bold text-blue-600">${estatisticas.gilbert.total + estatisticas.laise.total}</div>
-                                    <div class="text-sm text-gray-600">Total de Minutas</div>
+                                    <div class="text-3xl font-bold text-blue-600">${estatisticas.gilbert.totalParaMeta + estatisticas.laise.totalParaMeta}</div>
+                                    <div class="text-sm text-gray-600">Minutas para Meta</div>
+                                    <div class="text-xs text-gray-500 mt-1">(${estatisticas.gilbert.total + estatisticas.laise.total} total)</div>
                                 </div>
                                 <div class="bg-white rounded-lg p-4">
                                     <div class="text-3xl font-bold text-green-600">${mediaTotal}</div>
                                     <div class="text-sm text-gray-600">Média Diária</div>
+                                    <div class="text-xs text-gray-500 mt-1">minutas/dia útil</div>
                                 </div>
                                 <div class="bg-white rounded-lg p-4">
                                     <div class="text-3xl font-bold text-orange-600">${estatisticas.gilbert.assinadas + estatisticas.laise.assinadas}</div>
                                     <div class="text-sm text-gray-600">Assinadas</div>
+                                    <div class="text-xs text-gray-500 mt-1">status final</div>
                                 </div>
                                 <div class="bg-white rounded-lg p-4">
                                     <div class="text-3xl font-bold text-red-600">${estatisticas.gilbert.pendentes + estatisticas.laise.pendentes}</div>
                                     <div class="text-sm text-gray-600">Pendentes</div>
+                                    <div class="text-xs text-gray-500 mt-1">aguardando</div>
                                 </div>
                             </div>
                         </div>
@@ -2576,8 +2740,12 @@
                                 <h4 class="text-lg font-semibold text-blue-800 mb-4">👨‍💼 Gilbert Juliano</h4>
                                 <div class="space-y-3">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-sm font-medium">Total de minutas:</span>
-                                        <span class="text-lg font-bold text-blue-600">${estatisticas.gilbert.total}</span>
+                                        <span class="text-sm font-medium">Minutas para meta:</span>
+                                        <span class="text-lg font-bold text-blue-600">${estatisticas.gilbert.totalParaMeta}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium">Total produzido:</span>
+                                        <span class="text-lg font-bold text-gray-700">${estatisticas.gilbert.total}</span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-sm">Média diária:</span>
@@ -2605,9 +2773,14 @@
                                             <span>Pedidos/Atos:</span>
                                             <span class="font-medium">${estatisticas.gilbert.outros}</span>
                                         </div>
-                                        <div class="flex justify-between">
+                                        <hr class="border-blue-100">
+                                        <div class="flex justify-between text-gray-600">
                                             <span>Além da Meta:</span>
                                             <span class="font-medium">${estatisticas.gilbert.alem_meta}</span>
+                                        </div>
+                                        <div class="flex justify-between text-gray-600">
+                                            <span>SEEU:</span>
+                                            <span class="font-medium">${estatisticas.gilbert.seeu || 0}</span>
                                         </div>
                                     </div>
                                     <hr class="border-blue-200">
@@ -2628,8 +2801,12 @@
                                 <h4 class="text-lg font-semibold text-green-800 mb-4">👩‍💼 Laíse Vital</h4>
                                 <div class="space-y-3">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-sm font-medium">Total de minutas:</span>
-                                        <span class="text-lg font-bold text-green-600">${estatisticas.laise.total}</span>
+                                        <span class="text-sm font-medium">Minutas para meta:</span>
+                                        <span class="text-lg font-bold text-green-600">${estatisticas.laise.totalParaMeta}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium">Total produzido:</span>
+                                        <span class="text-lg font-bold text-gray-700">${estatisticas.laise.total}</span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-sm">Média diária:</span>
@@ -2642,8 +2819,8 @@
                                             <span class="font-medium">${estatisticas.laise.meta1}</span>
                                         </div>
                                         <div class="flex justify-between">
-                                            <span>SEEU:</span>
-                                            <span class="font-medium">${estatisticas.laise.seeu}</span>
+                                            <span>Meta 2 CNJ:</span>
+                                            <span class="font-medium">${estatisticas.laise.meta2}</span>
                                         </div>
                                         <div class="flex justify-between">
                                             <span>Sem movimentação:</span>
@@ -2653,9 +2830,14 @@
                                             <span>Pedidos/Atos:</span>
                                             <span class="font-medium">${estatisticas.laise.outros}</span>
                                         </div>
-                                        <div class="flex justify-between">
+                                        <hr class="border-green-100">
+                                        <div class="flex justify-between text-gray-600">
                                             <span>Além da Meta:</span>
                                             <span class="font-medium">${estatisticas.laise.alem_meta}</span>
+                                        </div>
+                                        <div class="flex justify-between text-gray-600">
+                                            <span>SEEU:</span>
+                                            <span class="font-medium">${estatisticas.laise.seeu}</span>
                                         </div>
                                     </div>
                                     <hr class="border-green-200">
@@ -2674,8 +2856,8 @@
                         </div>
                 `;
 
-                // Adicionar gráfico semanal apenas para relatório mensal
-                if (tipo === 'mensal') {
+                // Adicionar gráfico semanal apenas para relatório mensal ou personalizado longo
+                if (tipo === 'mensal' || (tipo === 'personalizado' && diasUteis >= 14)) {
                     try {
                         const graficoSemanal = renderGraficoSemanal(inicio, fim);
                         relatorioHtml += graficoSemanal;
@@ -2698,11 +2880,14 @@
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
                             <h4 class="text-lg font-semibold text-gray-800 mb-3">📝 Observações</h4>
                             <div class="space-y-2 text-sm text-gray-700">
+                                <p><strong>💡 Sobre o cálculo da média diária:</strong></p>
                                 <p>• Meta diária esperada: 10 minutas por assessor (20 total)</p>
+                                <p>• <strong>Minutas contabilizadas para meta:</strong> Meta 1 CNJ, Meta 2 CNJ, Meta 10 CNJ, Sem movimentação e Pedidos/Atos</p>
+                                <p>• <strong>Minutas NÃO contabilizadas:</strong> "Além da Meta" e "SEEU" (são produtividade adicional)</p>
                                 <p>• Meta 2 CNJ: 1 sentença por semana por assessor</p>
                                 <p>• Meta 10 CNJ: 1 minuta semanal (Gilbert)</p>
                                 <p>• SEEU: Controle de acesso a cada 10 dias (Laíse)</p>
-                                <p>• Minutas "Além da Meta" e "SEEU" não contam para produtividade diária</p>
+                                ${tipo === 'personalizado' ? '<p>• <strong>Relatório personalizado:</strong> Dados do período selecionado pelo usuário</p>' : ''}
                             </div>
                         </div>
                     </div>
@@ -2790,7 +2975,7 @@
 
                 log(`Gerando gráfico semanal para período ${inicio.toISOString().split('T')[0]} a ${fim.toISOString().split('T')[0]}`);
 
-                // Dividir o mês em semanas e calcular produtividade por semana
+                // Dividir o período em semanas e calcular produtividade por semana
                 const semanas = [];
                 let inicioSemana = new Date(inicio);
                 
@@ -2809,18 +2994,25 @@
                         return m.data >= inicioStr && m.data <= fimStr;
                     });
                     
+                    // CORREÇÃO: Contar apenas minutas que contam para meta
+                    const minutasParaMeta = minutasSemana.filter(m => {
+                        const categorias = normalizarCategorias(m);
+                        return categorias.some(cat => cat !== 'alem_meta' && cat !== 'seeu');
+                    });
+                    
                     semanas.push({
                         inicio: new Date(inicioSemana),
                         fim: new Date(fimSemana),
                         total: minutasSemana.length,
+                        paraMeta: minutasParaMeta.length,
                         semana: semanas.length + 1
                     });
                     
                     inicioSemana.setDate(inicioSemana.getDate() + 7);
                     
                     // Proteção contra loop infinito
-                    if (semanas.length > 10) {
-                        log('Aviso: Muitas semanas detectadas, limitando a 10');
+                    if (semanas.length > 15) {
+                        log('Aviso: Muitas semanas detectadas, limitando a 15');
                         break;
                     }
                 }
@@ -2836,18 +3028,18 @@
                     `;
                 }
                 
-                const maxMinutas = Math.max(...semanas.map(s => s.total), 10); // Mínimo 10 para escala visível
+                const maxMinutas = Math.max(...semanas.map(s => s.paraMeta), 10); // Usar minutas para meta
                 
-                log(`Gráfico semanal: ${semanas.length} semanas, máximo ${maxMinutas} minutas`);
+                log(`Gráfico semanal: ${semanas.length} semanas, máximo ${maxMinutas} minutas para meta`);
                 
                 return `
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-4">📈 Performance Semanal</h4>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">📈 Performance Semanal (Minutas para Meta)</h4>
                         <div class="space-y-3">
                             ${semanas.map((semana, index) => {
-                                const porcentagem = maxMinutas > 0 ? (semana.total / maxMinutas) * 100 : 0;
-                                const cor = semana.total >= 50 ? 'bg-green-500' : 
-                                           semana.total >= 25 ? 'bg-yellow-500' : 'bg-red-500';
+                                const porcentagem = maxMinutas > 0 ? (semana.paraMeta / maxMinutas) * 100 : 0;
+                                const cor = semana.paraMeta >= 50 ? 'bg-green-500' : 
+                                           semana.paraMeta >= 25 ? 'bg-yellow-500' : 'bg-red-500';
                                 
                                 return `
                                     <div class="flex items-center space-x-4">
@@ -2858,7 +3050,7 @@
                                             <div class="${cor} h-6 rounded-full transition-all duration-300" 
                                                  style="width: ${Math.max(porcentagem, 5)}%"></div>
                                             <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-white">
-                                                ${semana.total} minutas
+                                                ${semana.paraMeta} minutas ${semana.total > semana.paraMeta ? `(+${semana.total - semana.paraMeta})` : ''}
                                             </div>
                                         </div>
                                         <div class="w-24 text-sm text-gray-500">
@@ -2869,7 +3061,7 @@
                             }).join('')}
                         </div>
                         <div class="mt-4 text-xs text-gray-500 text-center">
-                            Total de ${semanas.reduce((acc, s) => acc + s.total, 0)} minutas em ${semanas.length} semana${semanas.length !== 1 ? 's' : ''}
+                            ${semanas.reduce((acc, s) => acc + s.paraMeta, 0)} minutas para meta • ${semanas.reduce((acc, s) => acc + s.total, 0)} total • ${semanas.length} semana${semanas.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                 `;
@@ -3052,6 +3244,7 @@
                     if (e.key === 'Escape') {
                         const modalEdicao = document.getElementById('modal-edicao');
                         const modalCorrecao = document.getElementById('modal-correcao');
+                        const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
                         
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             fecharModalEdicao();
@@ -3059,18 +3252,25 @@
                         if (modalCorrecao && !modalCorrecao.classList.contains('hidden')) {
                             fecharModalCorrecao();
                         }
+                        if (modalRelatorioPersonalizado && !modalRelatorioPersonalizado.classList.contains('hidden')) {
+                            fecharModalRelatorioPersonalizado();
+                        }
                     }
                     
                     // Ctrl+Enter para confirmar ações em modais
                     if (e.ctrlKey && e.key === 'Enter') {
                         const modalEdicao = document.getElementById('modal-edicao');
                         const modalCorrecao = document.getElementById('modal-correcao');
+                        const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
                         
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             salvarEdicao();
                         }
                         if (modalCorrecao && !modalCorrecao.classList.contains('hidden')) {
                             confirmarCorrecao();
+                        }
+                        if (modalRelatorioPersonalizado && !modalRelatorioPersonalizado.classList.contains('hidden')) {
+                            gerarRelatorioPersonalizado();
                         }
                     }
                     
@@ -3245,7 +3445,13 @@
         }
 
         // Log final
-        log('📋 Sistema de Produtividade Judicial v2.1 - Relatório Mensal CORRIGIDO! ✅');
+        log('📋 Sistema de Produtividade Judicial v3.0 - MELHORIAS IMPLEMENTADAS! ✅');
+        log('🎯 Correções aplicadas:');
+        log('  1. ✅ Meta 2 CNJ da Laíse agora aparece nos relatórios');
+        log('  2. ✅ Relatórios personalizados por período implementados');
+        log('  3. ✅ Minutas "além da meta" e "seeu" excluídas do cálculo de média diária');
+        log('  4. ✅ Gráficos corrigidos para mostrar apenas minutas que contam para meta');
+        log('  5. ✅ Interface aprimorada com explicações claras');
         
         // Aviso sobre funções de debug disponíveis
         if (typeof console !== 'undefined') {
@@ -3254,6 +3460,7 @@
             console.log('   • debugRelatorios(tipo) - Debug específico de relatórios');
             console.log('   • testarRelatorio(tipo) - Testar geração de relatórios');
             console.log('   • limparDados() - Limpar todos os dados');
+            console.log('   🆕 mostrarRelatorioPersonalizado() - Abrir modal de relatório personalizado');
         }
     </script>
 </body>
