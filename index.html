@@ -2059,78 +2059,7 @@
                             ${filtroProcesso || filtroTipo || filtroStatus || filtroCategoria ? ' (filtros aplicados)' : ''}
                         </div>
                         <div class="space-y-3">
-                            ${minutasFiltradas.map(minuta => {
-                                // ===== CORREÇÃO APLICADA =====
-                                const categoriasMinuta = normalizarCategorias(minuta).filter(cat => cat && categorias[cat]);
-                                const status = statusOptions[minuta.status || 'pendente'];
-                                
-                                // Renderizar todas as categorias da minuta
-                                const categoriasHtml = categoriasMinuta.map(catId => {
-                                    const categoria = categorias[catId];
-                                    return `<span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor || 'bg-gray-500'} text-white">
-                                                ${categoria.nome || catId}
-                                            </span>`;
-                                }).join(' ');
-                                
-                                return `
-                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                        <div class="flex items-start justify-between">
-                                            <div class="flex-1">
-                                                <div class="flex items-center gap-2 mb-2 flex-wrap">
-                                                    <span class="font-medium text-gray-800">${minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor'}</span>
-                                                    ${categoriasHtml || '<span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-500 text-white">Sem categoria</span>'}
-                                                    <span class="status-badge ${status.cor}">${status.nome}</span>
-                                                </div>
-                                                <div class="text-sm text-gray-600 mb-2">
-                                                    <div><strong>Processo:</strong> ${minuta.numeroProcesso || 'Não informado'}</div>
-                                                    <div><strong>Tipo:</strong> ${minuta.tipoMinuta || 'Não informado'}</div>
-                                                    ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
-                                                    ${categoriasMinuta.length > 1 ? `<div class="text-xs text-blue-600 mt-1"><strong>Múltiplas categorias:</strong> ${categoriasMinuta.map(id => categorias[id]?.nome || id).join(', ')}</div>` : ''}
-                                                </div>
-                                                ${currentUser.isJuiz ? `
-                                                    <div class="flex gap-2 mt-3">
-                                                        ${minuta.status !== 'assinada' ? `
-                                                            <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">
-                                                                <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>
-                                                                Assinar
-                                                            </button>
-                                                        ` : ''}
-                                                        ${minuta.status !== 'correcao' ? `
-                                                            <button onclick="solicitarCorrecao('${minuta.id}')" class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
-                                                                <i data-lucide="edit" class="h-3 w-3 mr-1 inline"></i>
-                                                                Correção
-                                                            </button>
-                                                        ` : ''}
-                                                        <button onclick="editarMinuta('${minuta.id}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
-                                                            <i data-lucide="edit-2" class="h-3 w-3 mr-1 inline"></i>
-                                                            Editar
-                                                        </button>
-                                                        <button onclick="excluirMinuta('${minuta.id}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">
-                                                            <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>
-                                                            Excluir
-                                                        </button>
-                                                    </div>
-                                                ` : ''}
-                                                ${minuta.status === 'correcao' && !currentUser.isJuiz ? `
-                                                    <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-                                                        <div class="text-red-800 text-sm">
-                                                            <strong>Correção solicitada:</strong> ${minuta.correcaoDetalhes || 'Detalhes não especificados'}
-                                                        </div>
-                                                        <button onclick="marcarComoCorrigida('${minuta.id}')" class="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
-                                                            <i data-lucide="check-circle" class="h-3 w-3 mr-1 inline"></i>
-                                                            Marcar como Corrigida
-                                                        </button>
-                                                    </div>
-                                                ` : ''}
-                                            </div>
-                                            <div class="text-xs text-gray-500 text-right ml-4">
-                                                <div>${new Date(minuta.data || Date.now()).toLocaleDateString('pt-BR')}</div>
-                                                <div>${minuta.timestamp || ''}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
+                            ${renderMinutasCards(minutasFiltradas)}
                         </div>
                     `;
                 }
@@ -2139,12 +2068,85 @@
                 historico.classList.remove('hidden');
                 
                 setTimeout(() => criarIcones(), 100);
-                log('Histórico renderizado com correção');
+                log('Histórico renderizado com sucesso');
                 
             } catch (error) {
                 log('Erro ao renderizar histórico', error);
                 showNotification('Erro ao carregar histórico', 'error');
             }
+        }
+
+        function renderMinutasCards(minutasFiltradas) {
+            return minutasFiltradas.map(minuta => {
+                const categoriasMinuta = normalizarCategorias(minuta);
+                const status = statusOptions[minuta.status || 'pendente'];
+                
+                // Criar HTML das categorias
+                const categoriasHtml = categoriasMinuta.map(catId => {
+                    const categoria = categorias[catId];
+                    if (!categoria) return '';
+                    return `<span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor || 'bg-gray-500'} text-white">${categoria.nome || catId}</span>`;
+                }).join(' ');
+                
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                    <span class="font-medium text-gray-800">${minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor'}</span>
+                                    ${categoriasHtml || '<span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-500 text-white">Sem categoria</span>'}
+                                    <span class="status-badge ${status.cor}">${status.nome}</span>
+                                </div>
+                                <div class="text-sm text-gray-600 mb-2">
+                                    <div><strong>Processo:</strong> ${minuta.numeroProcesso || 'Não informado'}</div>
+                                    <div><strong>Tipo:</strong> ${minuta.tipoMinuta || 'Não informado'}</div>
+                                    ${minuta.observacoes ? `<div><strong>Observações:</strong> ${minuta.observacoes}</div>` : ''}
+                                    ${categoriasMinuta.length > 1 ? `<div class="text-xs text-blue-600 mt-1"><strong>Múltiplas categorias:</strong> ${categoriasMinuta.map(id => categorias[id]?.nome || id).join(', ')}</div>` : ''}
+                                </div>
+                                ${currentUser.isJuiz ? `
+                                    <div class="flex gap-2 mt-3">
+                                        ${minuta.status !== 'assinada' ? `
+                                            <button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">
+                                                <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>
+                                                Assinar
+                                            </button>
+                                        ` : ''}
+                                        ${minuta.status !== 'correcao' ? `
+                                            <button onclick="solicitarCorrecao('${minuta.id}')" class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
+                                                <i data-lucide="edit" class="h-3 w-3 mr-1 inline"></i>
+                                                Correção
+                                            </button>
+                                        ` : ''}
+                                        <button onclick="editarMinuta('${minuta.id}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                                            <i data-lucide="edit-2" class="h-3 w-3 mr-1 inline"></i>
+                                            Editar
+                                        </button>
+                                        <button onclick="excluirMinuta('${minuta.id}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">
+                                            <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>
+                                            Excluir
+                                        </button>
+                                    </div>
+                                ` : ''}
+                                ${minuta.status === 'correcao' && !currentUser.isJuiz ? `
+                                    <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                                        <div class="text-red-800 text-sm">
+                                            <strong>Correção solicitada:</strong> ${minuta.correcaoDetalhes || 'Detalhes não especificados'}
+                                        </div>
+                                        <button onclick="marcarComoCorrigida('${minuta.id}')" class="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                                            <i data-lucide="check-circle" class="h-3 w-3 mr-1 inline"></i>
+                                            Marcar como Corrigida
+                                        </button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="text-xs text-gray-500 text-right ml-4">
+                                <div>${new Date(minuta.data || Date.now()).toLocaleDateString('pt-BR')}</div>
+                                <div>${minuta.timestamp || ''}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function limparFiltros() {
