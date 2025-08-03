@@ -2060,13 +2060,8 @@
                         </div>
                         <div class="space-y-3">
                             ${minutasFiltradas.map(minuta => {
-                                // ===== CORREÇÃO AQUI =====
-                                // Função auxiliar para lidar com categorias (array ou string)
-                                function getCategoriasMinuta(minuta) {
-                                    return normalizarCategorias(minuta).filter(cat => cat && categorias[cat]);
-                                }
-                                
-                                const categoriasMinuta = getCategoriasMinuta(minuta);
+                                // ===== CORREÇÃO APLICADA =====
+                                const categoriasMinuta = normalizarCategorias(minuta).filter(cat => cat && categorias[cat]);
                                 const status = statusOptions[minuta.status || 'pendente'];
                                 
                                 // Renderizar todas as categorias da minuta
