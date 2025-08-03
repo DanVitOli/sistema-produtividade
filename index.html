@@ -1351,7 +1351,6 @@
                         document.getElementById('registro-view')?.classList.remove('hidden');
                         break;
                     case 'historico':
-                        setupHistoricoFilters();
                         renderHistorico();
                         break;
                     case 'calendario':
@@ -2117,6 +2116,43 @@
                 if (!historicoContent) {
                     log('Elemento historico-content não encontrado');
                     return;
+                }
+
+                // ===== CONFIGURAR FILTROS AUTOMATICAMENTE =====
+                const filtrosContainer = document.getElementById('historico-filters');
+                if (filtrosContainer && filtrosContainer.innerHTML.trim() === '') {
+                    filtrosContainer.innerHTML = `
+                        <div class="flex flex-wrap gap-2">
+                            <input type="text" id="filtro-processo" placeholder="Buscar por nº do processo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-48" oninput="renderHistorico()">
+                            <select id="filtro-tipo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
+                                <option value="">Todos os tipos</option>
+                                <option value="Despacho">Despacho</option>
+                                <option value="Decisão">Decisão</option>
+                                <option value="Sentença">Sentença</option>
+                            </select>
+                            <select id="filtro-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
+                                <option value="">Todos os status</option>
+                                <option value="pendente">Pendentes</option>
+                                <option value="assinada">Assinadas</option>
+                                <option value="correcao">Precisam Correção</option>
+                                <option value="excluida">Excluídas</option>
+                            </select>
+                            <select id="filtro-categoria" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
+                                <option value="">Todas as categorias</option>
+                                <option value="meta1">Meta 1 CNJ</option>
+                                <option value="meta2">Meta 2 CNJ</option>
+                                <option value="meta10">Meta 10 CNJ</option>
+                                <option value="seeu">SEEU</option>
+                                <option value="sem_movimento">Sem movimentação</option>
+                                <option value="outros">Pedidos/Atos</option>
+                                <option value="alem_meta">Além da Meta</option>
+                            </select>
+                            <button onclick="limparFiltros()" class="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors text-sm">
+                                <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
+                                Limpar
+                            </button>
+                        </div>
+                    `;
                 }
 
                 // Verificar se minutas existe
