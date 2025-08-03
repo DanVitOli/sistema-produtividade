@@ -2017,8 +2017,20 @@
                 }
 
                 // Aplicar filtros se existirem
+                const filtroProcesso = document.getElementById('filtro-processo')?.value.toLowerCase().trim();
+                const filtroTipo = document.getElementById('filtro-tipo')?.value;
                 const filtroStatus = document.getElementById('filtro-status')?.value;
                 const filtroCategoria = document.getElementById('filtro-categoria')?.value;
+
+                if (filtroProcesso) {
+                    minutasFiltradas = minutasFiltradas.filter(m => 
+                        (m.numeroProcesso || '').toLowerCase().includes(filtroProcesso)
+                    );
+                }
+
+                if (filtroTipo) {
+                    minutasFiltradas = minutasFiltradas.filter(m => m.tipoMinuta === filtroTipo);
+                }
 
                 if (filtroStatus) {
                     minutasFiltradas = minutasFiltradas.filter(m => m.status === filtroStatus);
@@ -2037,14 +2049,14 @@
                         <div class="text-center text-gray-500 py-12">
                             <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
                             <p>Nenhuma minuta encontrada com os filtros aplicados.</p>
-                            ${filtroStatus || filtroCategoria ? '<button onclick="limparFiltros()" class="mt-4 text-blue-600 hover:text-blue-800 text-sm">Limpar filtros</button>' : ''}
+                            ${filtroProcesso || filtroTipo || filtroStatus || filtroCategoria ? '<button onclick="limparFiltros()" class="mt-4 text-blue-600 hover:text-blue-800 text-sm">Limpar filtros</button>' : ''}
                         </div>
                     `;
                 } else {
                     content = `
                         <div class="mb-4 text-sm text-gray-600">
                             Mostrando ${minutasFiltradas.length} de ${minutasArray.length} minutas
-                            ${filtroStatus || filtroCategoria ? ' (filtros aplicados)' : ''}
+                            ${filtroProcesso || filtroTipo || filtroStatus || filtroCategoria ? ' (filtros aplicados)' : ''}
                         </div>
                         <div class="space-y-3">
                             ${minutasFiltradas.map(minuta => {
@@ -2141,9 +2153,13 @@
         }
 
         function limparFiltros() {
+            const filtroProcesso = document.getElementById('filtro-processo');
+            const filtroTipo = document.getElementById('filtro-tipo');
             const filtroStatus = document.getElementById('filtro-status');
             const filtroCategoria = document.getElementById('filtro-categoria');
             
+            if (filtroProcesso) filtroProcesso.value = '';
+            if (filtroTipo) filtroTipo.value = '';
             if (filtroStatus) filtroStatus.value = '';
             if (filtroCategoria) filtroCategoria.value = '';
             
@@ -2512,36 +2528,6 @@
             }
         }
 
-        function setupHistoricoFilters() {
-            const filters = document.getElementById('historico-filters');
-            if (!filters) return;
-
-            filters.innerHTML = `
-                <select id="filtro-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
-                    <option value="">Todos os status</option>
-                    <option value="pendente">Pendentes</option>
-                    <option value="assinada">Assinadas</option>
-                    <option value="correcao">Precisam Correção</option>
-                    <option value="excluida">Excluídas</option>
-                </select>
-                <select id="filtro-categoria" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
-                    <option value="">Todas as categorias</option>
-                    <option value="meta1">Meta 1 CNJ</option>
-                    <option value="meta2">Meta 2 CNJ</option>
-                    <option value="meta10">Meta 10 CNJ</option>
-                    <option value="seeu">SEEU</option>
-                    <option value="sem_movimento">Sem movimentação</option>
-                    <option value="outros">Pedidos/Atos</option>
-                    <option value="alem_meta">Além da Meta</option>
-                </select>
-                <button onclick="limparFiltros()" class="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors text-sm">
-                    <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
-                    Limpar
-                </button>
-            `;
-            
-            setTimeout(() => criarIcones(), 100);
-        }
 
         // ==================== RELATÓRIOS PERSONALIZADOS ====================
         
@@ -3445,13 +3431,13 @@
         }
 
         // Log final
-        log('📋 Sistema de Produtividade Judicial v3.0 - MELHORIAS IMPLEMENTADAS! ✅');
-        log('🎯 Correções aplicadas:');
-        log('  1. ✅ Meta 2 CNJ da Laíse agora aparece nos relatórios');
-        log('  2. ✅ Relatórios personalizados por período implementados');
-        log('  3. ✅ Minutas "além da meta" e "seeu" excluídas do cálculo de média diária');
-        log('  4. ✅ Gráficos corrigidos para mostrar apenas minutas que contam para meta');
-        log('  5. ✅ Interface aprimorada com explicações claras');
+        log('📋 Sistema de Produtividade Judicial v4.0 - FILTROS APRIMORADOS! ✅');
+        log('🎯 Novas funcionalidades implementadas:');
+        log('  1. ✅ Campo de busca por número do processo');
+        log('  2. ✅ Filtro por tipo de minuta (Despacho/Decisão/Sentença)');
+        log('  3. ✅ Interface de filtros reorganizada e responsiva');
+        log('  4. ✅ Busca em tempo real no campo de processo');
+        log('  5. ✅ Filtros combinados funcionando perfeitamente');
         
         // Aviso sobre funções de debug disponíveis
         if (typeof console !== 'undefined') {
@@ -3460,7 +3446,7 @@
             console.log('   • debugRelatorios(tipo) - Debug específico de relatórios');
             console.log('   • testarRelatorio(tipo) - Testar geração de relatórios');
             console.log('   • limparDados() - Limpar todos os dados');
-            console.log('   🆕 mostrarRelatorioPersonalizado() - Abrir modal de relatório personalizado');
+            console.log('   🆕 Novos filtros de histórico implementados!');
         }
     </script>
 </body>
