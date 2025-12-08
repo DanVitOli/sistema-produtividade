@@ -646,7 +646,7 @@
         // ===== FUNÇÃO UTILITÁRIA PARA NORMALIZAR CATEGORIAS =====
         function normalizarCategorias(minuta) {
             let categorias = [];
-            
+
             if (Array.isArray(minuta.categorias)) {
                 categorias = minuta.categorias;
             } else if (minuta.categoria) {
@@ -654,8 +654,28 @@
             } else if (typeof minuta.categorias === 'string') {
                 categorias = [minuta.categorias];
             }
-            
+
             return categorias.filter(cat => cat && cat.trim()); // Remove vazios
+        }
+
+        // ===== FUNÇÃO DE SANITIZAÇÃO PARA PREVENIR XSS =====
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            const text = String(str);
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, char => map[char]);
+        }
+
+        // ===== FUNÇÃO PARA ESCAPAR IDs PARA USO EM ATRIBUTOS =====
+        function escapeAttr(str) {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/['"\\]/g, '\\$&');
         }
 
         // ===== FUNÇÃO PARA CRIAR ÍCONES COM FALLBACK =====
@@ -692,28 +712,55 @@
 
         function getDataHoraBrasilia() {
             try {
-                const agora = new Date();
-                
+                // Usar Intl.DateTimeFormat para obter a data/hora correta de Brasília
+                // Isso funciona corretamente com horário de verão (quando aplicável)
+                const options = {
+                    timeZone: 'America/Sao_Paulo',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                };
+
+                const formatter = new Intl.DateTimeFormat('pt-BR', options);
+                const parts = formatter.formatToParts(new Date());
+
+                const dateObj = {};
+                parts.forEach(part => {
+                    dateObj[part.type] = part.value;
+                });
+
+                // Criar objeto Date com os componentes de Brasília
+                const brasilia = new Date(
+                    parseInt(dateObj.year),
+                    parseInt(dateObj.month) - 1,
+                    parseInt(dateObj.day),
+                    parseInt(dateObj.hour),
+                    parseInt(dateObj.minute),
+                    parseInt(dateObj.second)
+                );
+
                 // Verificar se a data é válida
-                if (isNaN(agora.getTime())) {
-                    console.warn('Data inválida detectada, usando fallback');
-                    return new Date(2024, 11, 23); // Fallback para uma data conhecida
-                }
-                
-                const brasiliaOffset = -3;
-                const utc = agora.getTime() + (agora.getTimezoneOffset() * 60000);
-                const brasilia = new Date(utc + (brasiliaOffset * 3600000));
-                
-                // Verificar se a data convertida é válida
                 if (isNaN(brasilia.getTime())) {
-                    console.warn('Data convertida inválida, usando UTC');
-                    return agora;
+                    console.warn('Data de Brasília inválida, usando fallback');
+                    return new Date();
                 }
-                
+
                 return brasilia;
             } catch (error) {
                 console.error('Erro ao obter data/hora de Brasília:', error);
-                return new Date(); // Fallback para data atual do sistema
+                // Fallback: usar método antigo se Intl não funcionar
+                try {
+                    const agora = new Date();
+                    const brasiliaOffset = -3;
+                    const utc = agora.getTime() + (agora.getTimezoneOffset() * 60000);
+                    return new Date(utc + (brasiliaOffset * 3600000));
+                } catch (fallbackError) {
+                    return new Date();
+                }
             }
         }
 
@@ -1431,10 +1478,41 @@
                     `;
                 }
                 
-                // Simular dados locais para demonstração se não houver minutas
+                // Tentar carregar dados do localStorage antes de usar demo data
                 if (Object.keys(minutas).length === 0) {
-                    inicializarDadosDemo();
+                    carregarDadosLocais();
                 }
+            }
+        }
+
+        // Função para carregar dados do localStorage
+        function carregarDadosLocais() {
+            try {
+                const dadosSalvos = localStorage.getItem('minutas_backup');
+                if (dadosSalvos) {
+                    const dados = JSON.parse(dadosSalvos);
+                    if (dados && Object.keys(dados).length > 0) {
+                        minutas = dados;
+                        log('Dados carregados do localStorage:', Object.keys(dados).length + ' minutas');
+                        showNotification('Dados locais restaurados', 'info');
+                        return;
+                    }
+                }
+            } catch (error) {
+                log('Erro ao carregar dados do localStorage:', error);
+            }
+
+            // Somente inicializa demo data se não houver dados salvos
+            inicializarDadosDemo();
+        }
+
+        // Função para salvar dados no localStorage (backup)
+        function salvarDadosLocalmente() {
+            try {
+                localStorage.setItem('minutas_backup', JSON.stringify(minutas));
+                log('Dados salvos no localStorage');
+            } catch (error) {
+                log('Erro ao salvar no localStorage:', error);
             }
         }
 
@@ -1444,7 +1522,7 @@
             const ontem = new Date();
             ontem.setDate(ontem.getDate() - 1);
             const ontemStr = ontem.toISOString().split('T')[0];
-            
+
             // Dados de exemplo para demonstração
             minutas = {
                 'demo_1': {
@@ -1505,16 +1583,42 @@
 
         // ==================== REGISTRO DE MINUTAS ====================
         
+        // Função para validar formato do número do processo (padrão CNJ)
+        function validarNumeroProcesso(numero) {
+            // Formato CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO
+            // Também aceita formatos mais flexíveis com números e pontos/traços
+            const regexCNJ = /^\d{7}-\d{2}\.\d{4}\.\d{1,2}\.\d{2}\.\d{4}$/;
+            const regexFlexivel = /^[\d.\-\/]+$/;
+
+            if (regexCNJ.test(numero)) return true;
+            if (regexFlexivel.test(numero) && numero.length >= 10) return true;
+
+            return false;
+        }
+
         function registrarMinuta() {
             const numeroProcesso = document.getElementById('numero-processo').value.trim();
             const tipoMinuta = document.getElementById('tipo-minuta').value;
             const observacoes = document.getElementById('observacoes-minuta').value.trim();
-            
+
             const categoriasCheckboxes = document.querySelectorAll('input[name="categorias"]:checked');
             const categoriasSelecionadas = Array.from(categoriasCheckboxes).map(cb => cb.value);
 
+            // Validação de campos obrigatórios
             if (!numeroProcesso || !tipoMinuta || categoriasSelecionadas.length === 0) {
                 showNotification('Por favor, preencha todos os campos obrigatórios e selecione pelo menos uma categoria.', 'warning');
+                return;
+            }
+
+            // Validação do formato do número do processo
+            if (!validarNumeroProcesso(numeroProcesso)) {
+                showNotification('Número do processo inválido. Use o formato CNJ (ex: 1234567-89.2024.8.12.0001) ou similar.', 'error');
+                return;
+            }
+
+            // Validação de tamanho máximo das observações
+            if (observacoes.length > 500) {
+                showNotification('As observações devem ter no máximo 500 caracteres.', 'error');
                 return;
             }
 
@@ -1574,22 +1678,28 @@
                         showNotification(mensagem, tipo);
                         showView('dashboard');
                         log('Minuta registrada no Firebase', numeroProcesso + ' - Categorias: ' + categoriasSelecionadas.join(', '));
-                    }).catch(() => {
+                    }).catch((error) => {
+                        log('Erro ao salvar no Firebase, salvando localmente:', error);
                         salvarMinutaLocal(novaMinuta);
                     });
                 } else {
                     salvarMinutaLocal(novaMinuta);
                 }
-                
+
             } catch (error) {
+                log('Erro ao registrar minuta:', error);
                 salvarMinutaLocal(novaMinuta);
             }
         }
 
         function salvarMinutaLocal(minuta) {
             const id = 'local_' + getDataHoraBrasilia().getTime();
+            minuta.id = id;
             minutas[id] = minuta;
-            
+
+            // Salvar backup no localStorage
+            salvarDadosLocalmente();
+
             limparFormularioRegistro();
             showNotification('Minuta registrada localmente!', 'warning');
             showView('dashboard');
@@ -1608,62 +1718,8 @@
         }
 
         // ==================== FUNÇÕES DE HISTÓRICO ====================
-        
-        function setupHistoricoFilters() {
-            const filters = document.getElementById('historico-filters');
-            if (!filters) return;
+        // (setupHistoricoFilters e limparFiltros definidas acima na seção de navegação)
 
-            filters.innerHTML = `
-                <div class="flex flex-wrap gap-2">
-                    <input type="text" id="filtro-processo" placeholder="Buscar por nº do processo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-48" oninput="renderHistorico()">
-                    <select id="filtro-tipo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
-                        <option value="">Todos os tipos</option>
-                        <option value="Despacho">Despacho</option>
-                        <option value="Decisão">Decisão</option>
-                        <option value="Sentença">Sentença</option>
-                    </select>
-                    <select id="filtro-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
-                        <option value="">Todos os status</option>
-                        <option value="pendente">Pendentes</option>
-                        <option value="assinada">Assinadas</option>
-                        <option value="correcao">Precisam Correção</option>
-                        <option value="excluida">Excluídas</option>
-                    </select>
-                    <select id="filtro-categoria" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
-                        <option value="">Todas as categorias</option>
-                        <option value="meta1">Meta 1 CNJ</option>
-                        <option value="meta2">Meta 2 CNJ</option>
-                        <option value="meta10">Meta 10 CNJ</option>
-                        <option value="seeu">SEEU</option>
-                        <option value="sem_movimento">Sem movimentação</option>
-                        <option value="outros">Pedidos/Atos</option>
-                        <option value="alem_meta">Além da Meta</option>
-                    </select>
-                    <button onclick="limparFiltros()" class="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors text-sm">
-                        <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
-                        Limpar
-                    </button>
-                </div>
-            `;
-            
-            setTimeout(() => criarIcones(), 100);
-        }
-
-        function limparFiltros() {
-            const filtroProcesso = document.getElementById('filtro-processo');
-            const filtroTipo = document.getElementById('filtro-tipo');
-            const filtroStatus = document.getElementById('filtro-status');
-            const filtroCategoria = document.getElementById('filtro-categoria');
-            
-            if (filtroProcesso) filtroProcesso.value = '';
-            if (filtroTipo) filtroTipo.value = '';
-            if (filtroStatus) filtroStatus.value = '';
-            if (filtroCategoria) filtroCategoria.value = '';
-            
-            renderHistorico();
-            showNotification('Filtros limpos', 'info');
-        }
-        
         function renderDashboard() {
             try {
                 const dashboard = document.getElementById('dashboard-view');
@@ -2278,14 +2334,15 @@
         function criarCardMinuta(minuta) {
             try {
                 if (!minuta) return '';
-                
-                // Dados básicos com fallbacks seguros
-                const numeroProcesso = minuta.numeroProcesso || 'Não informado';
-                const tipoMinuta = minuta.tipoMinuta || 'Não informado';
-                const assessorNome = minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor';
-                const observacoes = minuta.observacoes || '';
+
+                // Dados básicos com fallbacks seguros e sanitização XSS
+                const numeroProcesso = escapeHtml(minuta.numeroProcesso || 'Não informado');
+                const tipoMinuta = escapeHtml(minuta.tipoMinuta || 'Não informado');
+                const assessorNome = escapeHtml(minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor');
+                const observacoes = escapeHtml(minuta.observacoes || '');
                 const dataFormatada = minuta.data ? new Date(minuta.data).toLocaleDateString('pt-BR') : 'Data não disponível';
-                const timestamp = minuta.timestamp || '';
+                const timestamp = escapeHtml(minuta.timestamp || '');
+                const minutaIdSafe = escapeAttr(minuta.id);
                 
                 // Status com fallback
                 const status = statusOptions[minuta.status] || statusOptions['pendente'];
@@ -2315,35 +2372,35 @@
                     categoriasHtml = '<span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-500 text-white">Sem categoria</span>';
                 }
                 
-                // Botões de ação para juiz
+                // Botões de ação para juiz (usando ID sanitizado)
                 let botoesJuiz = '';
                 if (currentUser.isJuiz) {
                     const botoes = [];
-                    
+
                     if (minuta.status !== 'assinada') {
-                        botoes.push(`<button onclick="atualizarStatus('${minuta.id}', 'assinada')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">Assinar</button>`);
+                        botoes.push(`<button onclick="atualizarStatus('${minutaIdSafe}', 'assinada')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">Assinar</button>`);
                     }
-                    
+
                     if (minuta.status !== 'correcao') {
-                        botoes.push(`<button onclick="solicitarCorrecao('${minuta.id}')" class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">Correção</button>`);
+                        botoes.push(`<button onclick="solicitarCorrecao('${minutaIdSafe}')" class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">Correção</button>`);
                     }
-                    
-                    botoes.push(`<button onclick="editarMinuta('${minuta.id}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">Editar</button>`);
-                    botoes.push(`<button onclick="excluirMinuta('${minuta.id}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">Excluir</button>`);
-                    
+
+                    botoes.push(`<button onclick="editarMinuta('${minutaIdSafe}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">Editar</button>`);
+                    botoes.push(`<button onclick="excluirMinuta('${minutaIdSafe}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">Excluir</button>`);
+
                     botoesJuiz = `<div class="flex gap-2 mt-3">${botoes.join('')}</div>`;
                 }
-                
-                // Alerta de correção para assessores
+
+                // Alerta de correção para assessores (com sanitização XSS)
                 let alertaCorrecao = '';
                 if (minuta.status === 'correcao' && !currentUser.isJuiz) {
-                    const detalhesCorrecao = minuta.correcaoDetalhes || 'Detalhes não especificados';
+                    const detalhesCorrecao = escapeHtml(minuta.correcaoDetalhes || 'Detalhes não especificados');
                     alertaCorrecao = `
                         <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded">
                             <div class="text-red-800 text-sm">
                                 <strong>Correção solicitada:</strong> ${detalhesCorrecao}
                             </div>
-                            <button onclick="marcarComoCorrigida('${minuta.id}')" class="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                            <button onclick="marcarComoCorrigida('${minutaIdSafe}')" class="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
                                 Marcar como Corrigida
                             </button>
                         </div>
@@ -2388,20 +2445,7 @@
             }
         }
 
-        function limparFiltros() {
-            const filtroProcesso = document.getElementById('filtro-processo');
-            const filtroTipo = document.getElementById('filtro-tipo');
-            const filtroStatus = document.getElementById('filtro-status');
-            const filtroCategoria = document.getElementById('filtro-categoria');
-            
-            if (filtroProcesso) filtroProcesso.value = '';
-            if (filtroTipo) filtroTipo.value = '';
-            if (filtroStatus) filtroStatus.value = '';
-            if (filtroCategoria) filtroCategoria.value = '';
-            
-            renderHistorico();
-            showNotification('Filtros limpos', 'info');
-        }
+        // (limparFiltros já definida na seção de navegação/filtros)
 
         function renderCalendario() {
             try {
