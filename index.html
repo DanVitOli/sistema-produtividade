@@ -818,17 +818,16 @@
         }
 
         function log(message, data = null) {
-            const brasilia = getDataHoraBrasilia();
-            const timestamp = brasilia.toLocaleTimeString('pt-BR');
-            
+            const timestamp = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
             // Log padrão
             console.log(`[${timestamp} BRT] ${message}`, data || '');
-            
+
             // Se for um erro, adicionar stack trace
             if (message.toLowerCase().includes('erro') && data instanceof Error) {
                 console.error('Stack trace:', data.stack);
             }
-            
+
             // Debug adicional para relatórios
             if (message.includes('relatório') || message.includes('gráfico')) {
                 console.group(`📊 Debug Relatório - ${timestamp}`);
