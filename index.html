@@ -748,71 +748,66 @@
             return dia >= 1 && dia <= 5;
         }
 
-        function getHojeString() {
-            const agora = new Date();
-            const brasiliaOffset = -3;
-            const utc = agora.getTime() + (agora.getTimezoneOffset() * 60000);
-            const brasilia = new Date(utc + (brasiliaOffset * 3600000));
-            
-            const ano = brasilia.getFullYear();
-            const mes = String(brasilia.getMonth() + 1).padStart(2, '0');
-            const dia = String(brasilia.getDate()).padStart(2, '0');
-            
-            return `${ano}-${mes}-${dia}`;
+        function getDataHoraBrasilia() {
+            // Retorna a data/hora atual no timezone de Brasília
+            // Usando toLocaleString para obter a representação correta
+            const now = new Date();
+            const brasiliaString = now.toLocaleString('en-CA', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            // Formato: "2024-12-09, 14:30:00" - parsear para Date
+            // Nota: Retornamos um objeto que simula Date mas com valores de Brasília
+            const [datePart, timePart] = brasiliaString.split(', ');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hour, minute, second] = timePart.split(':').map(Number);
+
+            // Criar objeto com métodos compatíveis com Date
+            return {
+                getFullYear: () => year,
+                getMonth: () => month - 1,
+                getDate: () => day,
+                getHours: () => hour,
+                getMinutes: () => minute,
+                getSeconds: () => second,
+                getDay: () => new Date(year, month - 1, day).getDay(),
+                getTime: () => new Date(year, month - 1, day, hour, minute, second).getTime(),
+                toLocaleDateString: (locale, options) => {
+                    return new Date(year, month - 1, day).toLocaleDateString(locale, options);
+                },
+                toLocaleString: (locale, options) => {
+                    return new Date(year, month - 1, day, hour, minute, second).toLocaleString(locale, options);
+                },
+                toISOString: () => {
+                    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}.000Z`;
+                },
+                // Propriedades extras para debug
+                _year: year,
+                _month: month,
+                _day: day,
+                _hour: hour,
+                _minute: minute,
+                _second: second
+            };
         }
 
-        function getDataHoraBrasilia() {
-            try {
-                // Usar Intl.DateTimeFormat para obter a data/hora correta de Brasília
-                // Isso funciona corretamente com horário de verão (quando aplicável)
-                const options = {
-                    timeZone: 'America/Sao_Paulo',
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                };
-
-                const formatter = new Intl.DateTimeFormat('pt-BR', options);
-                const parts = formatter.formatToParts(new Date());
-
-                const dateObj = {};
-                parts.forEach(part => {
-                    dateObj[part.type] = part.value;
-                });
-
-                // Criar objeto Date com os componentes de Brasília
-                const brasilia = new Date(
-                    parseInt(dateObj.year),
-                    parseInt(dateObj.month) - 1,
-                    parseInt(dateObj.day),
-                    parseInt(dateObj.hour),
-                    parseInt(dateObj.minute),
-                    parseInt(dateObj.second)
-                );
-
-                // Verificar se a data é válida
-                if (isNaN(brasilia.getTime())) {
-                    console.warn('Data de Brasília inválida, usando fallback');
-                    return new Date();
-                }
-
-                return brasilia;
-            } catch (error) {
-                console.error('Erro ao obter data/hora de Brasília:', error);
-                // Fallback: usar método antigo se Intl não funcionar
-                try {
-                    const agora = new Date();
-                    const brasiliaOffset = -3;
-                    const utc = agora.getTime() + (agora.getTimezoneOffset() * 60000);
-                    return new Date(utc + (brasiliaOffset * 3600000));
-                } catch (fallbackError) {
-                    return new Date();
-                }
-            }
+        function getHojeString() {
+            // Retorna a data de hoje em Brasília no formato YYYY-MM-DD
+            const now = new Date();
+            const brasiliaDate = now.toLocaleDateString('en-CA', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            return brasiliaDate; // Formato: "2024-12-09"
         }
 
         function getInicioSemana(data) {
