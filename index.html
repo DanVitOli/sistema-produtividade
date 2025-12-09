@@ -462,6 +462,57 @@
         </div>
     </div>
 
+    <!-- Modal de Comentário de Correção (Assessor) -->
+    <div id="modal-comentario-correcao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalComentarioCorrecao()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="message-square" class="h-5 w-5 text-green-600 mr-2"></i>
+                    Marcar como Corrigida
+                </h3>
+                <button onclick="fecharModalComentarioCorrecao()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div class="text-sm text-green-800">
+                        <div class="font-medium" id="modal-comentario-processo">Processo: </div>
+                        <div class="text-xs mt-1" id="modal-comentario-correcao-solicitada">Correção solicitada: </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Descreva as correções realizadas (opcional):
+                    </label>
+                    <textarea
+                        id="comentario-correcao-assessor"
+                        rows="4"
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Explique o que foi corrigido ou ajustado na minuta..."
+                    ></textarea>
+                </div>
+
+                <div class="flex gap-2 pt-4">
+                    <button onclick="confirmarCorrecaoAssessor()" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors">
+                        <i data-lucide="check" class="h-4 w-4 mr-1 inline"></i>
+                        Confirmar Correção
+                    </button>
+                    <button onclick="fecharModalComentarioCorrecao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Confirmar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Edição -->
     <div id="modal-edicao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalEdicao()">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
@@ -1318,9 +1369,19 @@
             const filters = document.getElementById('historico-filters');
             if (!filters) return;
 
+            // Mostrar filtro de assessor apenas para o juiz
+            const filtroAssessorHtml = currentUser.isJuiz ? `
+                <select id="filtro-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
+                    <option value="">Todos os assessores</option>
+                    <option value="gilbert">Gilbert Juliano</option>
+                    <option value="laise">Laíse Vital</option>
+                </select>
+            ` : '';
+
             filters.innerHTML = `
                 <div class="flex flex-wrap gap-2">
                     <input type="text" id="filtro-processo" placeholder="Buscar por nº do processo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-48" oninput="renderHistorico()">
+                    ${filtroAssessorHtml}
                     <select id="filtro-tipo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
                         <option value="">Todos os tipos</option>
                         <option value="Despacho">Despacho</option>
@@ -1350,7 +1411,7 @@
                     </button>
                 </div>
             `;
-            
+
             setTimeout(() => criarIcones(), 100);
         }
 
@@ -1359,12 +1420,14 @@
             const filtroTipo = document.getElementById('filtro-tipo');
             const filtroStatus = document.getElementById('filtro-status');
             const filtroCategoria = document.getElementById('filtro-categoria');
-            
+            const filtroAssessor = document.getElementById('filtro-assessor');
+
             if (filtroProcesso) filtroProcesso.value = '';
             if (filtroTipo) filtroTipo.value = '';
             if (filtroStatus) filtroStatus.value = '';
             if (filtroCategoria) filtroCategoria.value = '';
-            
+            if (filtroAssessor) filtroAssessor.value = '';
+
             renderHistorico();
             showNotification('Filtros limpos', 'info');
         }
@@ -2177,9 +2240,19 @@
                 // ===== CONFIGURAR FILTROS AUTOMATICAMENTE =====
                 const filtrosContainer = document.getElementById('historico-filters');
                 if (filtrosContainer && filtrosContainer.innerHTML.trim() === '') {
+                    // Mostrar filtro de assessor apenas para o juiz
+                    const filtroAssessorHtml = currentUser.isJuiz ? `
+                        <select id="filtro-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
+                            <option value="">Todos os assessores</option>
+                            <option value="gilbert">Gilbert Juliano</option>
+                            <option value="laise">Laíse Vital</option>
+                        </select>
+                    ` : '';
+
                     filtrosContainer.innerHTML = `
                         <div class="flex flex-wrap gap-2">
                             <input type="text" id="filtro-processo" placeholder="Buscar por nº do processo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-48" oninput="renderHistorico()">
+                            ${filtroAssessorHtml}
                             <select id="filtro-tipo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
                                 <option value="">Todos os tipos</option>
                                 <option value="Despacho">Despacho</option>
@@ -2253,12 +2326,22 @@
                 const filtroTipo = document.getElementById('filtro-tipo')?.value;
                 const filtroStatus = document.getElementById('filtro-status')?.value;
                 const filtroCategoria = document.getElementById('filtro-categoria')?.value;
+                const filtroAssessor = document.getElementById('filtro-assessor')?.value;
 
                 if (filtroProcesso && filtroProcesso.trim()) {
                     const processoLower = filtroProcesso.toLowerCase().trim();
                     minutasFiltradas = minutasFiltradas.filter(m => {
                         const numeroProcesso = m.numeroProcesso || '';
                         return numeroProcesso.toLowerCase().includes(processoLower);
+                    });
+                }
+
+                // Filtro por assessor (apenas para juiz)
+                if (filtroAssessor && currentUser.isJuiz) {
+                    minutasFiltradas = minutasFiltradas.filter(m => {
+                        return m.assessorId === filtroAssessor ||
+                               (filtroAssessor === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                               (filtroAssessor === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
                     });
                 }
 
@@ -2284,7 +2367,7 @@
 
                 // Verificar se há resultados
                 if (minutasFiltradas.length === 0) {
-                    const temFiltros = filtroProcesso || filtroTipo || filtroStatus || filtroCategoria;
+                    const temFiltros = filtroProcesso || filtroTipo || filtroStatus || filtroCategoria || filtroAssessor;
                     historicoContent.innerHTML = `
                         <div class="text-center text-gray-500 py-12">
                             <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
@@ -2372,9 +2455,18 @@
                     categoriasHtml = '<span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-500 text-white">Sem categoria</span>';
                 }
                 
-                // Botões de ação para juiz (usando ID sanitizado)
-                let botoesJuiz = '';
+                // Botões de ação (usando ID sanitizado)
+                let botoesAcao = '';
+
+                // Verificar se a minuta pertence ao assessor atual
+                const isMinutaDoAssessor = !currentUser.isJuiz && (
+                    minuta.assessorId === currentUser.assessorId ||
+                    (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || (minuta.assessorNome && minuta.assessorNome.includes('Gilbert')))) ||
+                    (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || (minuta.assessorNome && minuta.assessorNome.includes('Laíse'))))
+                );
+
                 if (currentUser.isJuiz) {
+                    // Botões para o juiz
                     const botoes = [];
 
                     if (minuta.status !== 'assinada') {
@@ -2388,7 +2480,16 @@
                     botoes.push(`<button onclick="editarMinuta('${minutaIdSafe}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">Editar</button>`);
                     botoes.push(`<button onclick="excluirMinuta('${minutaIdSafe}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">Excluir</button>`);
 
-                    botoesJuiz = `<div class="flex gap-2 mt-3">${botoes.join('')}</div>`;
+                    botoesAcao = `<div class="flex gap-2 mt-3">${botoes.join('')}</div>`;
+                } else if (isMinutaDoAssessor && minuta.status === 'pendente') {
+                    // Botão de excluir para assessor (apenas minutas pendentes que são dele)
+                    botoesAcao = `
+                        <div class="flex gap-2 mt-3">
+                            <button onclick="excluirMinutaAssessor('${minutaIdSafe}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">
+                                Excluir Minuta
+                            </button>
+                        </div>
+                    `;
                 }
 
                 // Alerta de correção para assessores (com sanitização XSS)
@@ -2422,7 +2523,7 @@
                                     ${observacoes ? `<div><strong>Observações:</strong> ${observacoes}</div>` : ''}
                                     ${categoriasTexto}
                                 </div>
-                                ${botoesJuiz}
+                                ${botoesAcao}
                                 ${alertaCorrecao}
                             </div>
                             <div class="text-xs text-gray-500 text-right ml-4">
@@ -2706,6 +2807,70 @@
             }
         }
 
+        // Função para assessor excluir sua própria minuta (apenas pendentes)
+        function excluirMinutaAssessor(id) {
+            try {
+                const minuta = minutas[id];
+                if (!minuta) {
+                    showNotification('Minuta não encontrada', 'error');
+                    return;
+                }
+
+                // Verificar se a minuta pertence ao assessor atual
+                const isMinutaDoAssessor = (
+                    minuta.assessorId === currentUser.assessorId ||
+                    (currentUser.assessorId === 'gilbert' && (minuta.assessorId === 'assessor1' || (minuta.assessorNome && minuta.assessorNome.includes('Gilbert')))) ||
+                    (currentUser.assessorId === 'laise' && (minuta.assessorId === 'assessor2' || (minuta.assessorNome && minuta.assessorNome.includes('Laíse'))))
+                );
+
+                if (!isMinutaDoAssessor) {
+                    showNotification('Você só pode excluir minutas registradas por você', 'error');
+                    return;
+                }
+
+                // Verificar se a minuta está pendente
+                if (minuta.status !== 'pendente') {
+                    showNotification('Apenas minutas pendentes podem ser excluídas', 'error');
+                    return;
+                }
+
+                if (!confirm('Tem certeza que deseja excluir esta minuta? Esta ação não pode ser desfeita.')) {
+                    return;
+                }
+
+                const minutaAtualizada = {
+                    ...minuta,
+                    status: 'excluida',
+                    excluidaEm: getDataHoraBrasilia().getTime(),
+                    excluidaPor: currentUser.nome
+                };
+
+                if (database) {
+                    database.ref(`minutas/${id}`).update(minutaAtualizada)
+                        .then(() => {
+                            showNotification('Minuta excluída com sucesso', 'success');
+                            log(`Minuta ${id} excluída pelo assessor ${currentUser.nome}`);
+                        })
+                        .catch((error) => {
+                            log('Erro ao excluir no Firebase:', error);
+                            minutas[id] = minutaAtualizada;
+                            salvarDadosLocalmente();
+                            showNotification('Minuta excluída localmente', 'warning');
+                            renderHistorico();
+                        });
+                } else {
+                    minutas[id] = minutaAtualizada;
+                    salvarDadosLocalmente();
+                    showNotification('Minuta excluída localmente', 'warning');
+                    renderHistorico();
+                }
+
+            } catch (error) {
+                log(`Erro ao excluir minuta ${id}:`, error);
+                showNotification('Erro ao excluir minuta', 'error');
+            }
+        }
+
         function atualizarStatus(id, status) {
             try {
                 const minuta = minutas[id];
@@ -2769,6 +2934,9 @@
             }
         }
 
+        // Variável para armazenar o ID da minuta sendo corrigida pelo assessor
+        let minutaCorrigindoAssessor = null;
+
         function marcarComoCorrigida(id) {
             try {
                 const minuta = minutas[id];
@@ -2777,33 +2945,91 @@
                     return;
                 }
 
+                // Armazena o ID da minuta
+                minutaCorrigindoAssessor = id;
+
+                // Preenche as informações no modal
+                document.getElementById('modal-comentario-processo').textContent = `Processo: ${minuta.numeroProcesso}`;
+                document.getElementById('modal-comentario-correcao-solicitada').textContent = `Correção solicitada: ${minuta.correcaoDetalhes || 'Não especificada'}`;
+                document.getElementById('comentario-correcao-assessor').value = '';
+
+                // Abre o modal
+                document.getElementById('modal-comentario-correcao').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('comentario-correcao-assessor').focus();
+                    criarIcones();
+                }, 100);
+
+            } catch (error) {
+                log(`Erro ao abrir modal de correção para minuta ${id}:`, error);
+                showNotification('Erro ao abrir correção', 'error');
+            }
+        }
+
+        function fecharModalComentarioCorrecao() {
+            document.getElementById('modal-comentario-correcao').classList.add('hidden');
+            minutaCorrigindoAssessor = null;
+        }
+
+        function confirmarCorrecaoAssessor() {
+            try {
+                if (!minutaCorrigindoAssessor) {
+                    showNotification('Nenhuma minuta selecionada', 'error');
+                    return;
+                }
+
+                const id = minutaCorrigindoAssessor;
+                const minuta = minutas[id];
+                if (!minuta) {
+                    showNotification('Minuta não encontrada', 'error');
+                    fecharModalComentarioCorrecao();
+                    return;
+                }
+
+                const comentarioAssessor = document.getElementById('comentario-correcao-assessor').value.trim();
+                const dataCorrecao = new Date().toLocaleString('pt-BR');
+
+                // Monta a observação com o comentário do assessor
+                let novaObservacao = (minuta.observacoes || '');
+                novaObservacao += `\n[CORREÇÃO APLICADA em ${dataCorrecao}]`;
+                if (comentarioAssessor) {
+                    novaObservacao += `\n[Comentário do assessor: ${comentarioAssessor}]`;
+                }
+
                 const minutaAtualizada = {
                     ...minuta,
                     status: 'pendente',
                     corrigidaEm: getDataHoraBrasilia().getTime(),
                     corrigidaPor: currentUser.nome,
-                    observacoes: (minuta.observacoes || '') + `\n[CORREÇÃO APLICADA em ${new Date().toLocaleString('pt-BR')}]`
+                    comentarioCorrecao: comentarioAssessor,
+                    observacoes: novaObservacao
                 };
 
                 if (database) {
                     database.ref(`minutas/${id}`).update(minutaAtualizada)
                         .then(() => {
                             showNotification('Minuta marcada como corrigida', 'success');
-                            log(`Minuta ${id} marcada como corrigida`);
+                            log(`Minuta ${id} marcada como corrigida pelo assessor ${currentUser.nome}`);
+                            fecharModalComentarioCorrecao();
                         })
                         .catch((error) => {
+                            log('Erro ao salvar correção no Firebase:', error);
                             minutas[id] = minutaAtualizada;
+                            salvarDadosLocalmente();
                             showNotification('Correção aplicada localmente', 'warning');
                             renderHistorico();
+                            fecharModalComentarioCorrecao();
                         });
                 } else {
                     minutas[id] = minutaAtualizada;
+                    salvarDadosLocalmente();
                     showNotification('Correção aplicada localmente', 'warning');
                     renderHistorico();
+                    fecharModalComentarioCorrecao();
                 }
-                
+
             } catch (error) {
-                log(`Erro ao marcar minuta ${id} como corrigida:`, error);
+                log(`Erro ao confirmar correção:`, error);
                 showNotification('Erro ao aplicar correção', 'error');
             }
         }
