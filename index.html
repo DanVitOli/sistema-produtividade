@@ -254,7 +254,7 @@
                                 </label>
                                 <label class="flex items-center">
                                     <input type="checkbox" name="categorias" value="sem_movimento" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                    <span class="text-sm">Sem movimentação 100+ dias (5/dia)</span>
+                                    <span class="text-sm">Sem movimentação 60+ dias (5/dia)</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="checkbox" name="categorias" value="outros" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
@@ -264,10 +264,39 @@
                                     <input type="checkbox" name="categorias" value="alem_meta" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                                     <span class="text-sm">Além da Meta (produtividade adicional)</span>
                                 </label>
+
+                                <!-- Painéis de Acompanhamento Especiais (15 dias) -->
+                                <div class="border-t border-gray-300 mt-3 pt-3">
+                                    <p class="text-xs text-gray-500 mb-2 font-medium">📋 Painéis de Acompanhamento (a cada 15 dias):</p>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="categorias" value="conhecimento_10anos" class="mr-2 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                                        <span class="text-sm">Conhecimento > 10 anos</span>
+                                    </label>
+                                    <label class="flex items-center" id="violencia-domestica-checkbox" style="display: none;">
+                                        <input type="checkbox" name="categorias" value="violencia_domestica" class="mr-2 h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded">
+                                        <span class="text-sm">Violência Doméstica (até 2025)</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="categorias" value="acoes_saude" class="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+                                        <span class="text-sm">Ações de Saúde (até 2025)</span>
+                                    </label>
+                                    <label class="flex items-center" id="acoes-penais-checkbox" style="display: none;">
+                                        <input type="checkbox" name="categorias" value="acoes_penais" class="mr-2 h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded">
+                                        <span class="text-sm">Ações Penais (até 2023)</span>
+                                    </label>
+                                    <label class="flex items-center" id="processos-juri-checkbox" style="display: none;">
+                                        <input type="checkbox" name="categorias" value="processos_juri" class="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <span class="text-sm">Júri (até 2021)</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="categorias" value="acoes_ambientais" class="mr-2 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded">
+                                        <span class="text-sm">Ações Ambientais (até 2022)</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
                         <textarea id="observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Comentários sobre a minuta (opcional)"></textarea>
@@ -545,7 +574,7 @@
                         <option value="meta2">Meta 2 CNJ</option>
                         <option value="meta10" id="edit-meta10-option" class="hidden">Meta 10 CNJ</option>
                         <option value="seeu" id="edit-seeu-option" class="hidden">SEEU - Execução Penal (controle)</option>
-                        <option value="sem_movimento">Sem movimentação 100+ dias</option>
+                        <option value="sem_movimento">Sem movimentação 60+ dias</option>
                         <option value="outros">Pedidos/Atos/Urgentes</option>
                         <option value="alem_meta">Além da Meta (produtividade adicional)</option>
                     </select>
@@ -662,9 +691,61 @@
                 explicacao: 'Minutar semanalmente em qualquer dos 9 processos mais antigos para impulsionar julgamentos'
             },
             'seeu': { nome: 'SEEU - Execução Penal (controle de acesso)', cor: 'bg-teal-500', meta: 1, prazo: 10, naoContaParaMeta: true },
-            'sem_movimento': { nome: 'Sem movimentação 100+ dias', cor: 'bg-orange-500', meta: 5 },
+            'sem_movimento': { nome: 'Sem movimentação 60+ dias', cor: 'bg-orange-500', meta: 5 },
             'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 3 },
-            'alem_meta': { nome: 'Além da Meta (produtividade adicional)', cor: 'bg-gray-500', meta: 0, semMeta: true, naoContaParaMeta: true }
+            'alem_meta': { nome: 'Além da Meta (produtividade adicional)', cor: 'bg-gray-500', meta: 0, semMeta: true, naoContaParaMeta: true },
+            // Painéis de Acompanhamento Especiais (meta: minutar a cada 15 dias)
+            'conhecimento_10anos': {
+                nome: 'Conhecimento > 10 anos',
+                cor: 'bg-red-700',
+                meta: 1,
+                prazo: 15,
+                naoContaParaMeta: true,
+                descricao: 'Processos de conhecimento em trâmite há mais de 10 anos'
+            },
+            'violencia_domestica': {
+                nome: 'Violência Doméstica (até 2025)',
+                cor: 'bg-pink-700',
+                meta: 1,
+                prazo: 15,
+                naoContaParaMeta: true,
+                exclusivoAssessor: 'laise',
+                descricao: 'Ações de violência doméstica distribuídas até 2025'
+            },
+            'acoes_saude': {
+                nome: 'Ações de Saúde (até 2025)',
+                cor: 'bg-green-700',
+                meta: 1,
+                prazo: 15,
+                naoContaParaMeta: true,
+                descricao: 'Ações de saúde distribuídas até 2025'
+            },
+            'acoes_penais': {
+                nome: 'Ações Penais (até 2023)',
+                cor: 'bg-gray-700',
+                meta: 1,
+                prazo: 15,
+                naoContaParaMeta: true,
+                exclusivoAssessor: 'laise',
+                descricao: 'Ações penais distribuídas até 2023'
+            },
+            'processos_juri': {
+                nome: 'Júri (até 2021)',
+                cor: 'bg-indigo-700',
+                meta: 1,
+                prazo: 15,
+                naoContaParaMeta: true,
+                exclusivoAssessor: 'laise',
+                descricao: 'Processos de júri distribuídos até 2021'
+            },
+            'acoes_ambientais': {
+                nome: 'Ações Ambientais (até 2022)',
+                cor: 'bg-emerald-700',
+                meta: 1,
+                prazo: 15,
+                naoContaParaMeta: true,
+                descricao: 'Ações ambientais distribuídas até 2022'
+            }
         };
 
         const statusOptions = {
@@ -1105,6 +1186,205 @@
             };
         }
 
+        // ===== FUNÇÃO PARA CALCULAR STATUS DOS PAINÉIS DE ACOMPANHAMENTO (15 DIAS) =====
+        function getPainelAcompanhamentoStatus(assessorId, categoriaKey) {
+            const hoje = getDataHoraBrasilia();
+            const categoria = categorias[categoriaKey];
+            const prazo = categoria?.prazo || 15;
+
+            // Buscar minutas desta categoria para este assessor
+            const minutasCategoria = Object.values(minutas).filter(m => {
+                if (!m || !m.data) return false;
+                if (m.status === 'excluida') return false;
+
+                // Verificar se é do assessor correto
+                const isAssessor = m.assessorId === assessorId ||
+                                  (assessorId === 'gilbert' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert')))) ||
+                                  (assessorId === 'laise' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse'))));
+
+                if (!isAssessor) return false;
+
+                const cats = normalizarCategorias(m);
+                return cats.includes(categoriaKey);
+            }).sort((a, b) => new Date(b.data) - new Date(a.data)); // Mais recente primeiro
+
+            const ultimaMinuta = minutasCategoria.length > 0 ? minutasCategoria[0] : null;
+
+            let diasSemMinuta = 0;
+            let status = 'nunca';
+            let proximoVencimento = null;
+
+            if (ultimaMinuta) {
+                const ultimaData = new Date(ultimaMinuta.data);
+                diasSemMinuta = Math.floor((hoje - ultimaData) / (1000 * 60 * 60 * 24));
+
+                proximoVencimento = new Date(ultimaData);
+                proximoVencimento.setDate(proximoVencimento.getDate() + prazo);
+
+                if (diasSemMinuta <= 10) {
+                    status = 'em_dia';
+                } else if (diasSemMinuta <= prazo) {
+                    status = 'atencao';
+                } else {
+                    status = 'atrasado';
+                }
+            }
+
+            return {
+                totalMinutas: minutasCategoria.length,
+                ultimaMinuta: ultimaMinuta ? ultimaMinuta.data : null,
+                diasSemMinuta,
+                status,
+                proximoVencimento,
+                diasParaVencimento: proximoVencimento ? Math.ceil((proximoVencimento - hoje) / (1000 * 60 * 60 * 24)) : -prazo,
+                prazo
+            };
+        }
+
+        // ===== FUNÇÃO PARA RENDERIZAR PAINÉIS DE ACOMPANHAMENTO =====
+        function renderPaineisAcompanhamento() {
+            // Identificar categorias de painéis de acompanhamento (aquelas com prazo)
+            const categoriasAcompanhamento = Object.keys(categorias).filter(key => categorias[key].prazo);
+
+            if (categoriasAcompanhamento.length === 0) return '';
+
+            let html = `
+                <div class="mt-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i data-lucide="clipboard-list" class="h-5 w-5 mr-2 text-purple-600"></i>
+                        Painéis de Acompanhamento (Meta: minutar a cada 15 dias)
+                    </h3>
+            `;
+
+            // Para o juiz, mostrar painel de cada assessor
+            if (currentUser.isJuiz) {
+                html += renderPaineisParaJuiz(categoriasAcompanhamento);
+            } else {
+                // Para assessor, mostrar apenas seus painéis
+                html += renderPaineisParaAssessor(categoriasAcompanhamento, currentUser.assessorId);
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderPaineisParaJuiz(categoriasAcompanhamento) {
+            let html = '';
+
+            // Gilbert
+            html += `
+                <div class="mb-6">
+                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                        Gilbert
+                    </h4>
+                    <div class="grid md:grid-cols-3 gap-3">
+            `;
+
+            const categoriasGilbert = categoriasAcompanhamento.filter(key => !categorias[key].exclusivoAssessor);
+            for (const catKey of categoriasGilbert) {
+                html += renderPainelCard(catKey, 'gilbert');
+            }
+
+            html += '</div></div>';
+
+            // Laíse
+            html += `
+                <div class="mb-6">
+                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-pink-500 mr-2"></span>
+                        Laíse
+                    </h4>
+                    <div class="grid md:grid-cols-3 gap-3">
+            `;
+
+            // Laíse vê todas as categorias
+            for (const catKey of categoriasAcompanhamento) {
+                html += renderPainelCard(catKey, 'laise');
+            }
+
+            html += '</div></div>';
+
+            return html;
+        }
+
+        function renderPaineisParaAssessor(categoriasAcompanhamento, assessorId) {
+            // Filtrar categorias baseado no assessor
+            const categoriasVisiveis = categoriasAcompanhamento.filter(key => {
+                const cat = categorias[key];
+                if (cat.exclusivoAssessor && cat.exclusivoAssessor !== assessorId) {
+                    return false;
+                }
+                return true;
+            });
+
+            let html = '<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3">';
+
+            for (const catKey of categoriasVisiveis) {
+                html += renderPainelCard(catKey, assessorId);
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderPainelCard(categoriaKey, assessorId) {
+            const cat = categorias[categoriaKey];
+            const status = getPainelAcompanhamentoStatus(assessorId, categoriaKey);
+
+            const statusColors = {
+                'em_dia': { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-100 text-green-800', icon: 'check-circle' },
+                'atencao': { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-800', icon: 'alert-circle' },
+                'atrasado': { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', badge: 'bg-red-100 text-red-800', icon: 'alert-triangle' },
+                'nunca': { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-600', badge: 'bg-gray-100 text-gray-800', icon: 'help-circle' }
+            };
+
+            const colors = statusColors[status.status];
+            const statusLabel = {
+                'em_dia': 'Em dia',
+                'atencao': 'Atenção',
+                'atrasado': 'Atrasado',
+                'nunca': 'Sem registro'
+            };
+
+            return `
+                <div class="${colors.bg} ${colors.border} border rounded-lg p-4">
+                    <div class="flex items-start justify-between mb-2">
+                        <h5 class="font-medium text-sm ${colors.text} flex-1">${escapeHtml(cat.nome)}</h5>
+                        <span class="text-xs px-2 py-1 rounded-full ${colors.badge} ml-2 whitespace-nowrap">
+                            ${statusLabel[status.status]}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-2xl font-bold ${colors.text}">
+                                ${status.status === 'nunca' ? '-' : status.diasSemMinuta}
+                            </div>
+                            <div class="text-xs text-gray-500">dias sem minuta</div>
+                        </div>
+                        <div class="text-right">
+                            ${status.ultimaMinuta ? `
+                                <div class="text-xs text-gray-500">Última:</div>
+                                <div class="text-xs font-medium ${colors.text}">${new Date(status.ultimaMinuta).toLocaleDateString('pt-BR')}</div>
+                            ` : `
+                                <div class="text-xs text-gray-500">Nenhum registro</div>
+                            `}
+                        </div>
+                    </div>
+                    ${status.status === 'atencao' ? `
+                        <div class="mt-2 text-xs ${colors.text} bg-yellow-100 rounded px-2 py-1">
+                            ⏰ Vence em ${status.diasParaVencimento} dia${status.diasParaVencimento !== 1 ? 's' : ''}
+                        </div>
+                    ` : ''}
+                    ${status.status === 'atrasado' ? `
+                        <div class="mt-2 text-xs ${colors.text} bg-red-100 rounded px-2 py-1">
+                            ⚠️ Atrasado há ${Math.abs(status.diasParaVencimento)} dia${Math.abs(status.diasParaVencimento) !== 1 ? 's' : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
         // ===== CORREÇÃO APLICADA =====
         function getProgressoCategoria(assessorId, categoria) {
             if (categoria === 'meta10') {
@@ -1280,25 +1560,42 @@
         function setupMeta10Options() {
             const meta10Checkbox = document.getElementById('meta10-checkbox');
             const editMeta10Option = document.getElementById('edit-meta10-option');
-            
+
             const seuCheckbox = document.getElementById('seeu-checkbox');
             const editSeuOption = document.getElementById('edit-seeu-option');
-            
+
+            // Checkboxes exclusivos da Laíse (painéis de acompanhamento)
+            const violenciaDomesticaCheckbox = document.getElementById('violencia-domestica-checkbox');
+            const acoesPenaisCheckbox = document.getElementById('acoes-penais-checkbox');
+            const processosJuriCheckbox = document.getElementById('processos-juri-checkbox');
+
             if (currentUser.assessorId === 'gilbert') {
                 meta10Checkbox?.style.setProperty('display', 'block');
                 editMeta10Option?.classList.remove('hidden');
                 seuCheckbox?.style.setProperty('display', 'none');
                 editSeuOption?.classList.add('hidden');
+                // Esconder categorias exclusivas da Laíse
+                violenciaDomesticaCheckbox?.style.setProperty('display', 'none');
+                acoesPenaisCheckbox?.style.setProperty('display', 'none');
+                processosJuriCheckbox?.style.setProperty('display', 'none');
             } else if (currentUser.assessorId === 'laise') {
                 meta10Checkbox?.style.setProperty('display', 'none');
                 editMeta10Option?.classList.add('hidden');
                 seuCheckbox?.style.setProperty('display', 'block');
                 editSeuOption?.classList.remove('hidden');
+                // Mostrar categorias exclusivas da Laíse
+                violenciaDomesticaCheckbox?.style.setProperty('display', 'block');
+                acoesPenaisCheckbox?.style.setProperty('display', 'block');
+                processosJuriCheckbox?.style.setProperty('display', 'block');
             } else {
-                meta10Checkbox?.style.setProperty('display', 'none');
-                editMeta10Option?.classList.add('hidden');
-                seuCheckbox?.style.setProperty('display', 'none');
-                editSeuOption?.classList.add('hidden');
+                // Juiz vê todas as opções
+                meta10Checkbox?.style.setProperty('display', 'block');
+                editMeta10Option?.classList.remove('hidden');
+                seuCheckbox?.style.setProperty('display', 'block');
+                editSeuOption?.classList.remove('hidden');
+                violenciaDomesticaCheckbox?.style.setProperty('display', 'block');
+                acoesPenaisCheckbox?.style.setProperty('display', 'block');
+                processosJuriCheckbox?.style.setProperty('display', 'block');
             }
         }
 
@@ -1382,9 +1679,17 @@
                         <option value="meta2">Meta 2 CNJ</option>
                         <option value="meta10">Meta 10 CNJ</option>
                         <option value="seeu">SEEU</option>
-                        <option value="sem_movimento">Sem movimentação</option>
+                        <option value="sem_movimento">Sem movimentação 60+</option>
                         <option value="outros">Pedidos/Atos</option>
                         <option value="alem_meta">Além da Meta</option>
+                        <optgroup label="Painéis de Acompanhamento">
+                            <option value="conhecimento_10anos">Conhecimento > 10 anos</option>
+                            <option value="violencia_domestica">Violência Doméstica</option>
+                            <option value="acoes_saude">Ações de Saúde</option>
+                            <option value="acoes_penais">Ações Penais</option>
+                            <option value="processos_juri">Júri</option>
+                            <option value="acoes_ambientais">Ações Ambientais</option>
+                        </optgroup>
                     </select>
                     <button onclick="limparFiltros()" class="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors text-sm">
                         <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
@@ -1873,6 +2178,9 @@
                     content += renderMetasSemanais();
                 }
 
+                // Painéis de acompanhamento (visíveis para todos)
+                content += renderPaineisAcompanhamento();
+
                 dashboard.innerHTML = content;
                 dashboard.classList.remove('hidden');
                 
@@ -2253,9 +2561,17 @@
                                 <option value="meta2">Meta 2 CNJ</option>
                                 <option value="meta10">Meta 10 CNJ</option>
                                 <option value="seeu">SEEU</option>
-                                <option value="sem_movimento">Sem movimentação</option>
+                                <option value="sem_movimento">Sem movimentação 60+</option>
                                 <option value="outros">Pedidos/Atos</option>
                                 <option value="alem_meta">Além da Meta</option>
+                                <optgroup label="Painéis de Acompanhamento">
+                                    <option value="conhecimento_10anos">Conhecimento > 10 anos</option>
+                                    <option value="violencia_domestica">Violência Doméstica</option>
+                                    <option value="acoes_saude">Ações de Saúde</option>
+                                    <option value="acoes_penais">Ações Penais</option>
+                                    <option value="processos_juri">Júri</option>
+                                    <option value="acoes_ambientais">Ações Ambientais</option>
+                                </optgroup>
                             </select>
                             <button onclick="limparFiltros()" class="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors text-sm">
                                 <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
