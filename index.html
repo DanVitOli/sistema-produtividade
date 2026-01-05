@@ -899,6 +899,16 @@
             }); // Formato: "2024-12-09"
         }
 
+        function formatarDataBrasilia(dataString) {
+            // Formata uma string de data (YYYY-MM-DD) para exibição em pt-BR
+            // Evita problemas de timezone ao interpretar a data
+            if (!dataString) return 'Data não disponível';
+            const [ano, mes, dia] = dataString.split('-').map(Number);
+            if (!ano || !mes || !dia) return 'Data inválida';
+            // Retorna no formato DD/MM/YYYY
+            return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${ano}`;
+        }
+
         function getInicioSemana(data) {
             const d = new Date(data);
             const day = d.getDay();
@@ -1386,7 +1396,7 @@
                         <div class="text-right">
                             ${status.ultimaMinuta ? `
                                 <div class="text-xs text-gray-500">Última:</div>
-                                <div class="text-xs font-medium ${colors.text}">${new Date(status.ultimaMinuta).toLocaleDateString('pt-BR')}</div>
+                                <div class="text-xs font-medium ${colors.text}">${formatarDataBrasilia(status.ultimaMinuta)}</div>
                             ` : `
                                 <div class="text-xs text-gray-500">Nenhum registro</div>
                             `}
@@ -2170,11 +2180,12 @@
                             <div>
                                 <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
                                 <p class="text-blue-100">
-                                    ${hoje.toLocaleDateString('pt-BR', { 
-                                        weekday: 'long', 
-                                        year: 'numeric', 
-                                        month: 'long', 
-                                        day: 'numeric' 
+                                    ${new Date().toLocaleDateString('pt-BR', {
+                                        timeZone: 'America/Sao_Paulo',
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
                                     })}
                                 </p>
                             </div>
@@ -2744,7 +2755,7 @@
                 const tipoMinuta = escapeHtml(minuta.tipoMinuta || 'Não informado');
                 const assessorNome = escapeHtml(minuta.assessorNome || assessores[minuta.assessorId]?.nome || 'Assessor');
                 const observacoes = escapeHtml(minuta.observacoes || '');
-                const dataFormatada = minuta.data ? new Date(minuta.data).toLocaleDateString('pt-BR') : 'Data não disponível';
+                const dataFormatada = formatarDataBrasilia(minuta.data);
                 const timestamp = escapeHtml(minuta.timestamp || '');
                 const minutaIdSafe = escapeAttr(minuta.id);
                 const substituicao = minuta.substituicao === true;
