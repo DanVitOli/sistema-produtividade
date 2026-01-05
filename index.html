@@ -297,6 +297,17 @@
                         </div>
                     </div>
 
+                    <!-- Campo de Substituição -->
+                    <div class="bg-amber-50 border border-amber-200 rounded-md p-3">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="substituicao-checkbox" class="mr-3 h-5 w-5 text-amber-600 focus:ring-amber-500 border-gray-300 rounded">
+                            <div>
+                                <span class="text-sm font-medium text-amber-800">Produzida durante substituição do juiz titular</span>
+                                <p class="text-xs text-amber-600 mt-1">Marque se esta minuta foi elaborada e/ou assinada durante período de substituição.</p>
+                            </div>
+                        </label>
+                    </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
                         <textarea id="observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Comentários sobre a minuta (opcional)"></textarea>
@@ -584,7 +595,17 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
                     <textarea id="edit-observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
-                
+
+                <!-- Campo de Substituição na Edição -->
+                <div class="bg-amber-50 border border-amber-200 rounded-md p-3">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="edit-substituicao-checkbox" class="mr-3 h-5 w-5 text-amber-600 focus:ring-amber-500 border-gray-300 rounded">
+                        <div>
+                            <span class="text-sm font-medium text-amber-800">Produzida durante substituição</span>
+                        </div>
+                    </label>
+                </div>
+
                 <div class="flex gap-2 pt-4">
                     <button onclick="salvarEdicao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
                         <i data-lucide="save" class="h-4 w-4 mr-1 inline"></i>
@@ -1949,6 +1970,7 @@
             const numeroProcesso = document.getElementById('numero-processo').value.trim();
             const tipoMinuta = document.getElementById('tipo-minuta').value;
             const observacoes = document.getElementById('observacoes-minuta').value.trim();
+            const substituicao = document.getElementById('substituicao-checkbox').checked;
 
             const categoriasCheckboxes = document.querySelectorAll('input[name="categorias"]:checked');
             const categoriasSelecionadas = Array.from(categoriasCheckboxes).map(cb => cb.value);
@@ -1993,6 +2015,7 @@
                 tipoMinuta,
                 categorias: categoriasSelecionadas,
                 observacoes,
+                substituicao,
                 status: 'pendente',
                 data: getHojeString(),
                 timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
@@ -2059,10 +2082,11 @@
             document.getElementById('numero-processo').value = '';
             document.getElementById('tipo-minuta').value = '';
             document.getElementById('observacoes-minuta').value = '';
-            
+            document.getElementById('substituicao-checkbox').checked = false;
+
             const categoriasCheckboxes = document.querySelectorAll('input[name="categorias"]');
             categoriasCheckboxes.forEach(cb => cb.checked = false);
-            
+
             validarTipoMinuta();
         }
 
@@ -2723,6 +2747,7 @@
                 const dataFormatada = minuta.data ? new Date(minuta.data).toLocaleDateString('pt-BR') : 'Data não disponível';
                 const timestamp = escapeHtml(minuta.timestamp || '');
                 const minutaIdSafe = escapeAttr(minuta.id);
+                const substituicao = minuta.substituicao === true;
                 
                 // Status com fallback
                 const status = statusOptions[minuta.status] || statusOptions['pendente'];
@@ -2813,6 +2838,7 @@
                                     <span class="font-medium text-gray-800">${assessorNome}</span>
                                     ${categoriasHtml}
                                     <span class="status-badge ${status.cor}">${status.nome}</span>
+                                    ${substituicao ? '<span class="px-2 py-1 rounded-full text-xs font-medium bg-amber-500 text-white">Substituição</span>' : ''}
                                 </div>
                                 <div class="text-sm text-gray-600 mb-2">
                                     <div><strong>Processo:</strong> ${numeroProcesso}</div>
@@ -3046,12 +3072,13 @@
                 
                 document.getElementById('edit-numero-processo').value = minuta.numeroProcesso || '';
                 document.getElementById('edit-tipo-minuta').value = minuta.tipoMinuta || 'Despacho';
-                
+
                 const categorias = normalizarCategorias(minuta);
                 document.getElementById('edit-categoria-minuta').value = categorias[0] || 'meta1';
-                
+
                 document.getElementById('edit-observacoes-minuta').value = minuta.observacoes || '';
-                
+                document.getElementById('edit-substituicao-checkbox').checked = minuta.substituicao === true;
+
                 validarTipoMinutaEdicao();
                 document.getElementById('modal-edicao').classList.remove('hidden');
                 
@@ -3894,6 +3921,7 @@
                 const tipoMinuta = document.getElementById('edit-tipo-minuta').value;
                 const categoria = document.getElementById('edit-categoria-minuta').value;
                 const observacoes = document.getElementById('edit-observacoes-minuta').value.trim();
+                const substituicao = document.getElementById('edit-substituicao-checkbox').checked;
 
                 if (!numeroProcesso || !tipoMinuta || !categoria) {
                     showNotification('Por favor, preencha todos os campos obrigatórios', 'warning');
@@ -3907,6 +3935,7 @@
                     tipoMinuta,
                     categorias: [categoria], // Atualiza para array
                     observacoes,
+                    substituicao,
                     editadaEm: getDataHoraBrasilia().getTime(),
                     editadaPor: currentUser.nome
                 };
