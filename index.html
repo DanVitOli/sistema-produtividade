@@ -455,8 +455,28 @@
             <!-- Painel de Monitoramento -->
             <div id="balcao-painel" class="mb-6"></div>
 
+            <!-- Abas de Navegação do Balcão -->
+            <div class="bg-white rounded-lg shadow-md mb-6 no-print">
+                <div class="border-b border-gray-200">
+                    <nav class="flex -mb-px" id="balcao-tabs">
+                        <button onclick="mudarAbaBalcao('cadastro')" id="tab-cadastro" class="balcao-tab px-6 py-3 text-sm font-medium border-b-2 border-purple-500 text-purple-600">
+                            <i data-lucide="plus-circle" class="h-4 w-4 mr-2 inline"></i>
+                            Cadastrar Pedido
+                        </button>
+                        <button onclick="mudarAbaBalcao('lista')" id="tab-lista" class="balcao-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            <i data-lucide="list" class="h-4 w-4 mr-2 inline"></i>
+                            Lista de Pedidos
+                        </button>
+                        <button onclick="mudarAbaBalcao('relatorios')" id="tab-relatorios" class="balcao-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            <i data-lucide="file-text" class="h-4 w-4 mr-2 inline"></i>
+                            Relatórios
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
             <!-- Cadastro de Pedido -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div id="balcao-aba-cadastro" class="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div class="flex items-center mb-6">
                     <i data-lucide="inbox" class="h-6 w-6 text-purple-600 mr-2"></i>
                     <h2 class="text-xl font-semibold text-gray-800">Cadastrar Pedido do Balcão Virtual</h2>
@@ -545,7 +565,7 @@
             </div>
 
             <!-- Lista de Pedidos -->
-            <div class="bg-white rounded-lg shadow-md p-6">
+            <div id="balcao-aba-lista" class="bg-white rounded-lg shadow-md p-6 hidden">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center">
                         <i data-lucide="list" class="h-6 w-6 text-purple-600 mr-2"></i>
@@ -582,6 +602,73 @@
                 </div>
 
                 <div id="balcao-lista"></div>
+            </div>
+
+            <!-- Relatórios do Balcão Virtual -->
+            <div id="balcao-aba-relatorios" class="hidden">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center">
+                            <i data-lucide="file-text" class="h-6 w-6 text-purple-600 mr-2"></i>
+                            <h2 class="text-xl font-semibold text-gray-800">Relatórios do Balcão Virtual</h2>
+                        </div>
+                        <div class="flex gap-2 no-print">
+                            <button onclick="gerarRelatorioBalcao('semanal')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm">
+                                <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
+                                Semanal
+                            </button>
+                            <button onclick="gerarRelatorioBalcao('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
+                                <i data-lucide="calendar" class="h-4 w-4 mr-1 inline"></i>
+                                Mensal
+                            </button>
+                            <button onclick="mostrarRelatorioBalcaoPersonalizado()" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors text-sm">
+                                <i data-lucide="calendar-range" class="h-4 w-4 mr-1 inline"></i>
+                                Personalizado
+                            </button>
+                            <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
+                                <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
+                                Imprimir
+                            </button>
+                        </div>
+                    </div>
+                    <div id="balcao-relatorio-content">
+                        <div class="text-center py-12">
+                            <i data-lucide="bar-chart-3" class="mx-auto h-16 w-16 text-gray-300 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-2">Relatórios do Balcão Virtual</h3>
+                            <p class="text-gray-600 mb-6">Selecione o tipo de relatório que deseja gerar</p>
+
+                            <div class="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                                    <h4 class="font-semibold text-blue-800 mb-2">📅 Relatório Semanal</h4>
+                                    <p class="text-sm text-blue-700 mb-3">Análise dos pedidos da semana atual com estatísticas de atendimento e prazos.</p>
+                                    <button onclick="gerarRelatorioBalcao('semanal')" class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm font-medium">
+                                        Gerar Semanal
+                                    </button>
+                                </div>
+
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
+                                    <h4 class="font-semibold text-green-800 mb-2">📊 Relatório Mensal</h4>
+                                    <p class="text-sm text-green-700 mb-3">Visão completa do mês com gráficos de performance e tempo médio de atendimento.</p>
+                                    <button onclick="gerarRelatorioBalcao('mensal')" class="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm font-medium">
+                                        Gerar Mensal
+                                    </button>
+                                </div>
+
+                                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 text-left">
+                                    <h4 class="font-semibold text-purple-800 mb-2">🎯 Relatório Personalizado</h4>
+                                    <p class="text-sm text-purple-700 mb-3">Escolha período específico para análise detalhada dos pedidos.</p>
+                                    <button onclick="mostrarRelatorioBalcaoPersonalizado()" class="w-full bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors text-sm font-medium">
+                                        Personalizar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 text-xs text-gray-500">
+                                <p>💡 <strong>Dica:</strong> Os relatórios mostram estatísticas de atendimento, tempo médio de resposta e distribuição por categoria.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -808,6 +895,79 @@
                     </button>
                 </div>
                 
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Gerar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Relatório Personalizado do Balcão Virtual -->
+    <div id="modal-relatorio-balcao-personalizado" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalRelatorioBalcaoPersonalizado()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="calendar-range" class="h-5 w-5 text-purple-600 mr-2"></i>
+                    Relatório do Balcão - Personalizado
+                </h3>
+                <button onclick="fecharModalRelatorioBalcaoPersonalizado()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                    <div class="text-sm text-purple-800">
+                        <div class="font-medium">📊 Relatório personalizado do Balcão Virtual</div>
+                        <div class="text-xs mt-1">Selecione o período para análise detalhada dos pedidos</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Início *</label>
+                        <input type="date" id="balcao-relatorio-data-inicio" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Fim *</label>
+                        <input type="date" id="balcao-relatorio-data-fim" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Categoria (opcional)</label>
+                    <select id="balcao-relatorio-categoria" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">Todas as categorias</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Assessor (opcional)</label>
+                    <select id="balcao-relatorio-assessor" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">Todos os assessores</option>
+                        <option value="gilbert">Gilbert Juliano</option>
+                        <option value="laise">Laíse Vital</option>
+                    </select>
+                </div>
+
+                <div class="text-xs text-gray-600 bg-gray-50 p-3 rounded">
+                    💡 <strong>Dicas:</strong><br>
+                    • Inclui estatísticas de atendimento e tempo médio de resposta<br>
+                    • Mostra distribuição por categoria e por assessor<br>
+                    • Identifica pedidos vencidos e cumprimento de prazos
+                </div>
+
+                <div class="flex gap-2 pt-4">
+                    <button onclick="gerarRelatorioBalcaoPersonalizado()" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors">
+                        <i data-lucide="bar-chart" class="h-4 w-4 mr-1 inline"></i>
+                        Gerar Relatório
+                    </button>
+                    <button onclick="fecharModalRelatorioBalcaoPersonalizado()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+
                 <div class="text-xs text-gray-500 text-center">
                     <span class="mr-4">💡 Ctrl+Enter: Gerar</span>
                     <span>ESC: Cancelar</span>
@@ -1987,7 +2147,9 @@
             }
 
             renderBalcaoPainel();
-            renderBalcaoLista();
+
+            // Inicializar sistema de abas - mostrar a aba atual
+            mudarAbaBalcao(abaBalcaoAtual || 'cadastro');
 
             balcaoView.classList.remove('hidden');
             setTimeout(() => criarIcones(), 100);
@@ -2378,6 +2540,441 @@
                 showNotification('Pedido cancelado localmente', 'warning');
                 renderBalcaoVirtual();
             }
+        }
+
+        // ==================== BALCÃO VIRTUAL - ABAS E RELATÓRIOS ====================
+
+        let abaBalcaoAtual = 'cadastro';
+
+        function mudarAbaBalcao(aba) {
+            abaBalcaoAtual = aba;
+
+            // Esconder todas as abas
+            document.getElementById('balcao-aba-cadastro')?.classList.add('hidden');
+            document.getElementById('balcao-aba-lista')?.classList.add('hidden');
+            document.getElementById('balcao-aba-relatorios')?.classList.add('hidden');
+
+            // Remover estilo ativo de todos os tabs
+            document.querySelectorAll('.balcao-tab').forEach(tab => {
+                tab.classList.remove('border-purple-500', 'text-purple-600');
+                tab.classList.add('border-transparent', 'text-gray-500');
+            });
+
+            // Mostrar aba selecionada e ativar tab
+            const abaElement = document.getElementById(`balcao-aba-${aba}`);
+            const tabElement = document.getElementById(`tab-${aba}`);
+
+            if (abaElement) {
+                abaElement.classList.remove('hidden');
+            }
+
+            if (tabElement) {
+                tabElement.classList.remove('border-transparent', 'text-gray-500');
+                tabElement.classList.add('border-purple-500', 'text-purple-600');
+            }
+
+            // Se for a aba de lista, renderizar a lista
+            if (aba === 'lista') {
+                renderBalcaoLista();
+            }
+
+            setTimeout(() => criarIcones(), 100);
+            log(`Aba do Balcão alterada para: ${aba}`);
+        }
+
+        function mostrarRelatorioBalcaoPersonalizado() {
+            // Preencher dropdown de categorias
+            const selectCategoria = document.getElementById('balcao-relatorio-categoria');
+            if (selectCategoria && selectCategoria.options.length <= 1) {
+                Object.entries(categoriasBalcao).forEach(([key, cat]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = cat.nome;
+                    selectCategoria.appendChild(option);
+                });
+            }
+
+            // Pré-preencher com datas do mês atual
+            const hoje = getDataHoraBrasilia();
+            const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+
+            document.getElementById('balcao-relatorio-data-inicio').value = inicioMes.toISOString().split('T')[0];
+            document.getElementById('balcao-relatorio-data-fim').value = fimMes.toISOString().split('T')[0];
+
+            document.getElementById('modal-relatorio-balcao-personalizado').classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+            log('Modal de relatório personalizado do Balcão aberto');
+        }
+
+        function fecharModalRelatorioBalcaoPersonalizado() {
+            document.getElementById('modal-relatorio-balcao-personalizado').classList.add('hidden');
+        }
+
+        function gerarRelatorioBalcaoPersonalizado() {
+            const dataInicio = document.getElementById('balcao-relatorio-data-inicio').value;
+            const dataFim = document.getElementById('balcao-relatorio-data-fim').value;
+            const categoriaFiltro = document.getElementById('balcao-relatorio-categoria').value;
+            const assessorFiltro = document.getElementById('balcao-relatorio-assessor').value;
+
+            if (!dataInicio || !dataFim) {
+                showNotification('Por favor, selecione as datas de início e fim', 'warning');
+                return;
+            }
+
+            if (dataInicio > dataFim) {
+                showNotification('A data de início deve ser anterior à data de fim', 'error');
+                return;
+            }
+
+            fecharModalRelatorioBalcaoPersonalizado();
+            gerarRelatorioBalcao('personalizado', new Date(dataInicio), new Date(dataFim), categoriaFiltro, assessorFiltro);
+        }
+
+        function gerarRelatorioBalcao(tipo, dataInicioCustom = null, dataFimCustom = null, categoriaFiltro = '', assessorFiltro = '') {
+            try {
+                const relatorioContent = document.getElementById('balcao-relatorio-content');
+                if (!relatorioContent) {
+                    throw new Error('Elemento balcao-relatorio-content não encontrado');
+                }
+
+                const hoje = getDataHoraBrasilia();
+                let inicio, fim, titulo;
+
+                if (tipo === 'personalizado' && dataInicioCustom && dataFimCustom) {
+                    inicio = dataInicioCustom;
+                    fim = dataFimCustom;
+                    titulo = `Relatório Personalizado - ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}`;
+                } else if (tipo === 'semanal') {
+                    inicio = getInicioSemana(hoje);
+                    fim = getFimSemana(hoje);
+                    titulo = `Relatório Semanal - ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}`;
+                } else if (tipo === 'mensal') {
+                    inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+                    fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+                    titulo = `Relatório Mensal - ${inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`;
+                } else {
+                    throw new Error(`Tipo de relatório inválido: ${tipo}`);
+                }
+
+                const inicioStr = inicio.toISOString().split('T')[0];
+                const fimStr = fim.toISOString().split('T')[0];
+
+                log(`Gerando relatório do Balcão ${tipo} para período ${inicioStr} a ${fimStr}`);
+
+                // Filtrar pedidos do período
+                let pedidosRelatorio = Object.values(pedidosBalcao).filter(p => {
+                    if (!p || !p.dataPedido) return false;
+                    return p.dataPedido >= inicioStr && p.dataPedido <= fimStr;
+                });
+
+                // Aplicar filtros adicionais
+                if (categoriaFiltro) {
+                    pedidosRelatorio = pedidosRelatorio.filter(p => p.categoria === categoriaFiltro);
+                }
+                if (assessorFiltro) {
+                    pedidosRelatorio = pedidosRelatorio.filter(p => p.assessorId === assessorFiltro);
+                }
+
+                log(`Encontrados ${pedidosRelatorio.length} pedidos no período`);
+
+                // Calcular estatísticas
+                const estatisticas = calcularEstatisticasBalcao(pedidosRelatorio);
+
+                // Gerar HTML do relatório
+                let relatorioHtml = `
+                    <div class="space-y-6">
+                        <div class="text-center border-b pb-4">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-2">${titulo}</h3>
+                            <p class="text-gray-600">Balcão Virtual - Fórum Major Izidoro</p>
+                            <p class="text-sm text-gray-500">Gerado em ${hoje.toLocaleString('pt-BR')}</p>
+                            ${categoriaFiltro ? `<p class="text-xs text-purple-600 mt-1">Filtro: ${categoriasBalcao[categoriaFiltro]?.nome || categoriaFiltro}</p>` : ''}
+                            ${assessorFiltro ? `<p class="text-xs text-purple-600">Assessor: ${assessores[assessorFiltro]?.nome || assessorFiltro}</p>` : ''}
+                        </div>
+
+                        <!-- Resumo Executivo -->
+                        <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-purple-800 mb-4">📊 Resumo Executivo</h4>
+                            <div class="grid md:grid-cols-5 gap-4 text-center">
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-purple-600">${estatisticas.total}</div>
+                                    <div class="text-sm text-gray-600">Total de Pedidos</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-green-600">${estatisticas.minutados}</div>
+                                    <div class="text-sm text-gray-600">Minutados</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-yellow-600">${estatisticas.pendentes}</div>
+                                    <div class="text-sm text-gray-600">Pendentes</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-red-600">${estatisticas.vencidos}</div>
+                                    <div class="text-sm text-gray-600">Vencidos</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="text-3xl font-bold text-gray-600">${estatisticas.cancelados}</div>
+                                    <div class="text-sm text-gray-600">Cancelados</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Indicadores de Performance -->
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-medium text-gray-600">Taxa de Atendimento</span>
+                                    <span class="text-lg font-bold ${estatisticas.taxaAtendimento >= 80 ? 'text-green-600' : estatisticas.taxaAtendimento >= 50 ? 'text-yellow-600' : 'text-red-600'}">${estatisticas.taxaAtendimento}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div class="${estatisticas.taxaAtendimento >= 80 ? 'bg-green-500' : estatisticas.taxaAtendimento >= 50 ? 'bg-yellow-500' : 'bg-red-500'} h-3 rounded-full" style="width: ${estatisticas.taxaAtendimento}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-medium text-gray-600">Cumprimento de Prazo</span>
+                                    <span class="text-lg font-bold ${estatisticas.taxaCumprimentoPrazo >= 80 ? 'text-green-600' : estatisticas.taxaCumprimentoPrazo >= 50 ? 'text-yellow-600' : 'text-red-600'}">${estatisticas.taxaCumprimentoPrazo}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div class="${estatisticas.taxaCumprimentoPrazo >= 80 ? 'bg-green-500' : estatisticas.taxaCumprimentoPrazo >= 50 ? 'bg-yellow-500' : 'bg-red-500'} h-3 rounded-full" style="width: ${estatisticas.taxaCumprimentoPrazo}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-medium text-gray-600">Tempo Médio de Atendimento</span>
+                                    <span class="text-lg font-bold text-blue-600">${estatisticas.tempoMedioAtendimento} dias</span>
+                                </div>
+                                <div class="text-xs text-gray-500">Baseado nos pedidos minutados</div>
+                            </div>
+                        </div>
+
+                        <!-- Distribuição por Categoria -->
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">📋 Distribuição por Categoria</h4>
+                            <div class="space-y-3">
+                                ${Object.entries(estatisticas.porCategoria).map(([catKey, dados]) => {
+                                    const categoria = categoriasBalcao[catKey] || { nome: catKey, cor: 'bg-gray-500' };
+                                    const porcentagem = estatisticas.total > 0 ? Math.round((dados.total / estatisticas.total) * 100) : 0;
+                                    return `
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-32 text-sm font-medium text-gray-600 truncate" title="${categoria.nome}">${categoria.nome}</div>
+                                            <div class="flex-1 bg-gray-200 rounded-full h-4 relative">
+                                                <div class="${categoria.cor} h-4 rounded-full" style="width: ${porcentagem}%"></div>
+                                            </div>
+                                            <div class="w-24 text-sm text-gray-600 text-right">
+                                                ${dados.total} (${porcentagem}%)
+                                            </div>
+                                            <div class="w-20 text-xs text-green-600">
+                                                ✓ ${dados.minutados}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <!-- Distribuição por Assessor -->
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                                <h4 class="text-lg font-semibold text-blue-800 mb-4">👨‍💼 Gilbert Juliano</h4>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span>Total de pedidos:</span>
+                                        <span class="font-bold">${estatisticas.porAssessor.gilbert?.total || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Minutados:</span>
+                                        <span class="font-bold text-green-600">${estatisticas.porAssessor.gilbert?.minutados || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Pendentes:</span>
+                                        <span class="font-bold text-yellow-600">${estatisticas.porAssessor.gilbert?.pendentes || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Vencidos:</span>
+                                        <span class="font-bold text-red-600">${estatisticas.porAssessor.gilbert?.vencidos || 0}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                                <h4 class="text-lg font-semibold text-green-800 mb-4">👩‍💼 Laíse Vital</h4>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span>Total de pedidos:</span>
+                                        <span class="font-bold">${estatisticas.porAssessor.laise?.total || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Minutados:</span>
+                                        <span class="font-bold text-green-600">${estatisticas.porAssessor.laise?.minutados || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Pendentes:</span>
+                                        <span class="font-bold text-yellow-600">${estatisticas.porAssessor.laise?.pendentes || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Vencidos:</span>
+                                        <span class="font-bold text-red-600">${estatisticas.porAssessor.laise?.vencidos || 0}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Distribuição por Classe -->
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">⚖️ Distribuição por Classe</h4>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                                    <div class="text-3xl font-bold text-blue-700">${estatisticas.porClasse.civel || 0}</div>
+                                    <div class="text-sm text-blue-600">Cível</div>
+                                </div>
+                                <div class="bg-gray-100 border border-gray-300 rounded-lg p-4 text-center">
+                                    <div class="text-3xl font-bold text-gray-700">${estatisticas.porClasse.criminal || 0}</div>
+                                    <div class="text-sm text-gray-600">Criminal</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pedidos com Despacho Virtual -->
+                        ${estatisticas.despachoVirtual > 0 ? `
+                            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                <div class="flex items-center">
+                                    <i data-lucide="video" class="h-6 w-6 text-indigo-600 mr-3"></i>
+                                    <div>
+                                        <div class="font-semibold text-indigo-800">${estatisticas.despachoVirtual} pedido${estatisticas.despachoVirtual !== 1 ? 's' : ''} com solicitação de Despacho Virtual</div>
+                                        <div class="text-sm text-indigo-600">Necessitam agendamento com o MM. Juiz</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Observações -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-3">📝 Observações</h4>
+                            <div class="space-y-2 text-sm text-gray-700">
+                                <p>• <strong>Taxa de Atendimento:</strong> Percentual de pedidos minutados em relação ao total (excluindo cancelados)</p>
+                                <p>• <strong>Cumprimento de Prazo:</strong> Percentual de pedidos minutados dentro do prazo estabelecido</p>
+                                <p>• <strong>Prazos:</strong> Urgências e categorias especiais = 72 horas | Outros = 60 dias</p>
+                                <p>• <strong>Tempo Médio:</strong> Calculado com base na diferença entre data do pedido e data de minutação</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                relatorioContent.innerHTML = relatorioHtml;
+                setTimeout(() => criarIcones(), 100);
+
+                log(`Relatório do Balcão ${tipo} gerado com sucesso - ${pedidosRelatorio.length} pedidos processados`);
+                showNotification(`Relatório ${tipo} gerado com sucesso!`, 'success');
+
+            } catch (error) {
+                log(`Erro ao gerar relatório do Balcão ${tipo}:`, error);
+                showNotification('Erro ao gerar relatório', 'error');
+            }
+        }
+
+        function calcularEstatisticasBalcao(pedidos) {
+            const estatisticas = {
+                total: pedidos.length,
+                minutados: 0,
+                pendentes: 0,
+                cancelados: 0,
+                vencidos: 0,
+                taxaAtendimento: 0,
+                taxaCumprimentoPrazo: 0,
+                tempoMedioAtendimento: 0,
+                despachoVirtual: 0,
+                porCategoria: {},
+                porAssessor: {
+                    gilbert: { total: 0, minutados: 0, pendentes: 0, vencidos: 0 },
+                    laise: { total: 0, minutados: 0, pendentes: 0, vencidos: 0 }
+                },
+                porClasse: { civel: 0, criminal: 0 }
+            };
+
+            let totalDiasAtendimento = 0;
+            let pedidosMinutadosComData = 0;
+            let minutadosDentroPrazo = 0;
+
+            pedidos.forEach(pedido => {
+                // Contagem por status
+                if (pedido.status === 'minutado') {
+                    estatisticas.minutados++;
+                } else if (pedido.status === 'pendente') {
+                    estatisticas.pendentes++;
+                    // Verificar se está vencido
+                    const prazo = calcularPrazoBalcao(pedido);
+                    if (prazo.vencido) {
+                        estatisticas.vencidos++;
+                    }
+                } else if (pedido.status === 'cancelado') {
+                    estatisticas.cancelados++;
+                }
+
+                // Despacho virtual
+                if (pedido.despachoVirtual) {
+                    estatisticas.despachoVirtual++;
+                }
+
+                // Por categoria
+                const cat = pedido.categoria || 'outros';
+                if (!estatisticas.porCategoria[cat]) {
+                    estatisticas.porCategoria[cat] = { total: 0, minutados: 0 };
+                }
+                estatisticas.porCategoria[cat].total++;
+                if (pedido.status === 'minutado') {
+                    estatisticas.porCategoria[cat].minutados++;
+                }
+
+                // Por assessor
+                const assessorId = pedido.assessorId || 'gilbert';
+                if (estatisticas.porAssessor[assessorId]) {
+                    estatisticas.porAssessor[assessorId].total++;
+                    if (pedido.status === 'minutado') {
+                        estatisticas.porAssessor[assessorId].minutados++;
+                    } else if (pedido.status === 'pendente') {
+                        estatisticas.porAssessor[assessorId].pendentes++;
+                        const prazo = calcularPrazoBalcao(pedido);
+                        if (prazo.vencido) {
+                            estatisticas.porAssessor[assessorId].vencidos++;
+                        }
+                    }
+                }
+
+                // Por classe
+                if (pedido.classe === 'civel') {
+                    estatisticas.porClasse.civel++;
+                } else if (pedido.classe === 'criminal') {
+                    estatisticas.porClasse.criminal++;
+                }
+
+                // Tempo médio de atendimento
+                if (pedido.status === 'minutado' && pedido.dataMinutado && pedido.dataPedido) {
+                    const dataPedido = new Date(pedido.dataPedido);
+                    const dataMinutado = new Date(pedido.dataMinutado);
+                    const dias = Math.floor((dataMinutado - dataPedido) / (1000 * 60 * 60 * 24));
+                    totalDiasAtendimento += dias;
+                    pedidosMinutadosComData++;
+
+                    // Verificar se foi dentro do prazo
+                    const categoria = categoriasBalcao[pedido.categoria];
+                    const prazoHoras = categoria?.prazoHoras || 72;
+                    const prazoDias = Math.ceil(prazoHoras / 24);
+                    if (dias <= prazoDias) {
+                        minutadosDentroPrazo++;
+                    }
+                }
+            });
+
+            // Calcular taxas
+            const pedidosAtivos = estatisticas.total - estatisticas.cancelados;
+            estatisticas.taxaAtendimento = pedidosAtivos > 0 ? Math.round((estatisticas.minutados / pedidosAtivos) * 100) : 0;
+            estatisticas.taxaCumprimentoPrazo = estatisticas.minutados > 0 ? Math.round((minutadosDentroPrazo / estatisticas.minutados) * 100) : 0;
+            estatisticas.tempoMedioAtendimento = pedidosMinutadosComData > 0 ? Math.round(totalDiasAtendimento / pedidosMinutadosComData) : 0;
+
+            return estatisticas;
         }
 
         // ==================== FIREBASE ====================
@@ -4666,7 +5263,8 @@
                         const modalEdicao = document.getElementById('modal-edicao');
                         const modalCorrecao = document.getElementById('modal-correcao');
                         const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
-                        
+                        const modalRelatorioBalcao = document.getElementById('modal-relatorio-balcao-personalizado');
+
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             fecharModalEdicao();
                         }
@@ -4676,14 +5274,18 @@
                         if (modalRelatorioPersonalizado && !modalRelatorioPersonalizado.classList.contains('hidden')) {
                             fecharModalRelatorioPersonalizado();
                         }
+                        if (modalRelatorioBalcao && !modalRelatorioBalcao.classList.contains('hidden')) {
+                            fecharModalRelatorioBalcaoPersonalizado();
+                        }
                     }
-                    
+
                     // Ctrl+Enter para confirmar ações em modais
                     if (e.ctrlKey && e.key === 'Enter') {
                         const modalEdicao = document.getElementById('modal-edicao');
                         const modalCorrecao = document.getElementById('modal-correcao');
                         const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
-                        
+                        const modalRelatorioBalcao = document.getElementById('modal-relatorio-balcao-personalizado');
+
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             salvarEdicao();
                         }
@@ -4692,6 +5294,9 @@
                         }
                         if (modalRelatorioPersonalizado && !modalRelatorioPersonalizado.classList.contains('hidden')) {
                             gerarRelatorioPersonalizado();
+                        }
+                        if (modalRelatorioBalcao && !modalRelatorioBalcao.classList.contains('hidden')) {
+                            gerarRelatorioBalcaoPersonalizado();
                         }
                     }
                     
