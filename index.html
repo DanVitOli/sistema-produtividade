@@ -449,6 +449,141 @@
                 <div id="relatorio-content"></div>
             </div>
         </div>
+
+        <!-- Balcão Virtual -->
+        <div id="balcao-view" class="hidden">
+            <!-- Painel de Monitoramento -->
+            <div id="balcao-painel" class="mb-6"></div>
+
+            <!-- Cadastro de Pedido -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex items-center mb-6">
+                    <i data-lucide="inbox" class="h-6 w-6 text-purple-600 mr-2"></i>
+                    <h2 class="text-xl font-semibold text-gray-800">Cadastrar Pedido do Balcão Virtual</h2>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
+                        <input type="text" id="balcao-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Ex: 1234567-89.2024.8.12.3456">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Sequencial *</label>
+                        <input type="number" id="balcao-sequencial" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Ex: 1, 2, 3...">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Classe *</label>
+                        <select id="balcao-classe" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="">Selecione</option>
+                            <option value="civel">Cível</option>
+                            <option value="criminal">Criminal</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria/Urgência *</label>
+                        <select id="balcao-categoria" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="">Selecione a categoria</option>
+                            <option value="urgencia">Urgência (72h)</option>
+                            <option value="meta_cnj">Meta do CNJ - exceto Meta 1 (72h)</option>
+                            <option value="saude">Saúde (72h)</option>
+                            <option value="crime">Crime (72h)</option>
+                            <option value="alvara">Alvará (72h)</option>
+                            <option value="crianca">Criança (72h)</option>
+                            <option value="incapaz">Incapaz (72h)</option>
+                            <option value="idoso">Idoso - exceto ação bancária (72h)</option>
+                            <option value="andamento_atrasado">Andamento Atrasado (72h)</option>
+                            <option value="embargos">Embargos Declaratórios (72h)</option>
+                            <option value="extincao">Extinção por desistência/perda objeto (72h)</option>
+                            <option value="acordo">Acordo (72h)</option>
+                            <option value="diligencia_simples">Diligência Simples (72h)</option>
+                            <option value="outros">Outros (60 dias)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data do Pedido *</label>
+                        <input type="date" id="balcao-data-pedido" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Solicitante *</label>
+                        <select id="balcao-tipo-solicitante" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="">Selecione</option>
+                            <option value="advogado">Advogado</option>
+                            <option value="parte">Parte</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Solicitante</label>
+                        <input type="text" id="balcao-nome-solicitante" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Nome do advogado ou parte">
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Resumo do Pedido *</label>
+                        <textarea id="balcao-resumo" rows="2" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Descreva brevemente o pedido..."></textarea>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="flex items-center cursor-pointer bg-blue-50 border border-blue-200 rounded-md p-3">
+                            <input type="checkbox" id="balcao-despacho-virtual" class="mr-3 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <div>
+                                <span class="text-sm font-medium text-blue-800">Necessita despacho virtual com o MM. Juiz</span>
+                                <p class="text-xs text-blue-600">Marque se for necessário agendar despacho virtual</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <button onclick="cadastrarPedidoBalcao()" class="w-full mt-4 bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 transition-colors font-medium">
+                    <i data-lucide="plus" class="h-5 w-5 mr-2 inline"></i>
+                    Cadastrar Pedido
+                </button>
+            </div>
+
+            <!-- Lista de Pedidos -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <i data-lucide="list" class="h-6 w-6 text-purple-600 mr-2"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">Pedidos Cadastrados</h2>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div id="balcao-filtros" class="flex flex-wrap gap-2 mb-4">
+                    <select id="filtro-balcao-status" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" onchange="renderBalcaoLista()">
+                        <option value="">Todos os status</option>
+                        <option value="pendente" selected>Pendentes</option>
+                        <option value="minutado">Minutados</option>
+                        <option value="cancelado">Cancelados</option>
+                    </select>
+                    <select id="filtro-balcao-categoria" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" onchange="renderBalcaoLista()">
+                        <option value="">Todas as categorias</option>
+                    </select>
+                    <select id="filtro-balcao-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" onchange="renderBalcaoLista()">
+                        <option value="">Todos os assessores</option>
+                        <option value="gilbert">Gilbert</option>
+                        <option value="laise">Laíse</option>
+                    </select>
+                    <select id="filtro-balcao-prazo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" onchange="renderBalcaoLista()">
+                        <option value="">Todos os prazos</option>
+                        <option value="vencido">Vencidos</option>
+                        <option value="vencendo">Vencendo hoje</option>
+                        <option value="no_prazo">No prazo</option>
+                    </select>
+                    <button onclick="limparFiltrosBalcao()" class="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600 transition-colors text-sm">
+                        <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
+                        Limpar
+                    </button>
+                </div>
+
+                <div id="balcao-lista"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Correção -->
@@ -776,12 +911,37 @@
             'correcao': { nome: 'Precisa Correção', cor: 'status-correcao' }
         };
 
+        // ==================== BALCÃO VIRTUAL ====================
+        const categoriasBalcao = {
+            'urgencia': { nome: 'Urgência', cor: 'bg-red-600', prazoHoras: 72 },
+            'meta_cnj': { nome: 'Meta do CNJ (exceto Meta 1)', cor: 'bg-purple-600', prazoHoras: 72 },
+            'saude': { nome: 'Saúde', cor: 'bg-green-600', prazoHoras: 72 },
+            'crime': { nome: 'Crime', cor: 'bg-gray-700', prazoHoras: 72 },
+            'alvara': { nome: 'Alvará', cor: 'bg-yellow-600', prazoHoras: 72 },
+            'crianca': { nome: 'Criança', cor: 'bg-pink-500', prazoHoras: 72 },
+            'incapaz': { nome: 'Incapaz', cor: 'bg-orange-500', prazoHoras: 72 },
+            'idoso': { nome: 'Idoso (exceto ação bancária)', cor: 'bg-amber-600', prazoHoras: 72 },
+            'andamento_atrasado': { nome: 'Andamento Atrasado', cor: 'bg-red-500', prazoHoras: 72 },
+            'embargos': { nome: 'Embargos Declaratórios', cor: 'bg-indigo-500', prazoHoras: 72 },
+            'extincao': { nome: 'Extinção (desistência/perda objeto)', cor: 'bg-slate-500', prazoHoras: 72 },
+            'acordo': { nome: 'Acordo', cor: 'bg-teal-500', prazoHoras: 72 },
+            'diligencia_simples': { nome: 'Diligência Simples', cor: 'bg-cyan-500', prazoHoras: 72 },
+            'outros': { nome: 'Outros', cor: 'bg-gray-500', prazoHoras: 1440 } // 60 dias = 1440 horas
+        };
+
+        const statusBalcao = {
+            'pendente': { nome: 'Pendente', cor: 'bg-yellow-500' },
+            'minutado': { nome: 'Minutado', cor: 'bg-green-500' },
+            'cancelado': { nome: 'Cancelado', cor: 'bg-gray-400' }
+        };
+
         // ==================== ESTADO GLOBAL ====================
         
         let firebase, database;
         let currentUser = null;
         let currentView = 'dashboard';
         let minutas = {};
+        let pedidosBalcao = {};
         let minutaEditando = null;
         let minutaCorrecao = null;
         let calendarioData = {
@@ -1655,6 +1815,10 @@
                     <i data-lucide="clock" class="h-4 w-4 mr-2"></i>
                     Histórico
                 </button>
+                <button onclick="showView('balcao')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    <i data-lucide="inbox" class="h-4 w-4 mr-2"></i>
+                    Balcão Virtual
+                </button>
             `;
 
             if (currentUser.isJuiz) {
@@ -1786,6 +1950,9 @@
                     case 'relatorios':
                         renderRelatorios();
                         break;
+                    case 'balcao':
+                        renderBalcaoVirtual();
+                        break;
                 }
 
                 log(`View ${view} carregada`);
@@ -1796,8 +1963,425 @@
             }
         }
 
+        // ==================== BALCÃO VIRTUAL - FUNÇÕES ====================
+
+        function renderBalcaoVirtual() {
+            const balcaoView = document.getElementById('balcao-view');
+            if (!balcaoView) return;
+
+            // Preencher dropdown de categorias nos filtros
+            const filtroCategoriaSelect = document.getElementById('filtro-balcao-categoria');
+            if (filtroCategoriaSelect && filtroCategoriaSelect.options.length <= 1) {
+                Object.entries(categoriasBalcao).forEach(([key, cat]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = cat.nome;
+                    filtroCategoriaSelect.appendChild(option);
+                });
+            }
+
+            // Definir data do pedido como hoje por padrão
+            const dataPedidoInput = document.getElementById('balcao-data-pedido');
+            if (dataPedidoInput && !dataPedidoInput.value) {
+                dataPedidoInput.value = getHojeString();
+            }
+
+            renderBalcaoPainel();
+            renderBalcaoLista();
+
+            balcaoView.classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function calcularPrazoBalcao(pedido) {
+            const categoria = categoriasBalcao[pedido.categoria];
+            const prazoHoras = categoria?.prazoHoras || 72;
+
+            const dataPedido = new Date(pedido.dataPedido + 'T00:00:00');
+            const agora = getDataHoraBrasilia();
+
+            const horasPassadas = Math.floor((agora - dataPedido) / (1000 * 60 * 60));
+            const diasPassados = Math.floor(horasPassadas / 24);
+
+            const horasRestantes = prazoHoras - horasPassadas;
+            const diasRestantes = Math.ceil(horasRestantes / 24);
+
+            let status = 'no_prazo';
+            if (horasRestantes <= 0) {
+                status = 'vencido';
+            } else if (horasRestantes <= 24) {
+                status = 'vencendo';
+            }
+
+            return {
+                prazoHoras,
+                horasPassadas,
+                diasPassados,
+                horasRestantes,
+                diasRestantes,
+                status,
+                vencido: horasRestantes <= 0
+            };
+        }
+
+        function renderBalcaoPainel() {
+            const painel = document.getElementById('balcao-painel');
+            if (!painel) return;
+
+            const pedidosArray = Object.values(pedidosBalcao).filter(p => p && p.status === 'pendente');
+
+            let vencidos = 0;
+            let vencendoHoje = 0;
+            let noPrazo = 0;
+            let totalPendentes = pedidosArray.length;
+
+            pedidosArray.forEach(pedido => {
+                const prazo = calcularPrazoBalcao(pedido);
+                if (prazo.status === 'vencido') vencidos++;
+                else if (prazo.status === 'vencendo') vencendoHoje++;
+                else noPrazo++;
+            });
+
+            painel.innerHTML = `
+                <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg p-6 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold mb-2">Balcão Virtual - Fórum Major Izidoro</h2>
+                            <p class="text-purple-100">Controle de pedidos e prazos</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-3xl font-bold">${totalPendentes}</div>
+                            <div class="text-purple-100 text-sm">pedidos pendentes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-red-600 font-medium">Vencidos</div>
+                                <div class="text-3xl font-bold text-red-700">${vencidos}</div>
+                            </div>
+                            <i data-lucide="alert-triangle" class="h-10 w-10 text-red-400"></i>
+                        </div>
+                        ${vencidos > 0 ? '<div class="text-xs text-red-600 mt-2">⚠️ Necessita atenção imediata!</div>' : ''}
+                    </div>
+
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-yellow-600 font-medium">Vencendo Hoje</div>
+                                <div class="text-3xl font-bold text-yellow-700">${vencendoHoje}</div>
+                            </div>
+                            <i data-lucide="clock" class="h-10 w-10 text-yellow-400"></i>
+                        </div>
+                        ${vencendoHoje > 0 ? '<div class="text-xs text-yellow-600 mt-2">⏰ Prazo expira em menos de 24h</div>' : ''}
+                    </div>
+
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-green-600 font-medium">No Prazo</div>
+                                <div class="text-3xl font-bold text-green-700">${noPrazo}</div>
+                            </div>
+                            <i data-lucide="check-circle" class="h-10 w-10 text-green-400"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function renderBalcaoLista() {
+            const lista = document.getElementById('balcao-lista');
+            if (!lista) return;
+
+            // Obter filtros
+            const filtroStatus = document.getElementById('filtro-balcao-status')?.value || 'pendente';
+            const filtroCategoria = document.getElementById('filtro-balcao-categoria')?.value;
+            const filtroAssessor = document.getElementById('filtro-balcao-assessor')?.value;
+            const filtroPrazo = document.getElementById('filtro-balcao-prazo')?.value;
+
+            let pedidosArray = Object.entries(pedidosBalcao)
+                .filter(([key, p]) => p)
+                .map(([key, p]) => ({ ...p, id: key }));
+
+            // Filtro por status
+            if (filtroStatus) {
+                pedidosArray = pedidosArray.filter(p => p.status === filtroStatus);
+            }
+
+            // Filtro por categoria
+            if (filtroCategoria) {
+                pedidosArray = pedidosArray.filter(p => p.categoria === filtroCategoria);
+            }
+
+            // Filtro por assessor
+            if (filtroAssessor) {
+                pedidosArray = pedidosArray.filter(p => p.assessorId === filtroAssessor);
+            }
+
+            // Filtro por prazo
+            if (filtroPrazo && filtroStatus === 'pendente') {
+                pedidosArray = pedidosArray.filter(p => {
+                    const prazo = calcularPrazoBalcao(p);
+                    return prazo.status === filtroPrazo;
+                });
+            }
+
+            // Ordenar por sequencial
+            pedidosArray.sort((a, b) => (a.sequencial || 0) - (b.sequencial || 0));
+
+            if (pedidosArray.length === 0) {
+                lista.innerHTML = `
+                    <div class="text-center text-gray-500 py-12">
+                        <i data-lucide="inbox" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                        <p>Nenhum pedido encontrado com os filtros aplicados.</p>
+                    </div>
+                `;
+                setTimeout(() => criarIcones(), 100);
+                return;
+            }
+
+            lista.innerHTML = `
+                <div class="text-sm text-gray-600 mb-4">
+                    Mostrando ${pedidosArray.length} pedido${pedidosArray.length !== 1 ? 's' : ''}
+                </div>
+                <div class="space-y-3">
+                    ${pedidosArray.map(pedido => criarCardBalcao(pedido)).join('')}
+                </div>
+            `;
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function criarCardBalcao(pedido) {
+            const categoria = categoriasBalcao[pedido.categoria] || { nome: 'Desconhecida', cor: 'bg-gray-500' };
+            const statusInfo = statusBalcao[pedido.status] || statusBalcao.pendente;
+            const prazo = calcularPrazoBalcao(pedido);
+
+            const prazoColor = {
+                'vencido': 'bg-red-100 border-red-300 text-red-800',
+                'vencendo': 'bg-yellow-100 border-yellow-300 text-yellow-800',
+                'no_prazo': 'bg-green-100 border-green-300 text-green-800'
+            };
+
+            const prazoLabel = {
+                'vencido': `⚠️ VENCIDO há ${Math.abs(prazo.diasRestantes)} dia${Math.abs(prazo.diasRestantes) !== 1 ? 's' : ''}`,
+                'vencendo': `⏰ Vence em ${prazo.horasRestantes}h`,
+                'no_prazo': `✓ ${prazo.diasRestantes} dia${prazo.diasRestantes !== 1 ? 's' : ''} restante${prazo.diasRestantes !== 1 ? 's' : ''}`
+            };
+
+            const assessorNome = pedido.assessorNome || assessores[pedido.assessorId]?.nome || 'Não atribuído';
+            const pedidoIdSafe = escapeAttr(pedido.id);
+
+            let botoesAcao = '';
+            if (pedido.status === 'pendente') {
+                // Se o usuário atual é o assessor responsável ou é juiz, pode marcar como minutado
+                const podeMinutar = currentUser.isJuiz || pedido.assessorId === currentUser.assessorId;
+                if (podeMinutar) {
+                    botoesAcao = `
+                        <button onclick="marcarComoMinutado('${pedidoIdSafe}')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">
+                            <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>
+                            Marcar como Minutado
+                        </button>
+                    `;
+                }
+                if (currentUser.isJuiz) {
+                    botoesAcao += `
+                        <button onclick="cancelarPedidoBalcao('${pedidoIdSafe}')" class="px-3 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 transition-colors">
+                            Cancelar
+                        </button>
+                    `;
+                }
+            }
+
+            return `
+                <div class="border ${prazo.vencido && pedido.status === 'pendente' ? 'border-red-300 bg-red-50' : 'border-gray-200'} rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="font-bold text-gray-800">#${pedido.sequencial || '-'}</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor} text-white">${categoria.nome}</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-medium ${statusInfo.cor} text-white">${statusInfo.nome}</span>
+                                <span class="px-2 py-1 rounded text-xs ${pedido.classe === 'criminal' ? 'bg-gray-700 text-white' : 'bg-blue-100 text-blue-800'}">${pedido.classe === 'criminal' ? 'Criminal' : 'Cível'}</span>
+                                ${pedido.despachoVirtual ? '<span class="px-2 py-1 rounded text-xs bg-blue-500 text-white">📹 Despacho Virtual</span>' : ''}
+                            </div>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <div><strong>Processo:</strong> ${escapeHtml(pedido.numeroProcesso)}</div>
+                                <div><strong>Assessor:</strong> ${escapeHtml(assessorNome)}</div>
+                                <div><strong>Solicitante:</strong> ${escapeHtml(pedido.nomeSolicitante || '-')} (${pedido.tipoSolicitante === 'advogado' ? 'Advogado' : 'Parte'})</div>
+                                <div><strong>Resumo:</strong> ${escapeHtml(pedido.resumo)}</div>
+                                ${pedido.dataMinutado ? `<div class="text-green-600"><strong>Minutado em:</strong> ${formatarDataBrasilia(pedido.dataMinutado)}</div>` : ''}
+                            </div>
+                            ${pedido.status === 'pendente' ? `
+                                <div class="inline-block px-3 py-1 rounded text-xs font-medium border ${prazoColor[prazo.status]}">
+                                    ${prazoLabel[prazo.status]} (${prazo.diasPassados} dia${prazo.diasPassados !== 1 ? 's' : ''} desde o pedido)
+                                </div>
+                            ` : ''}
+                            ${botoesAcao ? `<div class="flex gap-2 mt-3">${botoesAcao}</div>` : ''}
+                        </div>
+                        <div class="text-xs text-gray-500 text-right ml-4">
+                            <div>Pedido: ${formatarDataBrasilia(pedido.dataPedido)}</div>
+                            <div>Prazo: ${categoria.prazoHoras}h</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function cadastrarPedidoBalcao() {
+            const numeroProcesso = document.getElementById('balcao-processo').value.trim();
+            const sequencial = document.getElementById('balcao-sequencial').value;
+            const classe = document.getElementById('balcao-classe').value;
+            const categoria = document.getElementById('balcao-categoria').value;
+            const dataPedido = document.getElementById('balcao-data-pedido').value;
+            const tipoSolicitante = document.getElementById('balcao-tipo-solicitante').value;
+            const nomeSolicitante = document.getElementById('balcao-nome-solicitante').value.trim();
+            const resumo = document.getElementById('balcao-resumo').value.trim();
+            const despachoVirtual = document.getElementById('balcao-despacho-virtual').checked;
+
+            // Validações
+            if (!numeroProcesso || !sequencial || !classe || !categoria || !dataPedido || !tipoSolicitante || !resumo) {
+                showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
+                return;
+            }
+
+            if (!validarNumeroProcesso(numeroProcesso)) {
+                showNotification('Número do processo inválido.', 'error');
+                return;
+            }
+
+            const novoPedido = {
+                numeroProcesso,
+                sequencial: parseInt(sequencial),
+                classe,
+                categoria,
+                dataPedido,
+                tipoSolicitante,
+                nomeSolicitante,
+                resumo,
+                despachoVirtual,
+                assessorId: currentUser.assessorId || null,
+                assessorNome: currentUser.nome,
+                status: 'pendente',
+                createdAt: getDataHoraBrasilia().getTime()
+            };
+
+            try {
+                if (database) {
+                    database.ref('pedidosBalcao').push(novoPedido)
+                        .then(() => {
+                            limparFormularioBalcao();
+                            showNotification('Pedido cadastrado com sucesso!', 'success');
+                            renderBalcaoVirtual();
+                        })
+                        .catch((error) => {
+                            log('Erro ao salvar pedido no Firebase:', error);
+                            showNotification('Erro ao cadastrar pedido', 'error');
+                        });
+                } else {
+                    const id = 'local_balcao_' + getDataHoraBrasilia().getTime();
+                    pedidosBalcao[id] = novoPedido;
+                    limparFormularioBalcao();
+                    showNotification('Pedido cadastrado localmente', 'warning');
+                    renderBalcaoVirtual();
+                }
+            } catch (error) {
+                log('Erro ao cadastrar pedido:', error);
+                showNotification('Erro ao cadastrar pedido', 'error');
+            }
+        }
+
+        function limparFormularioBalcao() {
+            document.getElementById('balcao-processo').value = '';
+            document.getElementById('balcao-sequencial').value = '';
+            document.getElementById('balcao-classe').value = '';
+            document.getElementById('balcao-categoria').value = '';
+            document.getElementById('balcao-data-pedido').value = getHojeString();
+            document.getElementById('balcao-tipo-solicitante').value = '';
+            document.getElementById('balcao-nome-solicitante').value = '';
+            document.getElementById('balcao-resumo').value = '';
+            document.getElementById('balcao-despacho-virtual').checked = false;
+        }
+
+        function limparFiltrosBalcao() {
+            document.getElementById('filtro-balcao-status').value = 'pendente';
+            document.getElementById('filtro-balcao-categoria').value = '';
+            document.getElementById('filtro-balcao-assessor').value = '';
+            document.getElementById('filtro-balcao-prazo').value = '';
+            renderBalcaoLista();
+        }
+
+        function marcarComoMinutado(id) {
+            if (!confirm('Confirma que este pedido foi minutado?')) return;
+
+            const pedido = pedidosBalcao[id];
+            if (!pedido) {
+                showNotification('Pedido não encontrado', 'error');
+                return;
+            }
+
+            const pedidoAtualizado = {
+                ...pedido,
+                status: 'minutado',
+                dataMinutado: getHojeString(),
+                minutadoPor: currentUser.nome,
+                minutadoEm: getDataHoraBrasilia().getTime()
+            };
+
+            if (database) {
+                database.ref(`pedidosBalcao/${id}`).update(pedidoAtualizado)
+                    .then(() => {
+                        showNotification('Pedido marcado como minutado!', 'success');
+                    })
+                    .catch((error) => {
+                        log('Erro ao atualizar pedido:', error);
+                        showNotification('Erro ao atualizar pedido', 'error');
+                    });
+            } else {
+                pedidosBalcao[id] = pedidoAtualizado;
+                showNotification('Pedido atualizado localmente', 'warning');
+                renderBalcaoVirtual();
+            }
+        }
+
+        function cancelarPedidoBalcao(id) {
+            if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
+
+            const pedido = pedidosBalcao[id];
+            if (!pedido) {
+                showNotification('Pedido não encontrado', 'error');
+                return;
+            }
+
+            const pedidoAtualizado = {
+                ...pedido,
+                status: 'cancelado',
+                canceladoPor: currentUser.nome,
+                canceladoEm: getDataHoraBrasilia().getTime()
+            };
+
+            if (database) {
+                database.ref(`pedidosBalcao/${id}`).update(pedidoAtualizado)
+                    .then(() => {
+                        showNotification('Pedido cancelado', 'success');
+                    })
+                    .catch((error) => {
+                        log('Erro ao cancelar pedido:', error);
+                        showNotification('Erro ao cancelar pedido', 'error');
+                    });
+            } else {
+                pedidosBalcao[id] = pedidoAtualizado;
+                showNotification('Pedido cancelado localmente', 'warning');
+                renderBalcaoVirtual();
+            }
+        }
+
         // ==================== FIREBASE ====================
-        
+
         function setupFirebaseListeners() {
             try {
                 database.ref('minutas').on('value', (snapshot) => {
@@ -1826,6 +2410,14 @@
                         database.ref('assessores').set(assessores);
                         log('Dados iniciais dos assessores criados');
                     }
+                });
+
+                // Listener para pedidos do Balcão Virtual
+                database.ref('pedidosBalcao').on('value', (snapshot) => {
+                    pedidosBalcao = snapshot.val() || {};
+                    log(`Pedidos Balcão carregados: ${Object.keys(pedidosBalcao).length}`);
+
+                    if (currentView === 'balcao') renderBalcaoVirtual();
                 });
 
                 database.ref('.info/connected').on('value', (snapshot) => {
