@@ -192,10 +192,19 @@
                     <h1 class="text-2xl font-bold text-gray-800">Sistema de Produtividade Judicial</h1>
                     <p id="user-info" class="text-gray-600"></p>
                 </div>
-                <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors flex items-center">
-                    <i data-lucide="log-out" class="h-4 w-4 mr-2"></i>
-                    Sair
-                </button>
+                <div class="flex items-center gap-3">
+                    <!-- Indicador de Notificações (apenas para juiz) -->
+                    <div id="notificacoes-container" class="hidden">
+                        <button onclick="abrirModalNotificacoes()" class="relative bg-indigo-500 text-white p-2 rounded-full hover:bg-indigo-600 transition-colors" title="Notificações">
+                            <i data-lucide="bell" class="h-5 w-5"></i>
+                            <span id="notificacoes-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                        </button>
+                    </div>
+                    <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors flex items-center">
+                        <i data-lucide="log-out" class="h-4 w-4 mr-2"></i>
+                        Sair
+                    </button>
+                </div>
             </div>
             
             <!-- Navegação -->
@@ -976,6 +985,40 @@
         </div>
     </div>
 
+    <!-- Modal de Notificações do Juiz -->
+    <div id="modal-notificacoes" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalNotificacoes()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="bell" class="h-5 w-5 text-indigo-600 mr-2"></i>
+                    Notificações
+                    <span id="modal-notificacoes-count" class="ml-2 bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-1 rounded-full">0</span>
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="marcarTodasComoLidas()" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                        Marcar todas como lidas
+                    </button>
+                    <button onclick="fecharModalNotificacoes()" class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="notificacoes-lista" class="flex-1 overflow-y-auto space-y-3">
+                <div class="text-center text-gray-500 py-8">
+                    <i data-lucide="bell-off" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                    <p>Nenhuma notificação pendente</p>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t text-center">
+                <button onclick="fecharModalNotificacoes()" class="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 transition-colors">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ==================== CONFIGURAÇÃO ====================
         
@@ -1113,6 +1156,7 @@
             gilbert: { nome: 'Gilbert Juliano', ativo: true },
             laise: { nome: 'Laíse Vital', ativo: true }
         };
+        let notificacoesJuiz = {};
 
         // ==================== UTILITÁRIOS ====================
         
@@ -2435,9 +2479,21 @@
             try {
                 if (database) {
                     database.ref('pedidosBalcao').push(novoPedido)
-                        .then(() => {
+                        .then((ref) => {
+                            // Se marcou despacho virtual, criar notificação para o juiz
+                            if (despachoVirtual) {
+                                criarNotificacaoDespachoVirtual({
+                                    ...novoPedido,
+                                    id: ref.key
+                                });
+                            }
+
                             limparFormularioBalcao();
-                            showNotification('Pedido cadastrado com sucesso!', 'success');
+                            let mensagem = 'Pedido cadastrado com sucesso!';
+                            if (despachoVirtual) {
+                                mensagem += ' O juiz foi notificado sobre a solicitação de despacho virtual.';
+                            }
+                            showNotification(mensagem, 'success');
                             renderBalcaoVirtual();
                         })
                         .catch((error) => {
@@ -2977,6 +3033,210 @@
             return estatisticas;
         }
 
+        // ==================== NOTIFICAÇÕES DO JUIZ ====================
+
+        function criarNotificacaoDespachoVirtual(pedido) {
+            if (!database) {
+                log('Firebase não disponível, notificação não criada');
+                return;
+            }
+
+            const notificacao = {
+                tipo: 'despacho_virtual',
+                titulo: 'Solicitação de Despacho Virtual',
+                mensagem: `${pedido.assessorNome} solicitou despacho virtual para o processo ${pedido.numeroProcesso}`,
+                pedidoId: pedido.id || null,
+                numeroProcesso: pedido.numeroProcesso,
+                categoria: pedido.categoria,
+                assessorId: pedido.assessorId,
+                assessorNome: pedido.assessorNome,
+                resumoPedido: pedido.resumo,
+                lida: false,
+                criadaEm: getDataHoraBrasilia().getTime(),
+                data: getHojeString()
+            };
+
+            database.ref('notificacoesJuiz').push(notificacao)
+                .then(() => {
+                    log('Notificação de despacho virtual criada', pedido.numeroProcesso);
+                })
+                .catch((error) => {
+                    log('Erro ao criar notificação:', error);
+                });
+        }
+
+        function atualizarBadgeNotificacoes() {
+            const naoLidas = Object.values(notificacoesJuiz).filter(n => n && !n.lida).length;
+            const badge = document.getElementById('notificacoes-badge');
+            const container = document.getElementById('notificacoes-container');
+
+            if (container && currentUser?.isJuiz) {
+                container.classList.remove('hidden');
+            }
+
+            if (badge) {
+                if (naoLidas > 0) {
+                    badge.textContent = naoLidas > 99 ? '99+' : naoLidas;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+
+            // Atualizar contador no modal se estiver aberto
+            const modalCount = document.getElementById('modal-notificacoes-count');
+            if (modalCount) {
+                modalCount.textContent = naoLidas;
+            }
+        }
+
+        function abrirModalNotificacoes() {
+            if (!currentUser?.isJuiz) {
+                showNotification('Apenas o juiz pode acessar as notificações', 'warning');
+                return;
+            }
+
+            renderListaNotificacoes();
+            document.getElementById('modal-notificacoes').classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function fecharModalNotificacoes() {
+            document.getElementById('modal-notificacoes').classList.add('hidden');
+        }
+
+        function renderListaNotificacoes() {
+            const lista = document.getElementById('notificacoes-lista');
+            if (!lista) return;
+
+            const notificacoesArray = Object.entries(notificacoesJuiz)
+                .filter(([key, n]) => n)
+                .map(([key, n]) => ({ ...n, id: key }))
+                .sort((a, b) => (b.criadaEm || 0) - (a.criadaEm || 0));
+
+            if (notificacoesArray.length === 0) {
+                lista.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i data-lucide="bell-off" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                        <p>Nenhuma notificação</p>
+                    </div>
+                `;
+                setTimeout(() => criarIcones(), 100);
+                return;
+            }
+
+            lista.innerHTML = notificacoesArray.map(notif => {
+                const dataFormatada = formatarDataBrasilia(notif.data);
+                const horaFormatada = notif.criadaEm ? new Date(notif.criadaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                const categoria = categoriasBalcao[notif.categoria] || { nome: 'Outros', cor: 'bg-gray-500' };
+                const notifIdSafe = escapeAttr(notif.id);
+
+                return `
+                    <div class="border ${notif.lida ? 'border-gray-200 bg-gray-50' : 'border-indigo-200 bg-indigo-50'} rounded-lg p-4 transition-all">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    ${!notif.lida ? '<span class="w-2 h-2 bg-indigo-500 rounded-full"></span>' : ''}
+                                    <span class="font-semibold text-gray-800">${escapeHtml(notif.titulo)}</span>
+                                    <span class="px-2 py-1 text-xs rounded-full ${categoria.cor} text-white">${escapeHtml(categoria.nome)}</span>
+                                </div>
+                                <p class="text-sm text-gray-700 mb-2">${escapeHtml(notif.mensagem)}</p>
+                                <div class="text-xs text-gray-500 space-y-1">
+                                    <div><strong>Processo:</strong> ${escapeHtml(notif.numeroProcesso)}</div>
+                                    ${notif.resumoPedido ? `<div><strong>Resumo:</strong> ${escapeHtml(notif.resumoPedido)}</div>` : ''}
+                                    <div><strong>Data:</strong> ${dataFormatada} às ${horaFormatada}</div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2 ml-4">
+                                ${!notif.lida ? `
+                                    <button onclick="marcarNotificacaoComoLida('${notifIdSafe}')" class="text-xs bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600 transition-colors">
+                                        Marcar como lida
+                                    </button>
+                                ` : ''}
+                                <button onclick="excluirNotificacao('${notifIdSafe}')" class="text-xs bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500 transition-colors">
+                                    Excluir
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function marcarNotificacaoComoLida(id) {
+            if (!database) {
+                notificacoesJuiz[id] = { ...notificacoesJuiz[id], lida: true };
+                renderListaNotificacoes();
+                atualizarBadgeNotificacoes();
+                return;
+            }
+
+            database.ref(`notificacoesJuiz/${id}`).update({ lida: true })
+                .then(() => {
+                    log(`Notificação ${id} marcada como lida`);
+                })
+                .catch((error) => {
+                    log('Erro ao marcar notificação como lida:', error);
+                });
+        }
+
+        function marcarTodasComoLidas() {
+            const naoLidas = Object.entries(notificacoesJuiz)
+                .filter(([key, n]) => n && !n.lida);
+
+            if (naoLidas.length === 0) {
+                showNotification('Não há notificações pendentes', 'info');
+                return;
+            }
+
+            if (database) {
+                const updates = {};
+                naoLidas.forEach(([key, n]) => {
+                    updates[`notificacoesJuiz/${key}/lida`] = true;
+                });
+
+                database.ref().update(updates)
+                    .then(() => {
+                        showNotification(`${naoLidas.length} notificação(ões) marcada(s) como lida(s)`, 'success');
+                        log(`${naoLidas.length} notificações marcadas como lidas`);
+                    })
+                    .catch((error) => {
+                        log('Erro ao marcar todas como lidas:', error);
+                        showNotification('Erro ao marcar notificações', 'error');
+                    });
+            } else {
+                naoLidas.forEach(([key, n]) => {
+                    notificacoesJuiz[key] = { ...n, lida: true };
+                });
+                renderListaNotificacoes();
+                atualizarBadgeNotificacoes();
+                showNotification(`${naoLidas.length} notificação(ões) marcada(s) como lida(s)`, 'success');
+            }
+        }
+
+        function excluirNotificacao(id) {
+            if (!confirm('Deseja excluir esta notificação?')) return;
+
+            if (database) {
+                database.ref(`notificacoesJuiz/${id}`).remove()
+                    .then(() => {
+                        showNotification('Notificação excluída', 'success');
+                        log(`Notificação ${id} excluída`);
+                    })
+                    .catch((error) => {
+                        log('Erro ao excluir notificação:', error);
+                        showNotification('Erro ao excluir notificação', 'error');
+                    });
+            } else {
+                delete notificacoesJuiz[id];
+                renderListaNotificacoes();
+                atualizarBadgeNotificacoes();
+                showNotification('Notificação excluída', 'success');
+            }
+        }
+
         // ==================== FIREBASE ====================
 
         function setupFirebaseListeners() {
@@ -3015,6 +3275,21 @@
                     log(`Pedidos Balcão carregados: ${Object.keys(pedidosBalcao).length}`);
 
                     if (currentView === 'balcao') renderBalcaoVirtual();
+                });
+
+                // Listener para notificações do juiz
+                database.ref('notificacoesJuiz').on('value', (snapshot) => {
+                    notificacoesJuiz = snapshot.val() || {};
+                    log(`Notificações carregadas: ${Object.keys(notificacoesJuiz).length}`);
+
+                    // Atualizar badge de notificações
+                    atualizarBadgeNotificacoes();
+
+                    // Atualizar lista se o modal estiver aberto
+                    const modalNotificacoes = document.getElementById('modal-notificacoes');
+                    if (modalNotificacoes && !modalNotificacoes.classList.contains('hidden')) {
+                        renderListaNotificacoes();
+                    }
                 });
 
                 database.ref('.info/connected').on('value', (snapshot) => {
@@ -5264,6 +5539,7 @@
                         const modalCorrecao = document.getElementById('modal-correcao');
                         const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
                         const modalRelatorioBalcao = document.getElementById('modal-relatorio-balcao-personalizado');
+                        const modalNotificacoes = document.getElementById('modal-notificacoes');
 
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             fecharModalEdicao();
@@ -5276,6 +5552,9 @@
                         }
                         if (modalRelatorioBalcao && !modalRelatorioBalcao.classList.contains('hidden')) {
                             fecharModalRelatorioBalcaoPersonalizado();
+                        }
+                        if (modalNotificacoes && !modalNotificacoes.classList.contains('hidden')) {
+                            fecharModalNotificacoes();
                         }
                     }
 
