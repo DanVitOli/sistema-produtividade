@@ -2,8 +2,30 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sistema de Produtividade Judicial</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Sistema de controle de produtividade para gabinete judicial">
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Produtividade">
+    <meta name="application-name" content="Produtividade Judicial">
+    <meta name="msapplication-TileColor" content="#4F46E5">
+    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Ícones para iOS -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+
+    <!-- Ícone padrão (SVG com fallback PNG) -->
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
@@ -1019,9 +1041,101 @@
         </div>
     </div>
 
+    <!-- Modal de Edição de Pedido do Balcão -->
+    <div id="modal-edicao-pedido-balcao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalEdicaoPedidoBalcao()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="edit-2" class="h-5 w-5 text-blue-600 mr-2"></i>
+                    Editar Pedido #<span id="edicao-pedido-sequencial"></span>
+                </h3>
+                <button onclick="fecharModalEdicaoPedidoBalcao()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <input type="hidden" id="edicao-pedido-id">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
+                    <input type="text" id="edicao-pedido-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0000000-00.0000.0.00.0000">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Sequencial *</label>
+                        <input type="number" id="edicao-pedido-sequencial-input" min="1" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Classe *</label>
+                        <select id="edicao-pedido-classe" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="civel">Cível</option>
+                            <option value="criminal">Criminal</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+                        <select id="edicao-pedido-categoria" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data do Pedido *</label>
+                        <input type="date" id="edicao-pedido-data" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Solicitante *</label>
+                        <select id="edicao-pedido-tipo-solicitante" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="advogado">Advogado</option>
+                            <option value="parte">Parte</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Solicitante</label>
+                        <input type="text" id="edicao-pedido-nome-solicitante" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nome (opcional)">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Resumo do Pedido *</label>
+                    <textarea id="edicao-pedido-resumo" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Descreva o pedido..."></textarea>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="edicao-pedido-despacho-virtual" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="edicao-pedido-despacho-virtual" class="ml-2 text-sm text-gray-700">
+                        📹 Necessita Despacho Virtual com o Juiz
+                    </label>
+                </div>
+
+                <div class="flex gap-2 pt-4">
+                    <button onclick="salvarEdicaoPedidoBalcao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                        <i data-lucide="save" class="h-4 w-4 mr-1 inline"></i>
+                        Salvar Alterações
+                    </button>
+                    <button onclick="fecharModalEdicaoPedidoBalcao()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Salvar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ==================== CONFIGURAÇÃO ====================
-        
+
         const firebaseConfig = {
             apiKey: "AIzaSyCzuoRgbvKQSjOFssde-qUEtNDqGNJML7E",
             authDomain: "produtividade-gabinete.firebaseapp.com",
@@ -2387,8 +2501,22 @@
             if (pedido.status === 'pendente') {
                 // Se o usuário atual é o assessor responsável ou é juiz, pode marcar como minutado
                 const podeMinutar = currentUser.isJuiz || pedido.assessorId === currentUser.assessorId;
-                if (podeMinutar) {
+                const podeEditarExcluir = pedido.assessorId === currentUser.assessorId || currentUser.isJuiz;
+
+                if (podeEditarExcluir) {
                     botoesAcao = `
+                        <button onclick="abrirModalEdicaoPedidoBalcao('${pedidoIdSafe}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                            <i data-lucide="edit-2" class="h-3 w-3 mr-1 inline"></i>
+                            Editar
+                        </button>
+                        <button onclick="excluirPedidoBalcao('${pedidoIdSafe}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">
+                            <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>
+                            Excluir
+                        </button>
+                    `;
+                }
+                if (podeMinutar) {
+                    botoesAcao += `
                         <button onclick="marcarComoMinutado('${pedidoIdSafe}')" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">
                             <i data-lucide="check" class="h-3 w-3 mr-1 inline"></i>
                             Marcar como Minutado
@@ -2594,6 +2722,164 @@
             } else {
                 pedidosBalcao[id] = pedidoAtualizado;
                 showNotification('Pedido cancelado localmente', 'warning');
+                renderBalcaoVirtual();
+            }
+        }
+
+        function abrirModalEdicaoPedidoBalcao(id) {
+            const pedido = pedidosBalcao[id];
+            if (!pedido) {
+                showNotification('Pedido não encontrado', 'error');
+                return;
+            }
+
+            // Verificar permissão
+            const podeEditar = pedido.assessorId === currentUser.assessorId || currentUser.isJuiz;
+            if (!podeEditar) {
+                showNotification('Você não tem permissão para editar este pedido', 'error');
+                return;
+            }
+
+            // Preencher o dropdown de categorias
+            const categoriaSelect = document.getElementById('edicao-pedido-categoria');
+            categoriaSelect.innerHTML = '<option value="">Selecione...</option>';
+            Object.entries(categoriasBalcao).forEach(([key, cat]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = cat.nome;
+                categoriaSelect.appendChild(option);
+            });
+
+            // Preencher os campos com os dados do pedido
+            document.getElementById('edicao-pedido-id').value = id;
+            document.getElementById('edicao-pedido-sequencial').textContent = pedido.sequencial || '-';
+            document.getElementById('edicao-pedido-sequencial-input').value = pedido.sequencial || '';
+            document.getElementById('edicao-pedido-processo').value = pedido.numeroProcesso || '';
+            document.getElementById('edicao-pedido-classe').value = pedido.classe || 'civel';
+            document.getElementById('edicao-pedido-categoria').value = pedido.categoria || '';
+            document.getElementById('edicao-pedido-data').value = pedido.dataPedido || '';
+            document.getElementById('edicao-pedido-tipo-solicitante').value = pedido.tipoSolicitante || 'advogado';
+            document.getElementById('edicao-pedido-nome-solicitante').value = pedido.nomeSolicitante || '';
+            document.getElementById('edicao-pedido-resumo').value = pedido.resumo || '';
+            document.getElementById('edicao-pedido-despacho-virtual').checked = pedido.despachoVirtual || false;
+
+            // Abrir o modal
+            document.getElementById('modal-edicao-pedido-balcao').classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function fecharModalEdicaoPedidoBalcao() {
+            document.getElementById('modal-edicao-pedido-balcao').classList.add('hidden');
+        }
+
+        function salvarEdicaoPedidoBalcao() {
+            const id = document.getElementById('edicao-pedido-id').value;
+            const pedidoOriginal = pedidosBalcao[id];
+
+            if (!pedidoOriginal) {
+                showNotification('Pedido não encontrado', 'error');
+                return;
+            }
+
+            // Coletar dados do formulário
+            const numeroProcesso = document.getElementById('edicao-pedido-processo').value.trim();
+            const sequencial = document.getElementById('edicao-pedido-sequencial-input').value;
+            const classe = document.getElementById('edicao-pedido-classe').value;
+            const categoria = document.getElementById('edicao-pedido-categoria').value;
+            const dataPedido = document.getElementById('edicao-pedido-data').value;
+            const tipoSolicitante = document.getElementById('edicao-pedido-tipo-solicitante').value;
+            const nomeSolicitante = document.getElementById('edicao-pedido-nome-solicitante').value.trim();
+            const resumo = document.getElementById('edicao-pedido-resumo').value.trim();
+            const despachoVirtual = document.getElementById('edicao-pedido-despacho-virtual').checked;
+
+            // Validações
+            if (!numeroProcesso || !sequencial || !classe || !categoria || !dataPedido || !tipoSolicitante || !resumo) {
+                showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
+                return;
+            }
+
+            if (!validarNumeroProcesso(numeroProcesso)) {
+                showNotification('Número do processo inválido.', 'error');
+                return;
+            }
+
+            const pedidoAtualizado = {
+                ...pedidoOriginal,
+                numeroProcesso,
+                sequencial: parseInt(sequencial),
+                classe,
+                categoria,
+                dataPedido,
+                tipoSolicitante,
+                nomeSolicitante,
+                resumo,
+                despachoVirtual,
+                editadoPor: currentUser.nome,
+                editadoEm: getDataHoraBrasilia().getTime()
+            };
+
+            // Verificar se marcou despacho virtual e não tinha antes
+            const notificarDespacho = despachoVirtual && !pedidoOriginal.despachoVirtual;
+
+            if (database) {
+                database.ref(`pedidosBalcao/${id}`).update(pedidoAtualizado)
+                    .then(() => {
+                        // Se marcou despacho virtual agora, notificar o juiz
+                        if (notificarDespacho) {
+                            criarNotificacaoDespachoVirtual({
+                                ...pedidoAtualizado,
+                                id: id
+                            });
+                        }
+                        fecharModalEdicaoPedidoBalcao();
+                        let mensagem = 'Pedido atualizado com sucesso!';
+                        if (notificarDespacho) {
+                            mensagem += ' O juiz foi notificado sobre a solicitação de despacho virtual.';
+                        }
+                        showNotification(mensagem, 'success');
+                    })
+                    .catch((error) => {
+                        log('Erro ao atualizar pedido:', error);
+                        showNotification('Erro ao atualizar pedido', 'error');
+                    });
+            } else {
+                pedidosBalcao[id] = pedidoAtualizado;
+                fecharModalEdicaoPedidoBalcao();
+                showNotification('Pedido atualizado localmente', 'warning');
+                renderBalcaoVirtual();
+            }
+        }
+
+        function excluirPedidoBalcao(id) {
+            const pedido = pedidosBalcao[id];
+            if (!pedido) {
+                showNotification('Pedido não encontrado', 'error');
+                return;
+            }
+
+            // Verificar permissão
+            const podeExcluir = pedido.assessorId === currentUser.assessorId || currentUser.isJuiz;
+            if (!podeExcluir) {
+                showNotification('Você não tem permissão para excluir este pedido', 'error');
+                return;
+            }
+
+            const confirmMessage = `Tem certeza que deseja EXCLUIR permanentemente o pedido #${pedido.sequencial}?\n\nProcesso: ${pedido.numeroProcesso}\nResumo: ${pedido.resumo}\n\nEsta ação não pode ser desfeita!`;
+
+            if (!confirm(confirmMessage)) return;
+
+            if (database) {
+                database.ref(`pedidosBalcao/${id}`).remove()
+                    .then(() => {
+                        showNotification('Pedido excluído com sucesso', 'success');
+                    })
+                    .catch((error) => {
+                        log('Erro ao excluir pedido:', error);
+                        showNotification('Erro ao excluir pedido', 'error');
+                    });
+            } else {
+                delete pedidosBalcao[id];
+                showNotification('Pedido excluído localmente', 'warning');
                 renderBalcaoVirtual();
             }
         }
@@ -5524,7 +5810,32 @@
         document.addEventListener('DOMContentLoaded', function() {
             try {
                 log('🚀 Sistema de Produtividade Judicial iniciando...');
-                
+
+                // Registrar Service Worker para PWA
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/sw.js')
+                        .then((registration) => {
+                            log('✅ Service Worker registrado com sucesso');
+
+                            // Verificar atualizações
+                            registration.addEventListener('updatefound', () => {
+                                const newWorker = registration.installing;
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        // Nova versão disponível
+                                        log('📱 Nova versão do app disponível');
+                                        if (confirm('Nova versão disponível! Deseja atualizar?')) {
+                                            window.location.reload();
+                                        }
+                                    }
+                                });
+                            });
+                        })
+                        .catch((error) => {
+                            log('⚠️ Erro ao registrar Service Worker: ' + error.message);
+                        });
+                }
+
                 // Aguardar um pouco para garantir que todos os scripts carreguem
                 setTimeout(() => {
                     criarIcones();
@@ -5540,6 +5851,7 @@
                         const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
                         const modalRelatorioBalcao = document.getElementById('modal-relatorio-balcao-personalizado');
                         const modalNotificacoes = document.getElementById('modal-notificacoes');
+                        const modalEdicaoPedidoBalcao = document.getElementById('modal-edicao-pedido-balcao');
 
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             fecharModalEdicao();
@@ -5556,6 +5868,9 @@
                         if (modalNotificacoes && !modalNotificacoes.classList.contains('hidden')) {
                             fecharModalNotificacoes();
                         }
+                        if (modalEdicaoPedidoBalcao && !modalEdicaoPedidoBalcao.classList.contains('hidden')) {
+                            fecharModalEdicaoPedidoBalcao();
+                        }
                     }
 
                     // Ctrl+Enter para confirmar ações em modais
@@ -5564,6 +5879,7 @@
                         const modalCorrecao = document.getElementById('modal-correcao');
                         const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
                         const modalRelatorioBalcao = document.getElementById('modal-relatorio-balcao-personalizado');
+                        const modalEdicaoPedidoBalcao = document.getElementById('modal-edicao-pedido-balcao');
 
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             salvarEdicao();
@@ -5576,6 +5892,9 @@
                         }
                         if (modalRelatorioBalcao && !modalRelatorioBalcao.classList.contains('hidden')) {
                             gerarRelatorioBalcaoPersonalizado();
+                        }
+                        if (modalEdicaoPedidoBalcao && !modalEdicaoPedidoBalcao.classList.contains('hidden')) {
+                            salvarEdicaoPedidoBalcao();
                         }
                     }
                     
