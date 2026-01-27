@@ -31,8 +31,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons com fallbacks -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js" 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"
             onerror="this.onerror=null;this.src='https://unpkg.com/lucide@latest/dist/umd/lucide.js'"></script>
+    <!-- SheetJS para leitura de arquivos Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         .loading-spinner {
             border: 4px solid #f3f3f3;
@@ -704,6 +706,353 @@
         </div>
     </div>
 
+    <!-- Módulo Metas - Ações Penais -->
+    <div id="metas-view" class="hidden">
+        <!-- Dashboard da Meta -->
+        <div id="metas-dashboard" class="mb-6">
+            <!-- Será preenchido pelo JavaScript -->
+        </div>
+
+        <!-- Abas de Navegação das Metas -->
+        <div class="bg-white rounded-lg shadow-md mb-6 no-print">
+            <div class="border-b border-gray-200">
+                <nav class="flex -mb-px" id="metas-tabs">
+                    <button onclick="mudarAbaMetas('lista')" id="tab-metas-lista" class="metas-tab px-6 py-3 text-sm font-medium border-b-2 border-amber-500 text-amber-600">
+                        <i data-lucide="list" class="h-4 w-4 mr-2 inline"></i>
+                        Lista de Processos
+                    </button>
+                    <button onclick="mudarAbaMetas('cadastro')" id="tab-metas-cadastro" class="metas-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        <i data-lucide="plus-circle" class="h-4 w-4 mr-2 inline"></i>
+                        Cadastrar Processo
+                    </button>
+                    <button onclick="mudarAbaMetas('relatorios')" id="tab-metas-relatorios" class="metas-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        <i data-lucide="bar-chart" class="h-4 w-4 mr-2 inline"></i>
+                        Relatórios
+                    </button>
+                    <button onclick="mudarAbaMetas('importar')" id="tab-metas-importar" class="metas-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        <i data-lucide="upload" class="h-4 w-4 mr-2 inline"></i>
+                        Importar XLSX
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Lista de Processos da Meta -->
+        <div id="metas-aba-lista" class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center">
+                    <i data-lucide="scale" class="h-6 w-6 text-amber-600 mr-2"></i>
+                    <h2 class="text-xl font-semibold text-gray-800">Processos da Meta 4 - Ações Penais</h2>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="flex flex-wrap gap-2 mb-4">
+                <input type="text" id="filtro-metas-processo" placeholder="Buscar por nº do processo" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 min-w-48" oninput="renderListaMetas()">
+                <select id="filtro-metas-status" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="renderListaMetas()">
+                    <option value="">Todos os status</option>
+                    <option value="em_andamento">Em Andamento</option>
+                    <option value="baixado">Baixado</option>
+                    <option value="suspenso">Suspenso</option>
+                    <option value="sobrestado">Sobrestado</option>
+                    <option value="arquivado">Arquivado</option>
+                </select>
+                <select id="filtro-metas-fase" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="renderListaMetas()">
+                    <option value="">Todas as fases</option>
+                    <option value="inquerito">Inquérito/Investigação</option>
+                    <option value="denuncia">Denúncia Recebida</option>
+                    <option value="citacao">Citação</option>
+                    <option value="resposta">Resposta à Acusação</option>
+                    <option value="instrucao">Instrução</option>
+                    <option value="alegacoes">Alegações Finais</option>
+                    <option value="sentenca">Sentença</option>
+                    <option value="recurso">Recurso</option>
+                    <option value="transitado">Trânsito em Julgado</option>
+                    <option value="execucao">Execução</option>
+                </select>
+                <select id="filtro-metas-parado" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="renderListaMetas()">
+                    <option value="">Movimentação</option>
+                    <option value="30">Parados há +30 dias</option>
+                    <option value="60">Parados há +60 dias</option>
+                    <option value="90">Parados há +90 dias</option>
+                </select>
+                <button onclick="limparFiltrosMetas()" class="bg-gray-500 text-white px-3 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm">
+                    <i data-lucide="x" class="h-3 w-3 mr-1 inline"></i>
+                    Limpar
+                </button>
+            </div>
+
+            <div id="metas-lista-processos">
+                <!-- Será preenchido pelo JavaScript -->
+            </div>
+        </div>
+
+        <!-- Cadastro de Processo -->
+        <div id="metas-aba-cadastro" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <div class="flex items-center mb-6">
+                <i data-lucide="plus-circle" class="h-6 w-6 text-amber-600 mr-2"></i>
+                <h2 class="text-xl font-semibold text-gray-800">Cadastrar Processo na Meta</h2>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
+                    <input type="text" id="meta-processo-numero" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: 0000000-00.0000.8.02.0000">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                    <select id="meta-processo-status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="em_andamento">Em Andamento</option>
+                        <option value="baixado">Baixado</option>
+                        <option value="suspenso">Suspenso</option>
+                        <option value="sobrestado">Sobrestado</option>
+                        <option value="arquivado">Arquivado</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fase Processual *</label>
+                    <select id="meta-processo-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="">Selecione a fase</option>
+                        <option value="inquerito">Inquérito/Investigação</option>
+                        <option value="denuncia">Denúncia Recebida</option>
+                        <option value="citacao">Citação</option>
+                        <option value="resposta">Resposta à Acusação</option>
+                        <option value="instrucao">Instrução</option>
+                        <option value="alegacoes">Alegações Finais</option>
+                        <option value="sentenca">Sentença</option>
+                        <option value="recurso">Recurso</option>
+                        <option value="transitado">Trânsito em Julgado</option>
+                        <option value="execucao">Execução</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Data da Última Movimentação *</label>
+                    <input type="date" id="meta-processo-ultima-mov" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observações / Pendências</label>
+                    <textarea id="meta-processo-observacoes" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Anotações sobre o processo, pendências, etc..."></textarea>
+                </div>
+            </div>
+
+            <button onclick="cadastrarProcessoMeta()" class="w-full mt-4 bg-amber-600 text-white py-3 px-4 rounded-md hover:bg-amber-700 transition-colors font-medium">
+                <i data-lucide="plus" class="h-5 w-5 mr-2 inline"></i>
+                Cadastrar Processo
+            </button>
+        </div>
+
+        <!-- Relatórios da Meta -->
+        <div id="metas-aba-relatorios" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center">
+                    <i data-lucide="bar-chart" class="h-6 w-6 text-amber-600 mr-2"></i>
+                    <h2 class="text-xl font-semibold text-gray-800">Relatórios da Meta</h2>
+                </div>
+                <button onclick="window.print()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-sm no-print">
+                    <i data-lucide="printer" class="h-4 w-4 mr-1 inline"></i>
+                    Imprimir
+                </button>
+            </div>
+
+            <div id="metas-relatorio-content">
+                <!-- Será preenchido pelo JavaScript -->
+            </div>
+        </div>
+
+        <!-- Importar Processos do XLSX -->
+        <div id="metas-aba-importar" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <div class="flex items-center mb-6">
+                <i data-lucide="upload" class="h-6 w-6 text-amber-600 mr-2"></i>
+                <h2 class="text-xl font-semibold text-gray-800">Importar Processos de Arquivo Excel</h2>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Instruções -->
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <h3 class="font-medium text-amber-800 mb-2">📋 Instruções</h3>
+                    <ul class="text-sm text-amber-700 space-y-1">
+                        <li>• O arquivo deve estar no formato <strong>.xlsx</strong> ou <strong>.xls</strong></li>
+                        <li>• Os números dos processos devem estar em uma coluna do arquivo</li>
+                        <li>• Formato esperado: 0000000-00.0000.0.00.0000</li>
+                        <li>• Processos já cadastrados serão ignorados automaticamente</li>
+                    </ul>
+                </div>
+
+                <!-- Upload do arquivo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">1. Selecione o arquivo Excel</label>
+                    <div class="flex items-center gap-4">
+                        <input type="file" id="meta-arquivo-xlsx" accept=".xlsx,.xls" class="hidden" onchange="carregarArquivoXLSX(event)">
+                        <button onclick="document.getElementById('meta-arquivo-xlsx').click()" class="bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700 transition-colors">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 mr-2 inline"></i>
+                            Selecionar Arquivo
+                        </button>
+                        <span id="meta-arquivo-nome" class="text-gray-600 text-sm">Nenhum arquivo selecionado</span>
+                    </div>
+                </div>
+
+                <!-- Seleção da coluna -->
+                <div id="meta-selecao-coluna" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">2. Selecione a coluna com os números dos processos</label>
+                    <select id="meta-coluna-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="">Selecione a coluna...</option>
+                    </select>
+                </div>
+
+                <!-- Preview dos dados -->
+                <div id="meta-preview-container" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">3. Prévia dos processos encontrados</label>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+                        <div id="meta-preview-lista" class="space-y-1 text-sm">
+                            <!-- Será preenchido pelo JavaScript -->
+                        </div>
+                    </div>
+                    <div id="meta-preview-stats" class="mt-2 text-sm text-gray-600">
+                        <!-- Será preenchido pelo JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Opções de importação -->
+                <div id="meta-opcoes-importacao" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">4. Opções de importação</label>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Status inicial</label>
+                            <select id="meta-import-status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="em_andamento">Em Andamento</option>
+                                <option value="suspenso">Suspenso</option>
+                                <option value="sobrestado">Sobrestado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Fase inicial</label>
+                            <select id="meta-import-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="inquerito">Inquérito/Investigação</option>
+                                <option value="denuncia">Denúncia Recebida</option>
+                                <option value="citacao">Citação</option>
+                                <option value="resposta">Resposta à Acusação</option>
+                                <option value="instrucao">Instrução</option>
+                                <option value="alegacoes">Alegações Finais</option>
+                                <option value="sentenca">Sentença</option>
+                                <option value="recurso">Recurso</option>
+                                <option value="transitado">Trânsito em Julgado</option>
+                                <option value="execucao">Execução</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botão de importação -->
+                <div id="meta-botao-importar" class="hidden">
+                    <button onclick="executarImportacaoMeta()" class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition-colors font-medium">
+                        <i data-lucide="download" class="h-5 w-5 mr-2 inline"></i>
+                        Importar Processos
+                    </button>
+                </div>
+
+                <!-- Progresso da importação -->
+                <div id="meta-progresso-importacao" class="hidden">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center mb-2">
+                            <div class="loading-spinner mr-3" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                            <span class="text-blue-800 font-medium">Importando processos...</span>
+                        </div>
+                        <div class="bg-blue-200 rounded-full h-2 overflow-hidden">
+                            <div id="meta-progresso-barra" class="bg-blue-600 h-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <div id="meta-progresso-texto" class="text-xs text-blue-700 mt-1">0 de 0</div>
+                    </div>
+                </div>
+
+                <!-- Resultado da importação -->
+                <div id="meta-resultado-importacao" class="hidden">
+                    <!-- Será preenchido pelo JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edição de Processo da Meta -->
+    <div id="modal-edicao-processo-meta" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalEdicaoProcessoMeta()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="edit-2" class="h-5 w-5 text-amber-600 mr-2"></i>
+                    Atualizar Processo
+                </h3>
+                <button onclick="fecharModalEdicaoProcessoMeta()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <input type="hidden" id="edicao-meta-processo-id">
+
+            <div class="space-y-4">
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div class="text-sm text-amber-800">
+                        <div class="font-medium" id="edicao-meta-processo-numero-display">Processo: </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                    <select id="edicao-meta-processo-status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="em_andamento">Em Andamento</option>
+                        <option value="baixado">Baixado</option>
+                        <option value="suspenso">Suspenso</option>
+                        <option value="sobrestado">Sobrestado</option>
+                        <option value="arquivado">Arquivado</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fase Processual *</label>
+                    <select id="edicao-meta-processo-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="inquerito">Inquérito/Investigação</option>
+                        <option value="denuncia">Denúncia Recebida</option>
+                        <option value="citacao">Citação</option>
+                        <option value="resposta">Resposta à Acusação</option>
+                        <option value="instrucao">Instrução</option>
+                        <option value="alegacoes">Alegações Finais</option>
+                        <option value="sentenca">Sentença</option>
+                        <option value="recurso">Recurso</option>
+                        <option value="transitado">Trânsito em Julgado</option>
+                        <option value="execucao">Execução</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Data da Última Movimentação *</label>
+                    <input type="date" id="edicao-meta-processo-ultima-mov" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observações / Pendências</label>
+                    <textarea id="edicao-meta-processo-observacoes" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Anotações sobre o processo..."></textarea>
+                </div>
+
+                <div class="flex gap-2 pt-4">
+                    <button onclick="salvarEdicaoProcessoMeta()" class="flex-1 bg-amber-600 text-white py-2 px-4 rounded-md hover:bg-amber-700 transition-colors">
+                        <i data-lucide="save" class="h-4 w-4 mr-1 inline"></i>
+                        Salvar Alterações
+                    </button>
+                    <button onclick="fecharModalEdicaoProcessoMeta()" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="mr-4">💡 Ctrl+Enter: Salvar</span>
+                    <span>ESC: Cancelar</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Correção -->
     <div id="modal-correcao" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModalCorrecao()">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
@@ -1252,6 +1601,34 @@
             'cancelado': { nome: 'Cancelado', cor: 'bg-gray-400' }
         };
 
+        // ==================== METAS - AÇÕES PENAIS ====================
+        const META_ACOES_PENAIS = {
+            nome: 'Meta 4 - Ações Penais',
+            prazoFinal: '2026-12-19',
+            descricao: 'Acompanhamento das ações penais para cumprimento da meta'
+        };
+
+        const statusProcessoMeta = {
+            'em_andamento': { nome: 'Em Andamento', cor: 'bg-blue-500', icone: 'clock' },
+            'baixado': { nome: 'Baixado', cor: 'bg-green-600', icone: 'check-circle' },
+            'suspenso': { nome: 'Suspenso', cor: 'bg-yellow-500', icone: 'pause-circle' },
+            'sobrestado': { nome: 'Sobrestado', cor: 'bg-orange-500', icone: 'pause' },
+            'arquivado': { nome: 'Arquivado', cor: 'bg-gray-500', icone: 'archive' }
+        };
+
+        const fasesProcessoMeta = {
+            'inquerito': { nome: 'Inquérito/Investigação', ordem: 1 },
+            'denuncia': { nome: 'Denúncia Recebida', ordem: 2 },
+            'citacao': { nome: 'Citação', ordem: 3 },
+            'resposta': { nome: 'Resposta à Acusação', ordem: 4 },
+            'instrucao': { nome: 'Instrução', ordem: 5 },
+            'alegacoes': { nome: 'Alegações Finais', ordem: 6 },
+            'sentenca': { nome: 'Sentença', ordem: 7 },
+            'recurso': { nome: 'Recurso', ordem: 8 },
+            'transitado': { nome: 'Trânsito em Julgado', ordem: 9 },
+            'execucao': { nome: 'Execução', ordem: 10 }
+        };
+
         // ==================== ESTADO GLOBAL ====================
         
         let firebase, database;
@@ -1271,6 +1648,7 @@
             laise: { nome: 'Laíse Vital', ativo: true }
         };
         let notificacoesJuiz = {};
+        let processosMetaAcoesPenais = {};
 
         // ==================== UTILITÁRIOS ====================
         
@@ -2149,6 +2527,10 @@
                         <i data-lucide="bar-chart" class="h-4 w-4 mr-2"></i>
                         Relatórios
                     </button>
+                    <button onclick="showView('metas')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <i data-lucide="target" class="h-4 w-4 mr-2"></i>
+                        Metas
+                    </button>
                 `;
             }
 
@@ -2270,6 +2652,9 @@
                         break;
                     case 'balcao':
                         renderBalcaoVirtual();
+                        break;
+                    case 'metas':
+                        renderMetasAcoesPenais();
                         break;
                 }
 
@@ -3319,6 +3704,860 @@
             return estatisticas;
         }
 
+        // ==================== METAS - AÇÕES PENAIS ====================
+
+        let abaMetasAtual = 'lista';
+
+        function renderMetasAcoesPenais() {
+            const metasView = document.getElementById('metas-view');
+            if (!metasView) return;
+
+            renderMetasDashboard();
+            mudarAbaMetas(abaMetasAtual || 'lista');
+
+            metasView.classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function mudarAbaMetas(aba) {
+            abaMetasAtual = aba;
+
+            // Esconder todas as abas
+            document.getElementById('metas-aba-lista')?.classList.add('hidden');
+            document.getElementById('metas-aba-cadastro')?.classList.add('hidden');
+            document.getElementById('metas-aba-relatorios')?.classList.add('hidden');
+            document.getElementById('metas-aba-importar')?.classList.add('hidden');
+
+            // Resetar estilo dos botões
+            document.querySelectorAll('.metas-tab').forEach(tab => {
+                tab.className = 'metas-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
+            });
+
+            // Mostrar aba selecionada e atualizar botão
+            const abaElement = document.getElementById(`metas-aba-${aba}`);
+            const tabButton = document.getElementById(`tab-metas-${aba}`);
+
+            if (abaElement) {
+                abaElement.classList.remove('hidden');
+            }
+            if (tabButton) {
+                tabButton.className = 'metas-tab px-6 py-3 text-sm font-medium border-b-2 border-amber-500 text-amber-600';
+            }
+
+            // Renderizar conteúdo específico
+            if (aba === 'lista') {
+                renderListaMetas();
+            } else if (aba === 'relatorios') {
+                renderRelatorioMetas();
+            }
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function renderMetasDashboard() {
+            const dashboard = document.getElementById('metas-dashboard');
+            if (!dashboard) return;
+
+            const processos = Object.values(processosMetaAcoesPenais).filter(p => p);
+            const total = processos.length;
+            const baixados = processos.filter(p => p.status === 'baixado').length;
+            const emAndamento = processos.filter(p => p.status === 'em_andamento').length;
+            const suspensos = processos.filter(p => p.status === 'suspenso' || p.status === 'sobrestado').length;
+
+            // Calcular processos parados (sem movimentação há mais de 30 dias)
+            const hoje = getDataHoraBrasilia();
+            const parados = processos.filter(p => {
+                if (p.status === 'baixado') return false;
+                const ultimaMov = new Date(p.ultimaMovimentacao + 'T00:00:00');
+                const diasParado = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
+                return diasParado > 30;
+            }).length;
+
+            // Calcular dias até o prazo final
+            const prazoFinal = new Date(META_ACOES_PENAIS.prazoFinal + 'T23:59:59');
+            const diasRestantes = Math.ceil((prazoFinal - hoje) / (1000 * 60 * 60 * 24));
+
+            // Percentual de conclusão
+            const percentualConcluido = total > 0 ? Math.round((baixados / total) * 100) : 0;
+
+            dashboard.innerHTML = `
+                <div class="bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-lg p-6 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold mb-2">${META_ACOES_PENAIS.nome}</h2>
+                            <p class="text-amber-100">${META_ACOES_PENAIS.descricao}</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-4xl font-bold">${percentualConcluido}%</div>
+                            <div class="text-amber-100 text-sm">concluído</div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="bg-amber-800 rounded-full h-4 overflow-hidden">
+                            <div class="bg-green-400 h-full transition-all duration-500" style="width: ${percentualConcluido}%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-amber-100 mt-1">
+                            <span>${baixados} de ${total} processos baixados</span>
+                            <span>Prazo: 19/12/2026 (${diasRestantes} dias)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-blue-600 font-medium">Em Andamento</div>
+                                <div class="text-3xl font-bold text-blue-700">${emAndamento}</div>
+                            </div>
+                            <i data-lucide="clock" class="h-10 w-10 text-blue-400"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-green-600 font-medium">Baixados</div>
+                                <div class="text-3xl font-bold text-green-700">${baixados}</div>
+                            </div>
+                            <i data-lucide="check-circle" class="h-10 w-10 text-green-400"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-yellow-600 font-medium">Suspensos/Sobrestados</div>
+                                <div class="text-3xl font-bold text-yellow-700">${suspensos}</div>
+                            </div>
+                            <i data-lucide="pause-circle" class="h-10 w-10 text-yellow-400"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-red-600 font-medium">Parados (+30 dias)</div>
+                                <div class="text-3xl font-bold text-red-700">${parados}</div>
+                            </div>
+                            <i data-lucide="alert-triangle" class="h-10 w-10 text-red-400"></i>
+                        </div>
+                        ${parados > 0 ? '<div class="text-xs text-red-600 mt-2">⚠️ Necessita atenção!</div>' : ''}
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function renderListaMetas() {
+            const lista = document.getElementById('metas-lista-processos');
+            if (!lista) return;
+
+            // Obter filtros
+            const filtroProcesso = document.getElementById('filtro-metas-processo')?.value?.toLowerCase() || '';
+            const filtroStatus = document.getElementById('filtro-metas-status')?.value || '';
+            const filtroFase = document.getElementById('filtro-metas-fase')?.value || '';
+            const filtroParado = document.getElementById('filtro-metas-parado')?.value || '';
+
+            let processosArray = Object.entries(processosMetaAcoesPenais)
+                .filter(([key, p]) => p)
+                .map(([key, p]) => ({ ...p, id: key }));
+
+            // Aplicar filtros
+            if (filtroProcesso) {
+                processosArray = processosArray.filter(p =>
+                    p.numeroProcesso?.toLowerCase().includes(filtroProcesso)
+                );
+            }
+            if (filtroStatus) {
+                processosArray = processosArray.filter(p => p.status === filtroStatus);
+            }
+            if (filtroFase) {
+                processosArray = processosArray.filter(p => p.fase === filtroFase);
+            }
+            if (filtroParado) {
+                const hoje = getDataHoraBrasilia();
+                const diasFiltro = parseInt(filtroParado);
+                processosArray = processosArray.filter(p => {
+                    if (p.status === 'baixado') return false;
+                    const ultimaMov = new Date(p.ultimaMovimentacao + 'T00:00:00');
+                    const diasParado = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
+                    return diasParado >= diasFiltro;
+                });
+            }
+
+            // Ordenar por última movimentação (mais antigos primeiro)
+            processosArray.sort((a, b) => {
+                const dataA = new Date(a.ultimaMovimentacao || '2000-01-01');
+                const dataB = new Date(b.ultimaMovimentacao || '2000-01-01');
+                return dataA - dataB;
+            });
+
+            if (processosArray.length === 0) {
+                lista.innerHTML = `
+                    <div class="text-center text-gray-500 py-12">
+                        <i data-lucide="scale" class="mx-auto h-12 w-12 text-gray-300 mb-4"></i>
+                        <p>Nenhum processo encontrado${filtroProcesso || filtroStatus || filtroFase || filtroParado ? ' com os filtros aplicados' : ''}.</p>
+                        <p class="text-sm mt-2">Cadastre processos na aba "Cadastrar Processo".</p>
+                    </div>
+                `;
+                setTimeout(() => criarIcones(), 100);
+                return;
+            }
+
+            lista.innerHTML = `
+                <div class="text-sm text-gray-600 mb-4">
+                    Mostrando ${processosArray.length} processo${processosArray.length !== 1 ? 's' : ''}
+                </div>
+                <div class="space-y-3">
+                    ${processosArray.map(processo => criarCardProcessoMeta(processo)).join('')}
+                </div>
+            `;
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function criarCardProcessoMeta(processo) {
+            const statusInfo = statusProcessoMeta[processo.status] || statusProcessoMeta.em_andamento;
+            const faseInfo = fasesProcessoMeta[processo.fase] || { nome: 'Não definida', ordem: 0 };
+
+            // Calcular dias desde última movimentação
+            const hoje = getDataHoraBrasilia();
+            const ultimaMov = new Date(processo.ultimaMovimentacao + 'T00:00:00');
+            const diasParado = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
+
+            let alertaParado = '';
+            let borderClass = 'border-gray-200';
+            if (processo.status !== 'baixado' && diasParado > 30) {
+                borderClass = 'border-red-300 bg-red-50';
+                if (diasParado > 90) {
+                    alertaParado = `<span class="px-2 py-1 bg-red-600 text-white text-xs rounded">⚠️ ${diasParado} dias parado!</span>`;
+                } else if (diasParado > 60) {
+                    alertaParado = `<span class="px-2 py-1 bg-red-500 text-white text-xs rounded">⚠️ ${diasParado} dias parado</span>`;
+                } else {
+                    alertaParado = `<span class="px-2 py-1 bg-yellow-500 text-white text-xs rounded">⏰ ${diasParado} dias parado</span>`;
+                }
+            }
+
+            const processoIdSafe = escapeAttr(processo.id);
+
+            return `
+                <div class="border ${borderClass} rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="font-bold text-gray-800">${escapeHtml(processo.numeroProcesso)}</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-medium ${statusInfo.cor} text-white">${statusInfo.nome}</span>
+                                <span class="px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">${faseInfo.nome}</span>
+                                ${alertaParado}
+                            </div>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <div><strong>Última Movimentação:</strong> ${formatarDataBrasilia(processo.ultimaMovimentacao)}</div>
+                                ${processo.observacoes ? `<div><strong>Observações:</strong> ${escapeHtml(processo.observacoes)}</div>` : ''}
+                            </div>
+                            <div class="flex gap-2 mt-3">
+                                <button onclick="abrirModalEdicaoProcessoMeta('${processoIdSafe}')" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                                    <i data-lucide="edit-2" class="h-3 w-3 mr-1 inline"></i>
+                                    Atualizar
+                                </button>
+                                <button onclick="excluirProcessoMeta('${processoIdSafe}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors">
+                                    <i data-lucide="trash-2" class="h-3 w-3 mr-1 inline"></i>
+                                    Excluir
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-500 text-right ml-4">
+                            <div>Cadastrado: ${formatarDataBrasilia(processo.dataCadastro)}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function cadastrarProcessoMeta() {
+            const numeroProcesso = document.getElementById('meta-processo-numero').value.trim();
+            const status = document.getElementById('meta-processo-status').value;
+            const fase = document.getElementById('meta-processo-fase').value;
+            const ultimaMovimentacao = document.getElementById('meta-processo-ultima-mov').value;
+            const observacoes = document.getElementById('meta-processo-observacoes').value.trim();
+
+            // Validações
+            if (!numeroProcesso || !status || !fase || !ultimaMovimentacao) {
+                showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
+                return;
+            }
+
+            if (!validarNumeroProcesso(numeroProcesso)) {
+                showNotification('Número do processo inválido.', 'error');
+                return;
+            }
+
+            // Verificar se já existe
+            const existe = Object.values(processosMetaAcoesPenais).some(p =>
+                p && p.numeroProcesso === numeroProcesso
+            );
+            if (existe) {
+                showNotification('Este processo já está cadastrado na meta.', 'error');
+                return;
+            }
+
+            const novoProcesso = {
+                numeroProcesso,
+                status,
+                fase,
+                ultimaMovimentacao,
+                observacoes,
+                dataCadastro: getHojeString(),
+                criadoPor: currentUser.nome,
+                criadoEm: getDataHoraBrasilia().getTime()
+            };
+
+            if (database) {
+                database.ref('processosMetaAcoesPenais').push(novoProcesso)
+                    .then(() => {
+                        limparFormularioMeta();
+                        showNotification('Processo cadastrado na meta com sucesso!', 'success');
+                        mudarAbaMetas('lista');
+                    })
+                    .catch((error) => {
+                        log('Erro ao cadastrar processo na meta:', error);
+                        showNotification('Erro ao cadastrar processo', 'error');
+                    });
+            } else {
+                const id = 'local_' + Date.now();
+                processosMetaAcoesPenais[id] = novoProcesso;
+                limparFormularioMeta();
+                showNotification('Processo cadastrado localmente', 'warning');
+                renderMetasAcoesPenais();
+            }
+        }
+
+        function limparFormularioMeta() {
+            document.getElementById('meta-processo-numero').value = '';
+            document.getElementById('meta-processo-status').value = 'em_andamento';
+            document.getElementById('meta-processo-fase').value = '';
+            document.getElementById('meta-processo-ultima-mov').value = '';
+            document.getElementById('meta-processo-observacoes').value = '';
+        }
+
+        function limparFiltrosMetas() {
+            document.getElementById('filtro-metas-processo').value = '';
+            document.getElementById('filtro-metas-status').value = '';
+            document.getElementById('filtro-metas-fase').value = '';
+            document.getElementById('filtro-metas-parado').value = '';
+            renderListaMetas();
+        }
+
+        function abrirModalEdicaoProcessoMeta(id) {
+            const processo = processosMetaAcoesPenais[id];
+            if (!processo) {
+                showNotification('Processo não encontrado', 'error');
+                return;
+            }
+
+            document.getElementById('edicao-meta-processo-id').value = id;
+            document.getElementById('edicao-meta-processo-numero-display').textContent = `Processo: ${processo.numeroProcesso}`;
+            document.getElementById('edicao-meta-processo-status').value = processo.status || 'em_andamento';
+            document.getElementById('edicao-meta-processo-fase').value = processo.fase || '';
+            document.getElementById('edicao-meta-processo-ultima-mov').value = processo.ultimaMovimentacao || '';
+            document.getElementById('edicao-meta-processo-observacoes').value = processo.observacoes || '';
+
+            document.getElementById('modal-edicao-processo-meta').classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function fecharModalEdicaoProcessoMeta() {
+            document.getElementById('modal-edicao-processo-meta').classList.add('hidden');
+        }
+
+        function salvarEdicaoProcessoMeta() {
+            const id = document.getElementById('edicao-meta-processo-id').value;
+            const processoOriginal = processosMetaAcoesPenais[id];
+
+            if (!processoOriginal) {
+                showNotification('Processo não encontrado', 'error');
+                return;
+            }
+
+            const status = document.getElementById('edicao-meta-processo-status').value;
+            const fase = document.getElementById('edicao-meta-processo-fase').value;
+            const ultimaMovimentacao = document.getElementById('edicao-meta-processo-ultima-mov').value;
+            const observacoes = document.getElementById('edicao-meta-processo-observacoes').value.trim();
+
+            if (!status || !fase || !ultimaMovimentacao) {
+                showNotification('Por favor, preencha todos os campos obrigatórios.', 'warning');
+                return;
+            }
+
+            const processoAtualizado = {
+                ...processoOriginal,
+                status,
+                fase,
+                ultimaMovimentacao,
+                observacoes,
+                editadoPor: currentUser.nome,
+                editadoEm: getDataHoraBrasilia().getTime()
+            };
+
+            if (database) {
+                database.ref(`processosMetaAcoesPenais/${id}`).update(processoAtualizado)
+                    .then(() => {
+                        fecharModalEdicaoProcessoMeta();
+                        showNotification('Processo atualizado com sucesso!', 'success');
+                    })
+                    .catch((error) => {
+                        log('Erro ao atualizar processo:', error);
+                        showNotification('Erro ao atualizar processo', 'error');
+                    });
+            } else {
+                processosMetaAcoesPenais[id] = processoAtualizado;
+                fecharModalEdicaoProcessoMeta();
+                showNotification('Processo atualizado localmente', 'warning');
+                renderMetasAcoesPenais();
+            }
+        }
+
+        function excluirProcessoMeta(id) {
+            const processo = processosMetaAcoesPenais[id];
+            if (!processo) {
+                showNotification('Processo não encontrado', 'error');
+                return;
+            }
+
+            const confirmMessage = `Tem certeza que deseja EXCLUIR o processo da meta?\n\nProcesso: ${processo.numeroProcesso}\n\nEsta ação não pode ser desfeita!`;
+
+            if (!confirm(confirmMessage)) return;
+
+            if (database) {
+                database.ref(`processosMetaAcoesPenais/${id}`).remove()
+                    .then(() => {
+                        showNotification('Processo removido da meta', 'success');
+                    })
+                    .catch((error) => {
+                        log('Erro ao excluir processo:', error);
+                        showNotification('Erro ao excluir processo', 'error');
+                    });
+            } else {
+                delete processosMetaAcoesPenais[id];
+                showNotification('Processo removido localmente', 'warning');
+                renderMetasAcoesPenais();
+            }
+        }
+
+        function renderRelatorioMetas() {
+            const content = document.getElementById('metas-relatorio-content');
+            if (!content) return;
+
+            const processos = Object.values(processosMetaAcoesPenais).filter(p => p);
+            const total = processos.length;
+
+            if (total === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-12">
+                        <i data-lucide="bar-chart-3" class="mx-auto h-16 w-16 text-gray-300 mb-4"></i>
+                        <p class="text-gray-600">Nenhum processo cadastrado para gerar relatório.</p>
+                    </div>
+                `;
+                setTimeout(() => criarIcones(), 100);
+                return;
+            }
+
+            // Estatísticas por status
+            const porStatus = {};
+            Object.keys(statusProcessoMeta).forEach(key => {
+                porStatus[key] = processos.filter(p => p.status === key).length;
+            });
+
+            // Estatísticas por fase
+            const porFase = {};
+            Object.keys(fasesProcessoMeta).forEach(key => {
+                porFase[key] = processos.filter(p => p.fase === key).length;
+            });
+
+            // Calcular dias até o prazo
+            const hoje = getDataHoraBrasilia();
+            const prazoFinal = new Date(META_ACOES_PENAIS.prazoFinal + 'T23:59:59');
+            const diasRestantes = Math.ceil((prazoFinal - hoje) / (1000 * 60 * 60 * 24));
+
+            // Processos parados
+            const parados30 = processos.filter(p => {
+                if (p.status === 'baixado') return false;
+                const ultimaMov = new Date(p.ultimaMovimentacao + 'T00:00:00');
+                const dias = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
+                return dias > 30;
+            }).length;
+
+            const percentualConcluido = total > 0 ? Math.round((porStatus.baixado / total) * 100) : 0;
+            const processosRestantes = total - porStatus.baixado;
+            const processosPorDia = diasRestantes > 0 ? (processosRestantes / diasRestantes).toFixed(2) : 0;
+
+            content.innerHTML = `
+                <div class="space-y-6">
+                    <!-- Resumo Executivo -->
+                    <div class="bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-amber-800 mb-4">Resumo Executivo - ${META_ACOES_PENAIS.nome}</h3>
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-amber-700">${percentualConcluido}%</div>
+                                <div class="text-sm text-amber-600">Meta Concluída</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-amber-700">${diasRestantes}</div>
+                                <div class="text-sm text-amber-600">Dias até o prazo</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-amber-700">${processosPorDia}</div>
+                                <div class="text-sm text-amber-600">Processos/dia necessários</div>
+                            </div>
+                        </div>
+                        ${parados30 > 0 ? `
+                            <div class="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg">
+                                <span class="text-red-700 font-medium">⚠️ Atenção: ${parados30} processo(s) parado(s) há mais de 30 dias</span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Distribuição por Status -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Distribuição por Status</h3>
+                        <div class="space-y-3">
+                            ${Object.entries(statusProcessoMeta).map(([key, info]) => {
+                                const quantidade = porStatus[key] || 0;
+                                const percentual = total > 0 ? Math.round((quantidade / total) * 100) : 0;
+                                return `
+                                    <div class="flex items-center">
+                                        <div class="w-32 text-sm text-gray-700">${info.nome}</div>
+                                        <div class="flex-1 mx-4">
+                                            <div class="bg-gray-200 rounded-full h-4 overflow-hidden">
+                                                <div class="${info.cor} h-full" style="width: ${percentual}%"></div>
+                                            </div>
+                                        </div>
+                                        <div class="w-20 text-right text-sm font-medium">${quantidade} (${percentual}%)</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Distribuição por Fase -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Distribuição por Fase Processual</h3>
+                        <div class="grid md:grid-cols-2 gap-2">
+                            ${Object.entries(fasesProcessoMeta)
+                                .sort((a, b) => a[1].ordem - b[1].ordem)
+                                .map(([key, info]) => {
+                                    const quantidade = porFase[key] || 0;
+                                    return `
+                                        <div class="flex justify-between p-2 bg-gray-50 rounded">
+                                            <span class="text-sm text-gray-700">${info.nome}</span>
+                                            <span class="text-sm font-medium text-gray-800">${quantidade}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Data do Relatório -->
+                    <div class="text-center text-xs text-gray-500">
+                        Relatório gerado em ${formatarDataBrasilia(getHojeString())} às ${getDataHoraBrasilia().toLocaleTimeString('pt-BR')}
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        // ==================== METAS - IMPORTAÇÃO DE XLSX ====================
+
+        let dadosXLSXImportacao = null;
+        let processosParaImportar = [];
+
+        function carregarArquivoXLSX(event) {
+            const arquivo = event.target.files[0];
+            if (!arquivo) return;
+
+            document.getElementById('meta-arquivo-nome').textContent = arquivo.name;
+
+            // Resetar estados anteriores
+            document.getElementById('meta-selecao-coluna').classList.add('hidden');
+            document.getElementById('meta-preview-container').classList.add('hidden');
+            document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+            document.getElementById('meta-botao-importar').classList.add('hidden');
+            document.getElementById('meta-resultado-importacao').classList.add('hidden');
+            document.getElementById('meta-progresso-importacao').classList.add('hidden');
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    // Pegar a primeira planilha
+                    const primeiraPlanilha = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[primeiraPlanilha];
+
+                    // Converter para JSON
+                    dadosXLSXImportacao = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    if (dadosXLSXImportacao.length === 0) {
+                        showNotification('Arquivo vazio ou formato inválido', 'error');
+                        return;
+                    }
+
+                    // Detectar colunas (primeira linha como cabeçalho ou índices)
+                    const primeiraLinha = dadosXLSXImportacao[0];
+                    const selectColuna = document.getElementById('meta-coluna-processo');
+                    selectColuna.innerHTML = '<option value="">Selecione a coluna...</option>';
+
+                    primeiraLinha.forEach((coluna, index) => {
+                        const nomeColuna = coluna ? String(coluna).trim() : `Coluna ${index + 1}`;
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = nomeColuna;
+                        selectColuna.appendChild(option);
+                    });
+
+                    // Tentar detectar automaticamente a coluna de processos
+                    const colunaAutoDetectada = detectarColunaProcesso(primeiraLinha);
+                    if (colunaAutoDetectada !== -1) {
+                        selectColuna.value = colunaAutoDetectada;
+                        atualizarPreviewImportacao();
+                    }
+
+                    document.getElementById('meta-selecao-coluna').classList.remove('hidden');
+
+                    // Adicionar listener para mudança de coluna
+                    selectColuna.onchange = atualizarPreviewImportacao;
+
+                    showNotification(`Arquivo carregado: ${dadosXLSXImportacao.length} linhas encontradas`, 'success');
+
+                } catch (error) {
+                    log('Erro ao ler arquivo XLSX:', error);
+                    showNotification('Erro ao ler o arquivo. Verifique se é um arquivo Excel válido.', 'error');
+                }
+            };
+
+            reader.onerror = function() {
+                showNotification('Erro ao ler o arquivo', 'error');
+            };
+
+            reader.readAsArrayBuffer(arquivo);
+        }
+
+        function detectarColunaProcesso(linha) {
+            // Procurar por colunas que pareçam conter números de processo
+            const termosProcesso = ['processo', 'número', 'numero', 'nº', 'n°', 'proc'];
+
+            for (let i = 0; i < linha.length; i++) {
+                const valor = String(linha[i] || '').toLowerCase();
+                if (termosProcesso.some(termo => valor.includes(termo))) {
+                    return i;
+                }
+            }
+
+            // Se não encontrou pelo nome, verificar se alguma coluna tem formato de processo
+            if (dadosXLSXImportacao.length > 1) {
+                for (let i = 0; i < linha.length; i++) {
+                    const valorSegundaLinha = String(dadosXLSXImportacao[1][i] || '');
+                    if (validarNumeroProcesso(valorSegundaLinha)) {
+                        return i;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        function atualizarPreviewImportacao() {
+            const colunaIndex = document.getElementById('meta-coluna-processo').value;
+
+            if (colunaIndex === '') {
+                document.getElementById('meta-preview-container').classList.add('hidden');
+                document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+                document.getElementById('meta-botao-importar').classList.add('hidden');
+                return;
+            }
+
+            const index = parseInt(colunaIndex);
+            processosParaImportar = [];
+
+            // Extrair processos (pular primeira linha se for cabeçalho)
+            const temCabecalho = !validarNumeroProcesso(String(dadosXLSXImportacao[0][index] || ''));
+            const inicio = temCabecalho ? 1 : 0;
+
+            for (let i = inicio; i < dadosXLSXImportacao.length; i++) {
+                const valor = String(dadosXLSXImportacao[i][index] || '').trim();
+                if (valor) {
+                    // Normalizar número do processo
+                    const processoNormalizado = normalizarNumeroProcesso(valor);
+                    if (processoNormalizado && validarNumeroProcesso(processoNormalizado)) {
+                        // Verificar se já está cadastrado
+                        const jaExiste = Object.values(processosMetaAcoesPenais).some(p =>
+                            p && p.numeroProcesso === processoNormalizado
+                        );
+
+                        processosParaImportar.push({
+                            numero: processoNormalizado,
+                            original: valor,
+                            jaExiste: jaExiste
+                        });
+                    }
+                }
+            }
+
+            // Mostrar preview
+            const listaPreview = document.getElementById('meta-preview-lista');
+            const novos = processosParaImportar.filter(p => !p.jaExiste);
+            const existentes = processosParaImportar.filter(p => p.jaExiste);
+
+            if (processosParaImportar.length === 0) {
+                listaPreview.innerHTML = '<div class="text-gray-500">Nenhum número de processo válido encontrado nesta coluna.</div>';
+                document.getElementById('meta-preview-stats').innerHTML = '';
+                document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+                document.getElementById('meta-botao-importar').classList.add('hidden');
+            } else {
+                // Mostrar até 50 processos no preview
+                const processosPreview = processosParaImportar.slice(0, 50);
+                listaPreview.innerHTML = processosPreview.map(p => `
+                    <div class="flex items-center justify-between py-1 border-b border-gray-100">
+                        <span class="${p.jaExiste ? 'text-gray-400 line-through' : 'text-gray-800'}">${escapeHtml(p.numero)}</span>
+                        ${p.jaExiste ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Já cadastrado</span>' : '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Novo</span>'}
+                    </div>
+                `).join('');
+
+                if (processosParaImportar.length > 50) {
+                    listaPreview.innerHTML += `<div class="text-gray-500 text-center py-2">... e mais ${processosParaImportar.length - 50} processos</div>`;
+                }
+
+                document.getElementById('meta-preview-stats').innerHTML = `
+                    <span class="text-green-600 font-medium">${novos.length} novos</span> •
+                    <span class="text-yellow-600">${existentes.length} já cadastrados</span> •
+                    <span class="text-gray-600">${processosParaImportar.length} total</span>
+                `;
+
+                if (novos.length > 0) {
+                    document.getElementById('meta-opcoes-importacao').classList.remove('hidden');
+                    document.getElementById('meta-botao-importar').classList.remove('hidden');
+                } else {
+                    document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+                    document.getElementById('meta-botao-importar').classList.add('hidden');
+                    showNotification('Todos os processos já estão cadastrados na meta.', 'warning');
+                }
+            }
+
+            document.getElementById('meta-preview-container').classList.remove('hidden');
+        }
+
+        function normalizarNumeroProcesso(valor) {
+            // Remover espaços e caracteres especiais, exceto números e pontuação do processo
+            let normalizado = valor.replace(/\s+/g, '').trim();
+
+            // Se for só números, tentar formatar
+            if (/^\d+$/.test(normalizado) && normalizado.length >= 15) {
+                // Formato: NNNNNNN-DD.AAAA.J.TR.OOOO
+                const match = normalizado.match(/^(\d{7})(\d{2})(\d{4})(\d)(\d{2})(\d{4})$/);
+                if (match) {
+                    return `${match[1]}-${match[2]}.${match[3]}.${match[4]}.${match[5]}.${match[6]}`;
+                }
+            }
+
+            // Se já estiver formatado ou parcialmente formatado
+            return normalizado;
+        }
+
+        async function executarImportacaoMeta() {
+            const novosProcessos = processosParaImportar.filter(p => !p.jaExiste);
+
+            if (novosProcessos.length === 0) {
+                showNotification('Não há processos novos para importar.', 'warning');
+                return;
+            }
+
+            const statusInicial = document.getElementById('meta-import-status').value;
+            const faseInicial = document.getElementById('meta-import-fase').value;
+            const dataHoje = getHojeString();
+
+            // Mostrar progresso
+            document.getElementById('meta-botao-importar').classList.add('hidden');
+            document.getElementById('meta-progresso-importacao').classList.remove('hidden');
+
+            let importados = 0;
+            let erros = 0;
+            const total = novosProcessos.length;
+
+            for (let i = 0; i < novosProcessos.length; i++) {
+                const processo = novosProcessos[i];
+
+                const novoProcesso = {
+                    numeroProcesso: processo.numero,
+                    status: statusInicial,
+                    fase: faseInicial,
+                    ultimaMovimentacao: dataHoje,
+                    observacoes: 'Importado em lote',
+                    dataCadastro: dataHoje,
+                    criadoPor: currentUser.nome,
+                    criadoEm: getDataHoraBrasilia().getTime(),
+                    importado: true
+                };
+
+                try {
+                    if (database) {
+                        await database.ref('processosMetaAcoesPenais').push(novoProcesso);
+                    } else {
+                        const id = 'local_' + Date.now() + '_' + i;
+                        processosMetaAcoesPenais[id] = novoProcesso;
+                    }
+                    importados++;
+                } catch (error) {
+                    log(`Erro ao importar processo ${processo.numero}:`, error);
+                    erros++;
+                }
+
+                // Atualizar progresso
+                const percentual = Math.round(((i + 1) / total) * 100);
+                document.getElementById('meta-progresso-barra').style.width = percentual + '%';
+                document.getElementById('meta-progresso-texto').textContent = `${i + 1} de ${total}`;
+
+                // Pequena pausa para não sobrecarregar o Firebase
+                if (i < novosProcessos.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+            }
+
+            // Esconder progresso e mostrar resultado
+            document.getElementById('meta-progresso-importacao').classList.add('hidden');
+
+            const resultadoDiv = document.getElementById('meta-resultado-importacao');
+            resultadoDiv.innerHTML = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 class="font-medium text-green-800 mb-2">✅ Importação Concluída!</h4>
+                    <div class="text-sm text-green-700">
+                        <p><strong>${importados}</strong> processo(s) importado(s) com sucesso.</p>
+                        ${erros > 0 ? `<p class="text-red-600"><strong>${erros}</strong> erro(s) durante a importação.</p>` : ''}
+                    </div>
+                    <button onclick="mudarAbaMetas('lista')" class="mt-3 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm">
+                        <i data-lucide="list" class="h-4 w-4 mr-1 inline"></i>
+                        Ver Lista de Processos
+                    </button>
+                </div>
+            `;
+            resultadoDiv.classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+
+            showNotification(`${importados} processo(s) importado(s) com sucesso!`, 'success');
+
+            // Limpar dados de importação
+            dadosXLSXImportacao = null;
+            processosParaImportar = [];
+            document.getElementById('meta-arquivo-xlsx').value = '';
+            document.getElementById('meta-arquivo-nome').textContent = 'Nenhum arquivo selecionado';
+
+            // Atualizar dashboard
+            renderMetasDashboard();
+        }
+
         // ==================== NOTIFICAÇÕES DO JUIZ ====================
 
         function criarNotificacaoDespachoVirtual(pedido) {
@@ -3576,6 +4815,14 @@
                     if (modalNotificacoes && !modalNotificacoes.classList.contains('hidden')) {
                         renderListaNotificacoes();
                     }
+                });
+
+                // Listener para processos da Meta de Ações Penais
+                database.ref('processosMetaAcoesPenais').on('value', (snapshot) => {
+                    processosMetaAcoesPenais = snapshot.val() || {};
+                    log(`Processos Meta Ações Penais carregados: ${Object.keys(processosMetaAcoesPenais).length}`);
+
+                    if (currentView === 'metas') renderMetasAcoesPenais();
                 });
 
                 database.ref('.info/connected').on('value', (snapshot) => {
@@ -5852,6 +7099,7 @@
                         const modalRelatorioBalcao = document.getElementById('modal-relatorio-balcao-personalizado');
                         const modalNotificacoes = document.getElementById('modal-notificacoes');
                         const modalEdicaoPedidoBalcao = document.getElementById('modal-edicao-pedido-balcao');
+                        const modalEdicaoProcessoMeta = document.getElementById('modal-edicao-processo-meta');
 
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             fecharModalEdicao();
@@ -5871,6 +7119,9 @@
                         if (modalEdicaoPedidoBalcao && !modalEdicaoPedidoBalcao.classList.contains('hidden')) {
                             fecharModalEdicaoPedidoBalcao();
                         }
+                        if (modalEdicaoProcessoMeta && !modalEdicaoProcessoMeta.classList.contains('hidden')) {
+                            fecharModalEdicaoProcessoMeta();
+                        }
                     }
 
                     // Ctrl+Enter para confirmar ações em modais
@@ -5880,6 +7131,7 @@
                         const modalRelatorioPersonalizado = document.getElementById('modal-relatorio-personalizado');
                         const modalRelatorioBalcao = document.getElementById('modal-relatorio-balcao-personalizado');
                         const modalEdicaoPedidoBalcao = document.getElementById('modal-edicao-pedido-balcao');
+                        const modalEdicaoProcessoMeta = document.getElementById('modal-edicao-processo-meta');
 
                         if (modalEdicao && !modalEdicao.classList.contains('hidden')) {
                             salvarEdicao();
@@ -5895,6 +7147,9 @@
                         }
                         if (modalEdicaoPedidoBalcao && !modalEdicaoPedidoBalcao.classList.contains('hidden')) {
                             salvarEdicaoPedidoBalcao();
+                        }
+                        if (modalEdicaoProcessoMeta && !modalEdicaoProcessoMeta.classList.contains('hidden')) {
+                            salvarEdicaoProcessoMeta();
                         }
                     }
                     
