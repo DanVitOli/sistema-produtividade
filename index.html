@@ -895,17 +895,52 @@
                     </div>
                 </div>
 
-                <!-- Seleção da coluna -->
+                <!-- Mapeamento de colunas -->
                 <div id="meta-selecao-coluna" class="hidden">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">2. Selecione a coluna com os números dos processos</label>
-                    <select id="meta-coluna-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                        <option value="">Selecione a coluna...</option>
-                    </select>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">2. Mapeie as colunas do arquivo</label>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Coluna: Número do Processo *</label>
+                                <select id="meta-coluna-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="atualizarPreviewImportacao()">
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Coluna: Classe</label>
+                                <select id="meta-coluna-classe" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="atualizarPreviewImportacao()">
+                                    <option value="">Não importar</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Coluna: Situação</label>
+                                <select id="meta-coluna-situacao" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="atualizarPreviewImportacao()">
+                                    <option value="">Não importar</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            💡 O sistema tentará detectar as colunas automaticamente pelo nome do cabeçalho.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mapeamento de valores de situação -->
+                <div id="meta-mapeamento-situacao" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">3. Mapeamento de Situação → Status</label>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="text-xs text-blue-700 mb-3">
+                            Configure como os valores da coluna "Situação" serão convertidos para o status do sistema:
+                        </div>
+                        <div id="meta-mapeamento-valores" class="space-y-2">
+                            <!-- Será preenchido pelo JavaScript -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Preview dos dados -->
                 <div id="meta-preview-container" class="hidden">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">3. Prévia dos processos encontrados</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">4. Prévia dos processos encontrados</label>
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-64 overflow-y-auto">
                         <div id="meta-preview-lista" class="space-y-1 text-sm">
                             <!-- Será preenchido pelo JavaScript -->
@@ -916,33 +951,25 @@
                     </div>
                 </div>
 
-                <!-- Opções de importação -->
+                <!-- Opções de importação (fase padrão) -->
                 <div id="meta-opcoes-importacao" class="hidden">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">4. Opções de importação</label>
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Status inicial</label>
-                            <select id="meta-import-status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                                <option value="em_andamento">Em Andamento</option>
-                                <option value="suspenso">Suspenso</option>
-                                <option value="sobrestado">Sobrestado</option>
-                            </select>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">5. Fase processual padrão</label>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div class="text-xs text-gray-600 mb-2">
+                            Defina a fase inicial para os processos importados:
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Fase inicial</label>
-                            <select id="meta-import-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                                <option value="inquerito">Inquérito/Investigação</option>
-                                <option value="denuncia">Denúncia Recebida</option>
-                                <option value="citacao">Citação</option>
-                                <option value="resposta">Resposta à Acusação</option>
-                                <option value="instrucao">Instrução</option>
-                                <option value="alegacoes">Alegações Finais</option>
-                                <option value="sentenca">Sentença</option>
-                                <option value="recurso">Recurso</option>
-                                <option value="transitado">Trânsito em Julgado</option>
-                                <option value="execucao">Execução</option>
-                            </select>
-                        </div>
+                        <select id="meta-import-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <option value="inquerito">Inquérito/Investigação</option>
+                            <option value="denuncia">Denúncia Recebida</option>
+                            <option value="citacao">Citação</option>
+                            <option value="resposta">Resposta à Acusação</option>
+                            <option value="instrucao" selected>Instrução</option>
+                            <option value="alegacoes">Alegações Finais</option>
+                            <option value="sentenca">Sentença</option>
+                            <option value="recurso">Recurso</option>
+                            <option value="transitado">Trânsito em Julgado</option>
+                            <option value="execucao">Execução</option>
+                        </select>
                     </div>
                 </div>
 
@@ -3948,12 +3975,14 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
                                 <span class="font-bold text-gray-800">${escapeHtml(processo.numeroProcesso)}</span>
+                                ${processo.classe ? `<span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800">${escapeHtml(processo.classe)}</span>` : ''}
                                 <span class="px-2 py-1 rounded-full text-xs font-medium ${statusInfo.cor} text-white">${statusInfo.nome}</span>
                                 <span class="px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">${faseInfo.nome}</span>
                                 ${alertaParado}
                             </div>
                             <div class="text-sm text-gray-600 mb-2">
                                 <div><strong>Última Movimentação:</strong> ${formatarDataBrasilia(processo.ultimaMovimentacao)}</div>
+                                ${processo.situacaoOriginal ? `<div><strong>Situação Original:</strong> ${escapeHtml(processo.situacaoOriginal)}</div>` : ''}
                                 ${processo.observacoes ? `<div><strong>Observações:</strong> ${escapeHtml(processo.observacoes)}</div>` : ''}
                             </div>
                             <div class="flex gap-2 mt-3">
@@ -4272,6 +4301,24 @@
 
         let dadosXLSXImportacao = null;
         let processosParaImportar = [];
+        let valoresSituacaoUnicos = [];
+        let mapeamentoSituacao = {};
+
+        // Mapeamento padrão de situação para status do sistema
+        const mapeamentoPadraoSituacao = {
+            'em andamento': 'em_andamento',
+            'andamento': 'em_andamento',
+            'ativo': 'em_andamento',
+            'tramitando': 'em_andamento',
+            'baixado': 'baixado',
+            'baixa': 'baixado',
+            'arquivado': 'arquivado',
+            'arquivo': 'arquivado',
+            'suspenso': 'suspenso',
+            'suspensão': 'suspenso',
+            'sobrestado': 'sobrestado',
+            'sobrestamento': 'sobrestado'
+        };
 
         function carregarArquivoXLSX(event) {
             const arquivo = event.target.files[0];
@@ -4281,6 +4328,7 @@
 
             // Resetar estados anteriores
             document.getElementById('meta-selecao-coluna').classList.add('hidden');
+            document.getElementById('meta-mapeamento-situacao').classList.add('hidden');
             document.getElementById('meta-preview-container').classList.add('hidden');
             document.getElementById('meta-opcoes-importacao').classList.add('hidden');
             document.getElementById('meta-botao-importar').classList.add('hidden');
@@ -4306,32 +4354,35 @@
                         return;
                     }
 
-                    // Detectar colunas (primeira linha como cabeçalho ou índices)
+                    // Detectar colunas (primeira linha como cabeçalho)
                     const primeiraLinha = dadosXLSXImportacao[0];
-                    const selectColuna = document.getElementById('meta-coluna-processo');
-                    selectColuna.innerHTML = '<option value="">Selecione a coluna...</option>';
+
+                    // Preencher os 3 dropdowns de colunas
+                    const selectProcesso = document.getElementById('meta-coluna-processo');
+                    const selectClasse = document.getElementById('meta-coluna-classe');
+                    const selectSituacao = document.getElementById('meta-coluna-situacao');
+
+                    selectProcesso.innerHTML = '<option value="">Selecione...</option>';
+                    selectClasse.innerHTML = '<option value="">Não importar</option>';
+                    selectSituacao.innerHTML = '<option value="">Não importar</option>';
 
                     primeiraLinha.forEach((coluna, index) => {
                         const nomeColuna = coluna ? String(coluna).trim() : `Coluna ${index + 1}`;
-                        const option = document.createElement('option');
-                        option.value = index;
-                        option.textContent = nomeColuna;
-                        selectColuna.appendChild(option);
+
+                        [selectProcesso, selectClasse, selectSituacao].forEach(select => {
+                            const option = document.createElement('option');
+                            option.value = index;
+                            option.textContent = nomeColuna;
+                            select.appendChild(option);
+                        });
                     });
 
-                    // Tentar detectar automaticamente a coluna de processos
-                    const colunaAutoDetectada = detectarColunaProcesso(primeiraLinha);
-                    if (colunaAutoDetectada !== -1) {
-                        selectColuna.value = colunaAutoDetectada;
-                        atualizarPreviewImportacao();
-                    }
+                    // Tentar detectar automaticamente as colunas
+                    detectarColunasAutomaticamente(primeiraLinha);
 
                     document.getElementById('meta-selecao-coluna').classList.remove('hidden');
 
-                    // Adicionar listener para mudança de coluna
-                    selectColuna.onchange = atualizarPreviewImportacao;
-
-                    showNotification(`Arquivo carregado: ${dadosXLSXImportacao.length} linhas encontradas`, 'success');
+                    showNotification(`Arquivo carregado: ${dadosXLSXImportacao.length - 1} processos encontrados`, 'success');
 
                 } catch (error) {
                     log('Erro ao ler arquivo XLSX:', error);
@@ -4346,65 +4397,93 @@
             reader.readAsArrayBuffer(arquivo);
         }
 
-        function detectarColunaProcesso(linha) {
-            // Procurar por colunas que pareçam conter números de processo
-            const termosProcesso = ['processo', 'número', 'numero', 'nº', 'n°', 'proc'];
+        function detectarColunasAutomaticamente(linha) {
+            const selectProcesso = document.getElementById('meta-coluna-processo');
+            const selectClasse = document.getElementById('meta-coluna-classe');
+            const selectSituacao = document.getElementById('meta-coluna-situacao');
+
+            const termosProcesso = ['processo', 'número', 'numero', 'nº', 'n°', 'proc', 'npu'];
+            const termosClasse = ['classe', 'tipo', 'natureza', 'class'];
+            const termosSituacao = ['situação', 'situacao', 'status', 'estado', 'sit'];
 
             for (let i = 0; i < linha.length; i++) {
-                const valor = String(linha[i] || '').toLowerCase();
+                const valor = String(linha[i] || '').toLowerCase().trim();
+
                 if (termosProcesso.some(termo => valor.includes(termo))) {
-                    return i;
+                    selectProcesso.value = i;
+                }
+                if (termosClasse.some(termo => valor.includes(termo))) {
+                    selectClasse.value = i;
+                }
+                if (termosSituacao.some(termo => valor.includes(termo))) {
+                    selectSituacao.value = i;
                 }
             }
 
-            // Se não encontrou pelo nome, verificar se alguma coluna tem formato de processo
-            if (dadosXLSXImportacao.length > 1) {
-                for (let i = 0; i < linha.length; i++) {
-                    const valorSegundaLinha = String(dadosXLSXImportacao[1][i] || '');
-                    if (validarNumeroProcesso(valorSegundaLinha)) {
-                        return i;
-                    }
-                }
+            // Se detectou coluna de processo, atualizar preview
+            if (selectProcesso.value !== '') {
+                atualizarPreviewImportacao();
             }
-
-            return -1;
         }
 
         function atualizarPreviewImportacao() {
-            const colunaIndex = document.getElementById('meta-coluna-processo').value;
+            const colunaProcesso = document.getElementById('meta-coluna-processo').value;
+            const colunaClasse = document.getElementById('meta-coluna-classe').value;
+            const colunaSituacao = document.getElementById('meta-coluna-situacao').value;
 
-            if (colunaIndex === '') {
+            if (colunaProcesso === '') {
+                document.getElementById('meta-mapeamento-situacao').classList.add('hidden');
                 document.getElementById('meta-preview-container').classList.add('hidden');
                 document.getElementById('meta-opcoes-importacao').classList.add('hidden');
                 document.getElementById('meta-botao-importar').classList.add('hidden');
                 return;
             }
 
-            const index = parseInt(colunaIndex);
+            const indexProcesso = parseInt(colunaProcesso);
+            const indexClasse = colunaClasse !== '' ? parseInt(colunaClasse) : -1;
+            const indexSituacao = colunaSituacao !== '' ? parseInt(colunaSituacao) : -1;
+
             processosParaImportar = [];
+            valoresSituacaoUnicos = [];
+            const situacoesEncontradas = new Set();
 
-            // Extrair processos (pular primeira linha se for cabeçalho)
-            const temCabecalho = !validarNumeroProcesso(String(dadosXLSXImportacao[0][index] || ''));
-            const inicio = temCabecalho ? 1 : 0;
+            // Extrair processos (pular primeira linha = cabeçalho)
+            for (let i = 1; i < dadosXLSXImportacao.length; i++) {
+                const linha = dadosXLSXImportacao[i];
+                const valorProcesso = String(linha[indexProcesso] || '').trim();
 
-            for (let i = inicio; i < dadosXLSXImportacao.length; i++) {
-                const valor = String(dadosXLSXImportacao[i][index] || '').trim();
-                if (valor) {
-                    // Normalizar número do processo
-                    const processoNormalizado = normalizarNumeroProcesso(valor);
+                if (valorProcesso) {
+                    const processoNormalizado = normalizarNumeroProcesso(valorProcesso);
                     if (processoNormalizado && validarNumeroProcesso(processoNormalizado)) {
-                        // Verificar se já está cadastrado
                         const jaExiste = Object.values(processosMetaAcoesPenais).some(p =>
                             p && p.numeroProcesso === processoNormalizado
                         );
 
+                        const classe = indexClasse >= 0 ? String(linha[indexClasse] || '').trim() : '';
+                        const situacao = indexSituacao >= 0 ? String(linha[indexSituacao] || '').trim() : '';
+
+                        if (situacao && !situacoesEncontradas.has(situacao.toLowerCase())) {
+                            situacoesEncontradas.add(situacao.toLowerCase());
+                            valoresSituacaoUnicos.push(situacao);
+                        }
+
                         processosParaImportar.push({
                             numero: processoNormalizado,
-                            original: valor,
+                            original: valorProcesso,
+                            classe: classe,
+                            situacao: situacao,
                             jaExiste: jaExiste
                         });
                     }
                 }
+            }
+
+            // Mostrar mapeamento de situação se coluna foi selecionada
+            if (indexSituacao >= 0 && valoresSituacaoUnicos.length > 0) {
+                renderMapeamentoSituacao();
+                document.getElementById('meta-mapeamento-situacao').classList.remove('hidden');
+            } else {
+                document.getElementById('meta-mapeamento-situacao').classList.add('hidden');
             }
 
             // Mostrar preview
@@ -4413,22 +4492,43 @@
             const existentes = processosParaImportar.filter(p => p.jaExiste);
 
             if (processosParaImportar.length === 0) {
-                listaPreview.innerHTML = '<div class="text-gray-500">Nenhum número de processo válido encontrado nesta coluna.</div>';
+                listaPreview.innerHTML = '<div class="text-gray-500">Nenhum número de processo válido encontrado.</div>';
                 document.getElementById('meta-preview-stats').innerHTML = '';
                 document.getElementById('meta-opcoes-importacao').classList.add('hidden');
                 document.getElementById('meta-botao-importar').classList.add('hidden');
             } else {
-                // Mostrar até 50 processos no preview
-                const processosPreview = processosParaImportar.slice(0, 50);
-                listaPreview.innerHTML = processosPreview.map(p => `
-                    <div class="flex items-center justify-between py-1 border-b border-gray-100">
-                        <span class="${p.jaExiste ? 'text-gray-400 line-through' : 'text-gray-800'}">${escapeHtml(p.numero)}</span>
-                        ${p.jaExiste ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Já cadastrado</span>' : '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Novo</span>'}
-                    </div>
-                `).join('');
+                // Mostrar até 30 processos no preview com todas as colunas
+                const processosPreview = processosParaImportar.slice(0, 30);
 
-                if (processosParaImportar.length > 50) {
-                    listaPreview.innerHTML += `<div class="text-gray-500 text-center py-2">... e mais ${processosParaImportar.length - 50} processos</div>`;
+                listaPreview.innerHTML = `
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="text-left p-1">Processo</th>
+                                ${indexClasse >= 0 ? '<th class="text-left p-1">Classe</th>' : ''}
+                                ${indexSituacao >= 0 ? '<th class="text-left p-1">Situação</th>' : ''}
+                                <th class="text-right p-1">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${processosPreview.map(p => `
+                                <tr class="border-b border-gray-100 ${p.jaExiste ? 'text-gray-400' : ''}">
+                                    <td class="p-1 ${p.jaExiste ? 'line-through' : ''}">${escapeHtml(p.numero)}</td>
+                                    ${indexClasse >= 0 ? `<td class="p-1">${escapeHtml(p.classe)}</td>` : ''}
+                                    ${indexSituacao >= 0 ? `<td class="p-1">${escapeHtml(p.situacao)}</td>` : ''}
+                                    <td class="p-1 text-right">
+                                        ${p.jaExiste
+                                            ? '<span class="bg-yellow-100 text-yellow-700 px-1 rounded">Existente</span>'
+                                            : '<span class="bg-green-100 text-green-700 px-1 rounded">Novo</span>'}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                if (processosParaImportar.length > 30) {
+                    listaPreview.innerHTML += `<div class="text-gray-500 text-center py-2">... e mais ${processosParaImportar.length - 30} processos</div>`;
                 }
 
                 document.getElementById('meta-preview-stats').innerHTML = `
@@ -4450,20 +4550,50 @@
             document.getElementById('meta-preview-container').classList.remove('hidden');
         }
 
+        function renderMapeamentoSituacao() {
+            const container = document.getElementById('meta-mapeamento-valores');
+
+            container.innerHTML = valoresSituacaoUnicos.map(situacao => {
+                const situacaoLower = situacao.toLowerCase();
+                const statusSugerido = mapeamentoPadraoSituacao[situacaoLower] || 'em_andamento';
+
+                return `
+                    <div class="flex items-center gap-2 bg-white p-2 rounded border">
+                        <span class="flex-1 text-sm font-medium text-gray-700">"${escapeHtml(situacao)}"</span>
+                        <i data-lucide="arrow-right" class="h-4 w-4 text-gray-400"></i>
+                        <select class="mapeamento-situacao-select border border-gray-300 rounded px-2 py-1 text-sm" data-situacao="${escapeAttr(situacao)}">
+                            <option value="em_andamento" ${statusSugerido === 'em_andamento' ? 'selected' : ''}>Em Andamento</option>
+                            <option value="baixado" ${statusSugerido === 'baixado' ? 'selected' : ''}>Baixado</option>
+                            <option value="suspenso" ${statusSugerido === 'suspenso' ? 'selected' : ''}>Suspenso</option>
+                            <option value="sobrestado" ${statusSugerido === 'sobrestado' ? 'selected' : ''}>Sobrestado</option>
+                            <option value="arquivado" ${statusSugerido === 'arquivado' ? 'selected' : ''}>Arquivado</option>
+                        </select>
+                    </div>
+                `;
+            }).join('');
+
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function obterMapeamentoSituacao() {
+            const mapeamento = {};
+            document.querySelectorAll('.mapeamento-situacao-select').forEach(select => {
+                const situacao = select.getAttribute('data-situacao');
+                mapeamento[situacao.toLowerCase()] = select.value;
+            });
+            return mapeamento;
+        }
+
         function normalizarNumeroProcesso(valor) {
-            // Remover espaços e caracteres especiais, exceto números e pontuação do processo
             let normalizado = valor.replace(/\s+/g, '').trim();
 
-            // Se for só números, tentar formatar
             if (/^\d+$/.test(normalizado) && normalizado.length >= 15) {
-                // Formato: NNNNNNN-DD.AAAA.J.TR.OOOO
                 const match = normalizado.match(/^(\d{7})(\d{2})(\d{4})(\d)(\d{2})(\d{4})$/);
                 if (match) {
                     return `${match[1]}-${match[2]}.${match[3]}.${match[4]}.${match[5]}.${match[6]}`;
                 }
             }
 
-            // Se já estiver formatado ou parcialmente formatado
             return normalizado;
         }
 
@@ -4475,8 +4605,9 @@
                 return;
             }
 
-            const statusInicial = document.getElementById('meta-import-status').value;
             const faseInicial = document.getElementById('meta-import-fase').value;
+            const colunaSituacao = document.getElementById('meta-coluna-situacao').value;
+            const mapeamento = colunaSituacao !== '' ? obterMapeamentoSituacao() : {};
             const dataHoje = getHojeString();
 
             // Mostrar progresso
@@ -4490,12 +4621,21 @@
             for (let i = 0; i < novosProcessos.length; i++) {
                 const processo = novosProcessos[i];
 
+                // Determinar o status baseado no mapeamento da situação
+                let statusProcesso = 'em_andamento'; // padrão
+                if (processo.situacao && colunaSituacao !== '') {
+                    const situacaoLower = processo.situacao.toLowerCase().trim();
+                    statusProcesso = mapeamento[situacaoLower] || 'em_andamento';
+                }
+
                 const novoProcesso = {
                     numeroProcesso: processo.numero,
-                    status: statusInicial,
+                    classe: processo.classe || '',
+                    situacaoOriginal: processo.situacao || '',
+                    status: statusProcesso,
                     fase: faseInicial,
                     ultimaMovimentacao: dataHoje,
-                    observacoes: 'Importado em lote',
+                    observacoes: `Importado em lote${processo.classe ? ' | Classe: ' + processo.classe : ''}${processo.situacao ? ' | Situação: ' + processo.situacao : ''}`,
                     dataCadastro: dataHoje,
                     criadoPor: currentUser.nome,
                     criadoEm: getDataHoraBrasilia().getTime(),
