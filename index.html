@@ -31,8 +31,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons com fallbacks -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js" 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"
             onerror="this.onerror=null;this.src='https://unpkg.com/lucide@latest/dist/umd/lucide.js'"></script>
+    <!-- SheetJS para leitura de arquivos Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         .loading-spinner {
             border: 4px solid #f3f3f3;
@@ -727,6 +729,10 @@
                         <i data-lucide="bar-chart" class="h-4 w-4 mr-2 inline"></i>
                         Relatórios
                     </button>
+                    <button onclick="mudarAbaMetas('importar')" id="tab-metas-importar" class="metas-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        <i data-lucide="upload" class="h-4 w-4 mr-2 inline"></i>
+                        Importar XLSX
+                    </button>
                 </nav>
             </div>
         </div>
@@ -854,6 +860,118 @@
 
             <div id="metas-relatorio-content">
                 <!-- Será preenchido pelo JavaScript -->
+            </div>
+        </div>
+
+        <!-- Importar Processos do XLSX -->
+        <div id="metas-aba-importar" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <div class="flex items-center mb-6">
+                <i data-lucide="upload" class="h-6 w-6 text-amber-600 mr-2"></i>
+                <h2 class="text-xl font-semibold text-gray-800">Importar Processos de Arquivo Excel</h2>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Instruções -->
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <h3 class="font-medium text-amber-800 mb-2">📋 Instruções</h3>
+                    <ul class="text-sm text-amber-700 space-y-1">
+                        <li>• O arquivo deve estar no formato <strong>.xlsx</strong> ou <strong>.xls</strong></li>
+                        <li>• Os números dos processos devem estar em uma coluna do arquivo</li>
+                        <li>• Formato esperado: 0000000-00.0000.0.00.0000</li>
+                        <li>• Processos já cadastrados serão ignorados automaticamente</li>
+                    </ul>
+                </div>
+
+                <!-- Upload do arquivo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">1. Selecione o arquivo Excel</label>
+                    <div class="flex items-center gap-4">
+                        <input type="file" id="meta-arquivo-xlsx" accept=".xlsx,.xls" class="hidden" onchange="carregarArquivoXLSX(event)">
+                        <button onclick="document.getElementById('meta-arquivo-xlsx').click()" class="bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700 transition-colors">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 mr-2 inline"></i>
+                            Selecionar Arquivo
+                        </button>
+                        <span id="meta-arquivo-nome" class="text-gray-600 text-sm">Nenhum arquivo selecionado</span>
+                    </div>
+                </div>
+
+                <!-- Seleção da coluna -->
+                <div id="meta-selecao-coluna" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">2. Selecione a coluna com os números dos processos</label>
+                    <select id="meta-coluna-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="">Selecione a coluna...</option>
+                    </select>
+                </div>
+
+                <!-- Preview dos dados -->
+                <div id="meta-preview-container" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">3. Prévia dos processos encontrados</label>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+                        <div id="meta-preview-lista" class="space-y-1 text-sm">
+                            <!-- Será preenchido pelo JavaScript -->
+                        </div>
+                    </div>
+                    <div id="meta-preview-stats" class="mt-2 text-sm text-gray-600">
+                        <!-- Será preenchido pelo JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Opções de importação -->
+                <div id="meta-opcoes-importacao" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">4. Opções de importação</label>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Status inicial</label>
+                            <select id="meta-import-status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="em_andamento">Em Andamento</option>
+                                <option value="suspenso">Suspenso</option>
+                                <option value="sobrestado">Sobrestado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Fase inicial</label>
+                            <select id="meta-import-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="inquerito">Inquérito/Investigação</option>
+                                <option value="denuncia">Denúncia Recebida</option>
+                                <option value="citacao">Citação</option>
+                                <option value="resposta">Resposta à Acusação</option>
+                                <option value="instrucao">Instrução</option>
+                                <option value="alegacoes">Alegações Finais</option>
+                                <option value="sentenca">Sentença</option>
+                                <option value="recurso">Recurso</option>
+                                <option value="transitado">Trânsito em Julgado</option>
+                                <option value="execucao">Execução</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botão de importação -->
+                <div id="meta-botao-importar" class="hidden">
+                    <button onclick="executarImportacaoMeta()" class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition-colors font-medium">
+                        <i data-lucide="download" class="h-5 w-5 mr-2 inline"></i>
+                        Importar Processos
+                    </button>
+                </div>
+
+                <!-- Progresso da importação -->
+                <div id="meta-progresso-importacao" class="hidden">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center mb-2">
+                            <div class="loading-spinner mr-3" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                            <span class="text-blue-800 font-medium">Importando processos...</span>
+                        </div>
+                        <div class="bg-blue-200 rounded-full h-2 overflow-hidden">
+                            <div id="meta-progresso-barra" class="bg-blue-600 h-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <div id="meta-progresso-texto" class="text-xs text-blue-700 mt-1">0 de 0</div>
+                    </div>
+                </div>
+
+                <!-- Resultado da importação -->
+                <div id="meta-resultado-importacao" class="hidden">
+                    <!-- Será preenchido pelo JavaScript -->
+                </div>
             </div>
         </div>
     </div>
@@ -3608,6 +3726,7 @@
             document.getElementById('metas-aba-lista')?.classList.add('hidden');
             document.getElementById('metas-aba-cadastro')?.classList.add('hidden');
             document.getElementById('metas-aba-relatorios')?.classList.add('hidden');
+            document.getElementById('metas-aba-importar')?.classList.add('hidden');
 
             // Resetar estilo dos botões
             document.querySelectorAll('.metas-tab').forEach(tab => {
@@ -4147,6 +4266,296 @@
             `;
 
             setTimeout(() => criarIcones(), 100);
+        }
+
+        // ==================== METAS - IMPORTAÇÃO DE XLSX ====================
+
+        let dadosXLSXImportacao = null;
+        let processosParaImportar = [];
+
+        function carregarArquivoXLSX(event) {
+            const arquivo = event.target.files[0];
+            if (!arquivo) return;
+
+            document.getElementById('meta-arquivo-nome').textContent = arquivo.name;
+
+            // Resetar estados anteriores
+            document.getElementById('meta-selecao-coluna').classList.add('hidden');
+            document.getElementById('meta-preview-container').classList.add('hidden');
+            document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+            document.getElementById('meta-botao-importar').classList.add('hidden');
+            document.getElementById('meta-resultado-importacao').classList.add('hidden');
+            document.getElementById('meta-progresso-importacao').classList.add('hidden');
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    // Pegar a primeira planilha
+                    const primeiraPlanilha = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[primeiraPlanilha];
+
+                    // Converter para JSON
+                    dadosXLSXImportacao = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    if (dadosXLSXImportacao.length === 0) {
+                        showNotification('Arquivo vazio ou formato inválido', 'error');
+                        return;
+                    }
+
+                    // Detectar colunas (primeira linha como cabeçalho ou índices)
+                    const primeiraLinha = dadosXLSXImportacao[0];
+                    const selectColuna = document.getElementById('meta-coluna-processo');
+                    selectColuna.innerHTML = '<option value="">Selecione a coluna...</option>';
+
+                    primeiraLinha.forEach((coluna, index) => {
+                        const nomeColuna = coluna ? String(coluna).trim() : `Coluna ${index + 1}`;
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = nomeColuna;
+                        selectColuna.appendChild(option);
+                    });
+
+                    // Tentar detectar automaticamente a coluna de processos
+                    const colunaAutoDetectada = detectarColunaProcesso(primeiraLinha);
+                    if (colunaAutoDetectada !== -1) {
+                        selectColuna.value = colunaAutoDetectada;
+                        atualizarPreviewImportacao();
+                    }
+
+                    document.getElementById('meta-selecao-coluna').classList.remove('hidden');
+
+                    // Adicionar listener para mudança de coluna
+                    selectColuna.onchange = atualizarPreviewImportacao;
+
+                    showNotification(`Arquivo carregado: ${dadosXLSXImportacao.length} linhas encontradas`, 'success');
+
+                } catch (error) {
+                    log('Erro ao ler arquivo XLSX:', error);
+                    showNotification('Erro ao ler o arquivo. Verifique se é um arquivo Excel válido.', 'error');
+                }
+            };
+
+            reader.onerror = function() {
+                showNotification('Erro ao ler o arquivo', 'error');
+            };
+
+            reader.readAsArrayBuffer(arquivo);
+        }
+
+        function detectarColunaProcesso(linha) {
+            // Procurar por colunas que pareçam conter números de processo
+            const termosProcesso = ['processo', 'número', 'numero', 'nº', 'n°', 'proc'];
+
+            for (let i = 0; i < linha.length; i++) {
+                const valor = String(linha[i] || '').toLowerCase();
+                if (termosProcesso.some(termo => valor.includes(termo))) {
+                    return i;
+                }
+            }
+
+            // Se não encontrou pelo nome, verificar se alguma coluna tem formato de processo
+            if (dadosXLSXImportacao.length > 1) {
+                for (let i = 0; i < linha.length; i++) {
+                    const valorSegundaLinha = String(dadosXLSXImportacao[1][i] || '');
+                    if (validarNumeroProcesso(valorSegundaLinha)) {
+                        return i;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        function atualizarPreviewImportacao() {
+            const colunaIndex = document.getElementById('meta-coluna-processo').value;
+
+            if (colunaIndex === '') {
+                document.getElementById('meta-preview-container').classList.add('hidden');
+                document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+                document.getElementById('meta-botao-importar').classList.add('hidden');
+                return;
+            }
+
+            const index = parseInt(colunaIndex);
+            processosParaImportar = [];
+
+            // Extrair processos (pular primeira linha se for cabeçalho)
+            const temCabecalho = !validarNumeroProcesso(String(dadosXLSXImportacao[0][index] || ''));
+            const inicio = temCabecalho ? 1 : 0;
+
+            for (let i = inicio; i < dadosXLSXImportacao.length; i++) {
+                const valor = String(dadosXLSXImportacao[i][index] || '').trim();
+                if (valor) {
+                    // Normalizar número do processo
+                    const processoNormalizado = normalizarNumeroProcesso(valor);
+                    if (processoNormalizado && validarNumeroProcesso(processoNormalizado)) {
+                        // Verificar se já está cadastrado
+                        const jaExiste = Object.values(processosMetaAcoesPenais).some(p =>
+                            p && p.numeroProcesso === processoNormalizado
+                        );
+
+                        processosParaImportar.push({
+                            numero: processoNormalizado,
+                            original: valor,
+                            jaExiste: jaExiste
+                        });
+                    }
+                }
+            }
+
+            // Mostrar preview
+            const listaPreview = document.getElementById('meta-preview-lista');
+            const novos = processosParaImportar.filter(p => !p.jaExiste);
+            const existentes = processosParaImportar.filter(p => p.jaExiste);
+
+            if (processosParaImportar.length === 0) {
+                listaPreview.innerHTML = '<div class="text-gray-500">Nenhum número de processo válido encontrado nesta coluna.</div>';
+                document.getElementById('meta-preview-stats').innerHTML = '';
+                document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+                document.getElementById('meta-botao-importar').classList.add('hidden');
+            } else {
+                // Mostrar até 50 processos no preview
+                const processosPreview = processosParaImportar.slice(0, 50);
+                listaPreview.innerHTML = processosPreview.map(p => `
+                    <div class="flex items-center justify-between py-1 border-b border-gray-100">
+                        <span class="${p.jaExiste ? 'text-gray-400 line-through' : 'text-gray-800'}">${escapeHtml(p.numero)}</span>
+                        ${p.jaExiste ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Já cadastrado</span>' : '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Novo</span>'}
+                    </div>
+                `).join('');
+
+                if (processosParaImportar.length > 50) {
+                    listaPreview.innerHTML += `<div class="text-gray-500 text-center py-2">... e mais ${processosParaImportar.length - 50} processos</div>`;
+                }
+
+                document.getElementById('meta-preview-stats').innerHTML = `
+                    <span class="text-green-600 font-medium">${novos.length} novos</span> •
+                    <span class="text-yellow-600">${existentes.length} já cadastrados</span> •
+                    <span class="text-gray-600">${processosParaImportar.length} total</span>
+                `;
+
+                if (novos.length > 0) {
+                    document.getElementById('meta-opcoes-importacao').classList.remove('hidden');
+                    document.getElementById('meta-botao-importar').classList.remove('hidden');
+                } else {
+                    document.getElementById('meta-opcoes-importacao').classList.add('hidden');
+                    document.getElementById('meta-botao-importar').classList.add('hidden');
+                    showNotification('Todos os processos já estão cadastrados na meta.', 'warning');
+                }
+            }
+
+            document.getElementById('meta-preview-container').classList.remove('hidden');
+        }
+
+        function normalizarNumeroProcesso(valor) {
+            // Remover espaços e caracteres especiais, exceto números e pontuação do processo
+            let normalizado = valor.replace(/\s+/g, '').trim();
+
+            // Se for só números, tentar formatar
+            if (/^\d+$/.test(normalizado) && normalizado.length >= 15) {
+                // Formato: NNNNNNN-DD.AAAA.J.TR.OOOO
+                const match = normalizado.match(/^(\d{7})(\d{2})(\d{4})(\d)(\d{2})(\d{4})$/);
+                if (match) {
+                    return `${match[1]}-${match[2]}.${match[3]}.${match[4]}.${match[5]}.${match[6]}`;
+                }
+            }
+
+            // Se já estiver formatado ou parcialmente formatado
+            return normalizado;
+        }
+
+        async function executarImportacaoMeta() {
+            const novosProcessos = processosParaImportar.filter(p => !p.jaExiste);
+
+            if (novosProcessos.length === 0) {
+                showNotification('Não há processos novos para importar.', 'warning');
+                return;
+            }
+
+            const statusInicial = document.getElementById('meta-import-status').value;
+            const faseInicial = document.getElementById('meta-import-fase').value;
+            const dataHoje = getHojeString();
+
+            // Mostrar progresso
+            document.getElementById('meta-botao-importar').classList.add('hidden');
+            document.getElementById('meta-progresso-importacao').classList.remove('hidden');
+
+            let importados = 0;
+            let erros = 0;
+            const total = novosProcessos.length;
+
+            for (let i = 0; i < novosProcessos.length; i++) {
+                const processo = novosProcessos[i];
+
+                const novoProcesso = {
+                    numeroProcesso: processo.numero,
+                    status: statusInicial,
+                    fase: faseInicial,
+                    ultimaMovimentacao: dataHoje,
+                    observacoes: 'Importado em lote',
+                    dataCadastro: dataHoje,
+                    criadoPor: currentUser.nome,
+                    criadoEm: getDataHoraBrasilia().getTime(),
+                    importado: true
+                };
+
+                try {
+                    if (database) {
+                        await database.ref('processosMetaAcoesPenais').push(novoProcesso);
+                    } else {
+                        const id = 'local_' + Date.now() + '_' + i;
+                        processosMetaAcoesPenais[id] = novoProcesso;
+                    }
+                    importados++;
+                } catch (error) {
+                    log(`Erro ao importar processo ${processo.numero}:`, error);
+                    erros++;
+                }
+
+                // Atualizar progresso
+                const percentual = Math.round(((i + 1) / total) * 100);
+                document.getElementById('meta-progresso-barra').style.width = percentual + '%';
+                document.getElementById('meta-progresso-texto').textContent = `${i + 1} de ${total}`;
+
+                // Pequena pausa para não sobrecarregar o Firebase
+                if (i < novosProcessos.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+            }
+
+            // Esconder progresso e mostrar resultado
+            document.getElementById('meta-progresso-importacao').classList.add('hidden');
+
+            const resultadoDiv = document.getElementById('meta-resultado-importacao');
+            resultadoDiv.innerHTML = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 class="font-medium text-green-800 mb-2">✅ Importação Concluída!</h4>
+                    <div class="text-sm text-green-700">
+                        <p><strong>${importados}</strong> processo(s) importado(s) com sucesso.</p>
+                        ${erros > 0 ? `<p class="text-red-600"><strong>${erros}</strong> erro(s) durante a importação.</p>` : ''}
+                    </div>
+                    <button onclick="mudarAbaMetas('lista')" class="mt-3 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm">
+                        <i data-lucide="list" class="h-4 w-4 mr-1 inline"></i>
+                        Ver Lista de Processos
+                    </button>
+                </div>
+            `;
+            resultadoDiv.classList.remove('hidden');
+            setTimeout(() => criarIcones(), 100);
+
+            showNotification(`${importados} processo(s) importado(s) com sucesso!`, 'success');
+
+            // Limpar dados de importação
+            dadosXLSXImportacao = null;
+            processosParaImportar = [];
+            document.getElementById('meta-arquivo-xlsx').value = '';
+            document.getElementById('meta-arquivo-nome').textContent = 'Nenhum arquivo selecionado';
+
+            // Atualizar dashboard
+            renderMetasDashboard();
         }
 
         // ==================== NOTIFICAÇÕES DO JUIZ ====================
