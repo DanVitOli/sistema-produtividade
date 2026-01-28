@@ -4584,43 +4584,67 @@
             reader.readAsArrayBuffer(arquivo);
         }
 
+        // Função para normalizar texto removendo acentos
+        function normalizarTexto(texto) {
+            return texto
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+        }
+
         function detectarColunasAutomaticamente(linha) {
             const selectProcesso = document.getElementById('meta-coluna-processo');
             const selectClasse = document.getElementById('meta-coluna-classe');
             const selectSituacao = document.getElementById('meta-coluna-situacao');
 
-            const termosProcesso = ['processo', 'número', 'numero', 'nº', 'n°', 'proc', 'npu'];
+            // Termos normalizados (sem acentos)
+            const termosProcesso = ['processo', 'numero', 'n°', 'proc', 'npu'];
             const termosClasse = ['classe', 'tipo', 'natureza', 'class'];
-            const termosSituacao = ['situação', 'situacao', 'status', 'estado', 'sit'];
+            const termosSituacao = ['situacao', 'status', 'estado', 'sit'];
 
             let indiceProcesso = -1;
             let indiceClasse = -1;
             let indiceSituacao = -1;
 
+            // Log para debug
+            console.log('Colunas detectadas no arquivo:', linha);
+
             // Detectar índices das colunas
             for (let i = 0; i < linha.length; i++) {
-                const valor = String(linha[i] || '').toLowerCase().trim();
+                const valorOriginal = String(linha[i] || '').trim();
+                const valor = normalizarTexto(valorOriginal);
+
+                console.log(`Coluna ${i}: "${valorOriginal}" -> normalizado: "${valor}"`);
 
                 if (indiceProcesso === -1 && termosProcesso.some(termo => valor.includes(termo))) {
                     indiceProcesso = i;
+                    console.log(`  -> Detectado como PROCESSO`);
                 }
                 if (indiceClasse === -1 && termosClasse.some(termo => valor.includes(termo))) {
                     indiceClasse = i;
+                    console.log(`  -> Detectado como CLASSE`);
                 }
                 if (indiceSituacao === -1 && termosSituacao.some(termo => valor.includes(termo))) {
                     indiceSituacao = i;
+                    console.log(`  -> Detectado como SITUAÇÃO`);
                 }
             }
+
+            console.log(`Índices detectados: Processo=${indiceProcesso}, Classe=${indiceClasse}, Situação=${indiceSituacao}`);
 
             // Aplicar valores aos selects (índice + 1 porque tem a opção padrão "Selecione...")
             if (indiceProcesso >= 0) {
                 selectProcesso.selectedIndex = indiceProcesso + 1;
+                console.log(`Select Processo: selectedIndex = ${indiceProcesso + 1}`);
             }
             if (indiceClasse >= 0) {
                 selectClasse.selectedIndex = indiceClasse + 1;
+                console.log(`Select Classe: selectedIndex = ${indiceClasse + 1}`);
             }
             if (indiceSituacao >= 0) {
                 selectSituacao.selectedIndex = indiceSituacao + 1;
+                console.log(`Select Situação: selectedIndex = ${indiceSituacao + 1}`);
             }
 
             // Se detectou coluna de processo, atualizar preview após pequeno delay
