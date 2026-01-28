@@ -4558,7 +4558,7 @@
 
                         [selectProcesso, selectClasse, selectSituacao].forEach(select => {
                             const option = document.createElement('option');
-                            option.value = index;
+                            option.value = String(index);
                             option.textContent = nomeColuna;
                             select.appendChild(option);
                         });
@@ -4593,26 +4593,39 @@
             const termosClasse = ['classe', 'tipo', 'natureza', 'class'];
             const termosSituacao = ['situação', 'situacao', 'status', 'estado', 'sit'];
 
-            let processoDetectado = false;
+            let indiceProcesso = -1;
+            let indiceClasse = -1;
+            let indiceSituacao = -1;
 
+            // Detectar índices das colunas
             for (let i = 0; i < linha.length; i++) {
                 const valor = String(linha[i] || '').toLowerCase().trim();
 
-                if (termosProcesso.some(termo => valor.includes(termo))) {
-                    selectProcesso.value = String(i);
-                    processoDetectado = true;
+                if (indiceProcesso === -1 && termosProcesso.some(termo => valor.includes(termo))) {
+                    indiceProcesso = i;
                 }
-                if (termosClasse.some(termo => valor.includes(termo))) {
-                    selectClasse.value = String(i);
+                if (indiceClasse === -1 && termosClasse.some(termo => valor.includes(termo))) {
+                    indiceClasse = i;
                 }
-                if (termosSituacao.some(termo => valor.includes(termo))) {
-                    selectSituacao.value = String(i);
+                if (indiceSituacao === -1 && termosSituacao.some(termo => valor.includes(termo))) {
+                    indiceSituacao = i;
                 }
             }
 
-            // Se detectou coluna de processo, atualizar preview
-            if (processoDetectado) {
-                atualizarPreviewImportacao();
+            // Aplicar valores aos selects (índice + 1 porque tem a opção padrão "Selecione...")
+            if (indiceProcesso >= 0) {
+                selectProcesso.selectedIndex = indiceProcesso + 1;
+            }
+            if (indiceClasse >= 0) {
+                selectClasse.selectedIndex = indiceClasse + 1;
+            }
+            if (indiceSituacao >= 0) {
+                selectSituacao.selectedIndex = indiceSituacao + 1;
+            }
+
+            // Se detectou coluna de processo, atualizar preview após pequeno delay
+            if (indiceProcesso >= 0) {
+                setTimeout(() => atualizarPreviewImportacao(), 100);
             }
         }
 
