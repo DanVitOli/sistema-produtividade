@@ -3915,6 +3915,8 @@
             } else if (aba === 'relatorios') {
                 renderRelatorioMetas();
             } else if (aba === 'importar') {
+                // Garantir que os selects de fases estejam atualizados
+                atualizarSelectsFasesMeta();
                 // Revalidar preview se já houver dados carregados
                 if (dadosXLSXImportacao && document.getElementById('meta-coluna-processo').value !== '') {
                     atualizarPreviewImportacao();
@@ -4791,7 +4793,13 @@
                 return;
             }
 
-            const faseInicial = document.getElementById('meta-import-fase').value;
+            let faseInicial = document.getElementById('meta-import-fase').value;
+            // Fallback para primeira fase disponível se estiver vazio
+            if (!faseInicial) {
+                const fases = getFasesMetaAtual();
+                const primeiraFase = Object.keys(fases).sort((a, b) => fases[a].ordem - fases[b].ordem)[0];
+                faseInicial = primeiraFase || 'instrucao';
+            }
             const colunaSituacao = document.getElementById('meta-coluna-situacao').value;
             const mapeamento = colunaSituacao !== '' ? obterMapeamentoSituacao() : {};
             const dataHoje = getHojeString();
