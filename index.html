@@ -706,25 +706,8 @@
         </div>
     </div>
 
-    <!-- Módulo Metas -->
+    <!-- Módulo Metas - Ações Penais -->
     <div id="metas-view" class="hidden">
-        <!-- Seletor de Meta -->
-        <div class="bg-white rounded-lg shadow-md p-4 mb-6 no-print">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <i data-lucide="target" class="h-6 w-6 text-gray-600"></i>
-                    <span class="text-sm font-medium text-gray-600">Selecionar Meta:</span>
-                    <select id="seletor-meta" onchange="trocarMeta(this.value)" class="border border-gray-300 rounded-md px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white min-w-64">
-                        <option value="acoes_penais">Meta 4 - Ações Penais</option>
-                        <option value="juri">Meta - Tribunal do Júri</option>
-                    </select>
-                </div>
-                <div id="meta-prazo-badge" class="text-sm text-gray-500">
-                    <!-- Preenchido pelo JavaScript -->
-                </div>
-            </div>
-        </div>
-
         <!-- Dashboard da Meta -->
         <div id="metas-dashboard" class="mb-6">
             <!-- Será preenchido pelo JavaScript -->
@@ -759,7 +742,7 @@
             <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center">
                     <i data-lucide="scale" class="h-6 w-6 text-amber-600 mr-2"></i>
-                    <h2 id="titulo-lista-metas" class="text-xl font-semibold text-gray-800">Processos da Meta</h2>
+                    <h2 class="text-xl font-semibold text-gray-800">Processos da Meta 4 - Ações Penais</h2>
                 </div>
             </div>
 
@@ -776,7 +759,16 @@
                 </select>
                 <select id="filtro-metas-fase" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="renderListaMetas()">
                     <option value="">Todas as fases</option>
-                    <!-- Opções preenchidas dinamicamente pelo JavaScript -->
+                    <option value="inquerito">Inquérito/Investigação</option>
+                    <option value="denuncia">Denúncia Recebida</option>
+                    <option value="citacao">Citação</option>
+                    <option value="resposta">Resposta à Acusação</option>
+                    <option value="instrucao">Instrução</option>
+                    <option value="alegacoes">Alegações Finais</option>
+                    <option value="sentenca">Sentença</option>
+                    <option value="recurso">Recurso</option>
+                    <option value="transitado">Trânsito em Julgado</option>
+                    <option value="execucao">Execução</option>
                 </select>
                 <select id="filtro-metas-parado" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="renderListaMetas()">
                     <option value="">Movimentação</option>
@@ -823,7 +815,16 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Fase Processual *</label>
                     <select id="meta-processo-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
                         <option value="">Selecione a fase</option>
-                        <!-- Opções preenchidas dinamicamente pelo JavaScript -->
+                        <option value="inquerito">Inquérito/Investigação</option>
+                        <option value="denuncia">Denúncia Recebida</option>
+                        <option value="citacao">Citação</option>
+                        <option value="resposta">Resposta à Acusação</option>
+                        <option value="instrucao">Instrução</option>
+                        <option value="alegacoes">Alegações Finais</option>
+                        <option value="sentenca">Sentença</option>
+                        <option value="recurso">Recurso</option>
+                        <option value="transitado">Trânsito em Julgado</option>
+                        <option value="execucao">Execução</option>
                     </select>
                 </div>
 
@@ -964,7 +965,16 @@
                             Defina a fase inicial para os processos importados:
                         </div>
                         <select id="meta-import-fase" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                            <!-- Opções preenchidas dinamicamente pelo JavaScript -->
+                            <option value="inquerito">Inquérito/Investigação</option>
+                            <option value="denuncia">Denúncia Recebida</option>
+                            <option value="citacao">Citação</option>
+                            <option value="resposta">Resposta à Acusação</option>
+                            <option value="instrucao" selected>Instrução</option>
+                            <option value="alegacoes">Alegações Finais</option>
+                            <option value="sentenca">Sentença</option>
+                            <option value="recurso">Recurso</option>
+                            <option value="transitado">Trânsito em Julgado</option>
+                            <option value="execucao">Execução</option>
                         </select>
                     </div>
                 </div>
@@ -1624,53 +1634,12 @@
             'cancelado': { nome: 'Cancelado', cor: 'bg-gray-400' }
         };
 
-        // ==================== METAS - CONFIGURAÇÃO ====================
-        const METAS_CONFIG = {
-            'acoes_penais': {
-                id: 'acoes_penais',
-                nome: 'Meta 4 - Ações Penais',
-                prazoFinal: '2026-12-19',
-                descricao: 'Acompanhamento das ações penais para cumprimento da meta',
-                cor: 'amber',
-                colecaoFirebase: 'processosMetaAcoesPenais',
-                fases: {
-                    'inquerito': { nome: 'Inquérito/Investigação', ordem: 1 },
-                    'denuncia': { nome: 'Denúncia Recebida', ordem: 2 },
-                    'citacao': { nome: 'Citação', ordem: 3 },
-                    'resposta': { nome: 'Resposta à Acusação', ordem: 4 },
-                    'instrucao': { nome: 'Instrução', ordem: 5 },
-                    'alegacoes': { nome: 'Alegações Finais', ordem: 6 },
-                    'sentenca': { nome: 'Sentença', ordem: 7 },
-                    'recurso': { nome: 'Recurso', ordem: 8 },
-                    'transitado': { nome: 'Trânsito em Julgado', ordem: 9 },
-                    'execucao': { nome: 'Execução', ordem: 10 }
-                }
-            },
-            'juri': {
-                id: 'juri',
-                nome: 'Meta - Tribunal do Júri',
-                prazoFinal: '2026-12-19',
-                descricao: 'Acompanhamento dos processos de competência do Tribunal do Júri',
-                cor: 'purple',
-                colecaoFirebase: 'processosMetaJuri',
-                fases: {
-                    'inquerito': { nome: 'Inquérito Policial', ordem: 1 },
-                    'denuncia': { nome: 'Denúncia Recebida', ordem: 2 },
-                    'citacao': { nome: 'Citação do Réu', ordem: 3 },
-                    'resposta': { nome: 'Resposta à Acusação', ordem: 4 },
-                    'instrucao': { nome: 'Instrução (1ª Fase)', ordem: 5 },
-                    'pronuncia': { nome: 'Pronúncia', ordem: 6 },
-                    'libelo': { nome: 'Preparação do Júri', ordem: 7 },
-                    'plenario': { nome: 'Sessão Plenária', ordem: 8 },
-                    'sentenca': { nome: 'Sentença', ordem: 9 },
-                    'recurso': { nome: 'Recurso', ordem: 10 },
-                    'transitado': { nome: 'Trânsito em Julgado', ordem: 11 },
-                    'execucao': { nome: 'Execução', ordem: 12 }
-                }
-            }
+        // ==================== METAS - AÇÕES PENAIS ====================
+        const META_ACOES_PENAIS = {
+            nome: 'Meta 4 - Ações Penais',
+            prazoFinal: '2026-12-19',
+            descricao: 'Acompanhamento das ações penais para cumprimento da meta'
         };
-
-        let metaAtual = 'acoes_penais'; // Meta selecionada atualmente
 
         const statusProcessoMeta = {
             'em_andamento': { nome: 'Em Andamento', cor: 'bg-blue-500', icone: 'clock' },
@@ -1680,20 +1649,18 @@
             'arquivado': { nome: 'Arquivado', cor: 'bg-gray-500', icone: 'archive' }
         };
 
-        // Funções auxiliares para obter configurações da meta atual
-        function getMetaAtual() {
-            return METAS_CONFIG[metaAtual];
-        }
-
-        function getFasesMetaAtual() {
-            return getMetaAtual().fases;
-        }
-
-        function getProcessosMetaAtual() {
-            if (metaAtual === 'acoes_penais') return processosMetaAcoesPenais;
-            if (metaAtual === 'juri') return processosMetaJuri;
-            return {};
-        }
+        const fasesProcessoMeta = {
+            'inquerito': { nome: 'Inquérito/Investigação', ordem: 1 },
+            'denuncia': { nome: 'Denúncia Recebida', ordem: 2 },
+            'citacao': { nome: 'Citação', ordem: 3 },
+            'resposta': { nome: 'Resposta à Acusação', ordem: 4 },
+            'instrucao': { nome: 'Instrução', ordem: 5 },
+            'alegacoes': { nome: 'Alegações Finais', ordem: 6 },
+            'sentenca': { nome: 'Sentença', ordem: 7 },
+            'recurso': { nome: 'Recurso', ordem: 8 },
+            'transitado': { nome: 'Trânsito em Julgado', ordem: 9 },
+            'execucao': { nome: 'Execução', ordem: 10 }
+        };
 
         // ==================== ESTADO GLOBAL ====================
         
@@ -1715,7 +1682,6 @@
         };
         let notificacoesJuiz = {};
         let processosMetaAcoesPenais = {};
-        let processosMetaJuri = {};
 
         // ==================== UTILITÁRIOS ====================
         
@@ -3771,111 +3737,13 @@
             return estatisticas;
         }
 
-        // ==================== METAS ====================
+        // ==================== METAS - AÇÕES PENAIS ====================
 
         let abaMetasAtual = 'lista';
-
-        function trocarMeta(novaMetaId) {
-            if (!METAS_CONFIG[novaMetaId]) return;
-
-            metaAtual = novaMetaId;
-
-            // Atualizar seletor
-            document.getElementById('seletor-meta').value = metaAtual;
-
-            // Atualizar selects de fases
-            atualizarSelectsFasesMeta();
-
-            // Atualizar título da lista
-            const meta = getMetaAtual();
-            document.getElementById('titulo-lista-metas').textContent = `Processos - ${meta.nome}`;
-
-            // Atualizar badge de prazo
-            const hoje = getDataHoraBrasilia();
-            const prazoFinal = new Date(meta.prazoFinal + 'T23:59:59');
-            const diasRestantes = Math.ceil((prazoFinal - hoje) / (1000 * 60 * 60 * 24));
-            document.getElementById('meta-prazo-badge').innerHTML = `
-                <span class="text-${meta.cor}-600 font-medium">Prazo: ${formatarDataBrasilia(meta.prazoFinal)}</span>
-                <span class="text-gray-400 mx-2">|</span>
-                <span class="${diasRestantes <= 30 ? 'text-red-600' : 'text-gray-600'}">${diasRestantes} dias restantes</span>
-            `;
-
-            // Limpar dados de importação ao trocar de meta
-            dadosXLSXImportacao = null;
-            processosParaImportar = [];
-
-            // Renderizar novamente
-            renderMetasDashboard();
-            renderListaMetas();
-
-            // Resetar interface de importação
-            const arquivoInput = document.getElementById('meta-arquivo-xlsx');
-            if (arquivoInput) arquivoInput.value = '';
-            document.getElementById('meta-arquivo-nome').textContent = 'Nenhum arquivo selecionado';
-            document.getElementById('meta-selecao-coluna').classList.add('hidden');
-            document.getElementById('meta-mapeamento-situacao').classList.add('hidden');
-            document.getElementById('meta-preview-container').classList.add('hidden');
-            document.getElementById('meta-opcoes-importacao').classList.add('hidden');
-            document.getElementById('meta-botao-importar').classList.add('hidden');
-            document.getElementById('meta-resultado-importacao').classList.add('hidden');
-
-            setTimeout(() => criarIcones(), 100);
-        }
-
-        function atualizarSelectsFasesMeta() {
-            const fases = getFasesMetaAtual();
-            const fasesOrdenadas = Object.entries(fases)
-                .sort((a, b) => a[1].ordem - b[1].ordem);
-
-            // Gerar opções HTML
-            const opcoesHtml = fasesOrdenadas.map(([key, fase]) =>
-                `<option value="${key}">${fase.nome}</option>`
-            ).join('');
-
-            // Atualizar filtro de fases
-            const filtroFases = document.getElementById('filtro-metas-fase');
-            if (filtroFases) {
-                filtroFases.innerHTML = '<option value="">Todas as fases</option>' + opcoesHtml;
-            }
-
-            // Atualizar select do cadastro
-            const cadastroFase = document.getElementById('meta-processo-fase');
-            if (cadastroFase) {
-                cadastroFase.innerHTML = '<option value="">Selecione a fase</option>' + opcoesHtml;
-            }
-
-            // Atualizar select da importação (com 'instrucao' selecionado por padrão se existir)
-            const importFase = document.getElementById('meta-import-fase');
-            if (importFase) {
-                const opcoesImport = fasesOrdenadas.map(([key, fase]) =>
-                    `<option value="${key}"${key === 'instrucao' ? ' selected' : ''}>${fase.nome}</option>`
-                ).join('');
-                importFase.innerHTML = opcoesImport;
-            }
-        }
 
         function renderMetasAcoesPenais() {
             const metasView = document.getElementById('metas-view');
             if (!metasView) return;
-
-            // Sincronizar seletor com meta atual
-            document.getElementById('seletor-meta').value = metaAtual;
-
-            // Atualizar selects de fases
-            atualizarSelectsFasesMeta();
-
-            // Atualizar título e badge
-            const meta = getMetaAtual();
-            document.getElementById('titulo-lista-metas').textContent = `Processos - ${meta.nome}`;
-
-            const hoje = getDataHoraBrasilia();
-            const prazoFinal = new Date(meta.prazoFinal + 'T23:59:59');
-            const diasRestantes = Math.ceil((prazoFinal - hoje) / (1000 * 60 * 60 * 24));
-            document.getElementById('meta-prazo-badge').innerHTML = `
-                <span class="text-${meta.cor}-600 font-medium">Prazo: ${formatarDataBrasilia(meta.prazoFinal)}</span>
-                <span class="text-gray-400 mx-2">|</span>
-                <span class="${diasRestantes <= 30 ? 'text-red-600' : 'text-gray-600'}">${diasRestantes} dias restantes</span>
-            `;
 
             renderMetasDashboard();
             mudarAbaMetas(abaMetasAtual || 'lista');
@@ -3928,8 +3796,7 @@
             const dashboard = document.getElementById('metas-dashboard');
             if (!dashboard) return;
 
-            const meta = getMetaAtual();
-            const processos = Object.values(getProcessosMetaAtual()).filter(p => p);
+            const processos = Object.values(processosMetaAcoesPenais).filter(p => p);
             const total = processos.length;
             const baixados = processos.filter(p => p.status === 'baixado').length;
             const emAndamento = processos.filter(p => p.status === 'em_andamento').length;
@@ -3945,36 +3812,31 @@
             }).length;
 
             // Calcular dias até o prazo final
-            const prazoFinal = new Date(meta.prazoFinal + 'T23:59:59');
+            const prazoFinal = new Date(META_ACOES_PENAIS.prazoFinal + 'T23:59:59');
             const diasRestantes = Math.ceil((prazoFinal - hoje) / (1000 * 60 * 60 * 24));
 
             // Percentual de conclusão
             const percentualConcluido = total > 0 ? Math.round((baixados / total) * 100) : 0;
 
-            // Cores dinâmicas baseadas na meta
-            const corGradiente = meta.cor === 'purple' ? 'from-purple-600 to-purple-700' : 'from-amber-600 to-amber-700';
-            const corBg = meta.cor === 'purple' ? 'bg-purple-800' : 'bg-amber-800';
-            const corTexto = meta.cor === 'purple' ? 'text-purple-100' : 'text-amber-100';
-
             dashboard.innerHTML = `
-                <div class="bg-gradient-to-r ${corGradiente} text-white rounded-lg p-6 mb-4">
+                <div class="bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-lg p-6 mb-4">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-2xl font-bold mb-2">${meta.nome}</h2>
-                            <p class="${corTexto}">${meta.descricao}</p>
+                            <h2 class="text-2xl font-bold mb-2">${META_ACOES_PENAIS.nome}</h2>
+                            <p class="text-amber-100">${META_ACOES_PENAIS.descricao}</p>
                         </div>
                         <div class="text-right">
                             <div class="text-4xl font-bold">${percentualConcluido}%</div>
-                            <div class="${corTexto} text-sm">concluído</div>
+                            <div class="text-amber-100 text-sm">concluído</div>
                         </div>
                     </div>
                     <div class="mt-4">
-                        <div class="${corBg} rounded-full h-4 overflow-hidden">
+                        <div class="bg-amber-800 rounded-full h-4 overflow-hidden">
                             <div class="bg-green-400 h-full transition-all duration-500" style="width: ${percentualConcluido}%"></div>
                         </div>
-                        <div class="flex justify-between text-xs ${corTexto} mt-1">
+                        <div class="flex justify-between text-xs text-amber-100 mt-1">
                             <span>${baixados} de ${total} processos baixados</span>
-                            <span>Prazo: ${formatarDataBrasilia(meta.prazoFinal)} (${diasRestantes} dias)</span>
+                            <span>Prazo: 19/12/2026 (${diasRestantes} dias)</span>
                         </div>
                     </div>
                 </div>
@@ -4036,7 +3898,7 @@
             const filtroFase = document.getElementById('filtro-metas-fase')?.value || '';
             const filtroParado = document.getElementById('filtro-metas-parado')?.value || '';
 
-            let processosArray = Object.entries(getProcessosMetaAtual())
+            let processosArray = Object.entries(processosMetaAcoesPenais)
                 .filter(([key, p]) => p)
                 .map(([key, p]) => ({ ...p, id: key }));
 
@@ -4096,8 +3958,7 @@
 
         function criarCardProcessoMeta(processo) {
             const statusInfo = statusProcessoMeta[processo.status] || statusProcessoMeta.em_andamento;
-            const fases = getFasesMetaAtual();
-            const faseInfo = fases[processo.fase] || { nome: 'Não definida', ordem: 0 };
+            const faseInfo = fasesProcessoMeta[processo.fase] || { nome: 'Não definida', ordem: 0 };
 
             // Calcular dias desde última movimentação
             const hoje = getDataHoraBrasilia();
@@ -4172,9 +4033,8 @@
                 return;
             }
 
-            // Verificar se já existe na meta atual
-            const processosAtuais = getProcessosMetaAtual();
-            const existe = Object.values(processosAtuais).some(p =>
+            // Verificar se já existe
+            const existe = Object.values(processosMetaAcoesPenais).some(p =>
                 p && p.numeroProcesso === numeroProcesso
             );
             if (existe) {
@@ -4182,7 +4042,6 @@
                 return;
             }
 
-            const meta = getMetaAtual();
             const novoProcesso = {
                 numeroProcesso,
                 status,
@@ -4195,7 +4054,7 @@
             };
 
             if (database) {
-                database.ref(meta.colecaoFirebase).push(novoProcesso)
+                database.ref('processosMetaAcoesPenais').push(novoProcesso)
                     .then(() => {
                         limparFormularioMeta();
                         showNotification('Processo cadastrado na meta com sucesso!', 'success');
@@ -4207,11 +4066,7 @@
                     });
             } else {
                 const id = 'local_' + Date.now();
-                if (metaAtual === 'acoes_penais') {
-                    processosMetaAcoesPenais[id] = novoProcesso;
-                } else if (metaAtual === 'juri') {
-                    processosMetaJuri[id] = novoProcesso;
-                }
+                processosMetaAcoesPenais[id] = novoProcesso;
                 limparFormularioMeta();
                 showNotification('Processo cadastrado localmente', 'warning');
                 renderMetasAcoesPenais();
@@ -4235,19 +4090,11 @@
         }
 
         function abrirModalEdicaoProcessoMeta(id) {
-            const processosAtuais = getProcessosMetaAtual();
-            const processo = processosAtuais[id];
+            const processo = processosMetaAcoesPenais[id];
             if (!processo) {
                 showNotification('Processo não encontrado', 'error');
                 return;
             }
-
-            // Atualizar select de fases no modal de edição
-            const fases = getFasesMetaAtual();
-            const fasesOrdenadas = Object.entries(fases).sort((a, b) => a[1].ordem - b[1].ordem);
-            const selectFase = document.getElementById('edicao-meta-processo-fase');
-            selectFase.innerHTML = '<option value="">Selecione a fase</option>' +
-                fasesOrdenadas.map(([key, fase]) => `<option value="${key}">${fase.nome}</option>`).join('');
 
             document.getElementById('edicao-meta-processo-id').value = id;
             document.getElementById('edicao-meta-processo-numero-display').textContent = `Processo: ${processo.numeroProcesso}`;
@@ -4266,8 +4113,7 @@
 
         function salvarEdicaoProcessoMeta() {
             const id = document.getElementById('edicao-meta-processo-id').value;
-            const processosAtuais = getProcessosMetaAtual();
-            const processoOriginal = processosAtuais[id];
+            const processoOriginal = processosMetaAcoesPenais[id];
 
             if (!processoOriginal) {
                 showNotification('Processo não encontrado', 'error');
@@ -4294,9 +4140,8 @@
                 editadoEm: getDataHoraBrasilia().getTime()
             };
 
-            const meta = getMetaAtual();
             if (database) {
-                database.ref(`${meta.colecaoFirebase}/${id}`).update(processoAtualizado)
+                database.ref(`processosMetaAcoesPenais/${id}`).update(processoAtualizado)
                     .then(() => {
                         fecharModalEdicaoProcessoMeta();
                         showNotification('Processo atualizado com sucesso!', 'success');
@@ -4306,11 +4151,7 @@
                         showNotification('Erro ao atualizar processo', 'error');
                     });
             } else {
-                if (metaAtual === 'acoes_penais') {
-                    processosMetaAcoesPenais[id] = processoAtualizado;
-                } else if (metaAtual === 'juri') {
-                    processosMetaJuri[id] = processoAtualizado;
-                }
+                processosMetaAcoesPenais[id] = processoAtualizado;
                 fecharModalEdicaoProcessoMeta();
                 showNotification('Processo atualizado localmente', 'warning');
                 renderMetasAcoesPenais();
@@ -4318,8 +4159,7 @@
         }
 
         function excluirProcessoMeta(id) {
-            const processosAtuais = getProcessosMetaAtual();
-            const processo = processosAtuais[id];
+            const processo = processosMetaAcoesPenais[id];
             if (!processo) {
                 showNotification('Processo não encontrado', 'error');
                 return;
@@ -4329,9 +4169,8 @@
 
             if (!confirm(confirmMessage)) return;
 
-            const meta = getMetaAtual();
             if (database) {
-                database.ref(`${meta.colecaoFirebase}/${id}`).remove()
+                database.ref(`processosMetaAcoesPenais/${id}`).remove()
                     .then(() => {
                         showNotification('Processo removido da meta', 'success');
                     })
@@ -4340,11 +4179,7 @@
                         showNotification('Erro ao excluir processo', 'error');
                     });
             } else {
-                if (metaAtual === 'acoes_penais') {
-                    delete processosMetaAcoesPenais[id];
-                } else if (metaAtual === 'juri') {
-                    delete processosMetaJuri[id];
-                }
+                delete processosMetaAcoesPenais[id];
                 showNotification('Processo removido localmente', 'warning');
                 renderMetasAcoesPenais();
             }
@@ -4354,9 +4189,7 @@
             const content = document.getElementById('metas-relatorio-content');
             if (!content) return;
 
-            const meta = getMetaAtual();
-            const fases = getFasesMetaAtual();
-            const processos = Object.values(getProcessosMetaAtual()).filter(p => p);
+            const processos = Object.values(processosMetaAcoesPenais).filter(p => p);
             const total = processos.length;
 
             if (total === 0) {
@@ -4378,13 +4211,13 @@
 
             // Estatísticas por fase
             const porFase = {};
-            Object.keys(fases).forEach(key => {
+            Object.keys(fasesProcessoMeta).forEach(key => {
                 porFase[key] = processos.filter(p => p.fase === key).length;
             });
 
             // Calcular dias até o prazo
             const hoje = getDataHoraBrasilia();
-            const prazoFinal = new Date(meta.prazoFinal + 'T23:59:59');
+            const prazoFinal = new Date(META_ACOES_PENAIS.prazoFinal + 'T23:59:59');
             const diasRestantes = Math.ceil((prazoFinal - hoje) / (1000 * 60 * 60 * 24));
 
             // Processos parados
@@ -4399,30 +4232,23 @@
             const processosRestantes = total - porStatus.baixado;
             const processosPorDia = diasRestantes > 0 ? (processosRestantes / diasRestantes).toFixed(2) : 0;
 
-            // Cores dinâmicas
-            const corBgGradiente = meta.cor === 'purple' ? 'from-purple-50 to-purple-100' : 'from-amber-50 to-amber-100';
-            const corBorda = meta.cor === 'purple' ? 'border-purple-200' : 'border-amber-200';
-            const corTitulo = meta.cor === 'purple' ? 'text-purple-800' : 'text-amber-800';
-            const corTexto = meta.cor === 'purple' ? 'text-purple-700' : 'text-amber-700';
-            const corTextoSec = meta.cor === 'purple' ? 'text-purple-600' : 'text-amber-600';
-
             content.innerHTML = `
                 <div class="space-y-6">
                     <!-- Resumo Executivo -->
-                    <div class="bg-gradient-to-r ${corBgGradiente} border ${corBorda} rounded-lg p-6">
-                        <h3 class="text-lg font-semibold ${corTitulo} mb-4">Resumo Executivo - ${meta.nome}</h3>
+                    <div class="bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-amber-800 mb-4">Resumo Executivo - ${META_ACOES_PENAIS.nome}</h3>
                         <div class="grid md:grid-cols-3 gap-4">
                             <div class="text-center">
-                                <div class="text-3xl font-bold ${corTexto}">${percentualConcluido}%</div>
-                                <div class="text-sm ${corTextoSec}">Meta Concluída</div>
+                                <div class="text-3xl font-bold text-amber-700">${percentualConcluido}%</div>
+                                <div class="text-sm text-amber-600">Meta Concluída</div>
                             </div>
                             <div class="text-center">
-                                <div class="text-3xl font-bold ${corTexto}">${diasRestantes}</div>
-                                <div class="text-sm ${corTextoSec}">Dias até o prazo</div>
+                                <div class="text-3xl font-bold text-amber-700">${diasRestantes}</div>
+                                <div class="text-sm text-amber-600">Dias até o prazo</div>
                             </div>
                             <div class="text-center">
-                                <div class="text-3xl font-bold ${corTexto}">${processosPorDia}</div>
-                                <div class="text-sm ${corTextoSec}">Processos/dia necessários</div>
+                                <div class="text-3xl font-bold text-amber-700">${processosPorDia}</div>
+                                <div class="text-sm text-amber-600">Processos/dia necessários</div>
                             </div>
                         </div>
                         ${parados30 > 0 ? `
@@ -4458,7 +4284,7 @@
                     <div class="bg-white border border-gray-200 rounded-lg p-6">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4">Distribuição por Fase Processual</h3>
                         <div class="grid md:grid-cols-2 gap-2">
-                            ${Object.entries(fases)
+                            ${Object.entries(fasesProcessoMeta)
                                 .sort((a, b) => a[1].ordem - b[1].ordem)
                                 .map(([key, info]) => {
                                     const quantidade = porFase[key] || 0;
@@ -4640,8 +4466,7 @@
                 if (valorProcesso) {
                     const processoNormalizado = normalizarNumeroProcesso(valorProcesso);
                     if (processoNormalizado && validarNumeroProcesso(processoNormalizado)) {
-                        const processosAtuais = getProcessosMetaAtual();
-                        const jaExiste = Object.values(processosAtuais).some(p =>
+                        const jaExiste = Object.values(processosMetaAcoesPenais).some(p =>
                             p && p.numeroProcesso === processoNormalizado
                         );
 
@@ -4829,16 +4654,11 @@
                 };
 
                 try {
-                    const meta = getMetaAtual();
                     if (database) {
-                        await database.ref(meta.colecaoFirebase).push(novoProcesso);
+                        await database.ref('processosMetaAcoesPenais').push(novoProcesso);
                     } else {
                         const id = 'local_' + Date.now() + '_' + i;
-                        if (metaAtual === 'acoes_penais') {
-                            processosMetaAcoesPenais[id] = novoProcesso;
-                        } else if (metaAtual === 'juri') {
-                            processosMetaJuri[id] = novoProcesso;
-                        }
+                        processosMetaAcoesPenais[id] = novoProcesso;
                     }
                     importados++;
                 } catch (error) {
@@ -5153,21 +4973,7 @@
                     processosMetaAcoesPenais = snapshot.val() || {};
                     log(`Processos Meta Ações Penais carregados: ${Object.keys(processosMetaAcoesPenais).length}`);
 
-                    if (currentView === 'metas' && metaAtual === 'acoes_penais') {
-                        renderMetasDashboard();
-                        renderListaMetas();
-                    }
-                });
-
-                // Listener para processos da Meta do Tribunal do Júri
-                database.ref('processosMetaJuri').on('value', (snapshot) => {
-                    processosMetaJuri = snapshot.val() || {};
-                    log(`Processos Meta Júri carregados: ${Object.keys(processosMetaJuri).length}`);
-
-                    if (currentView === 'metas' && metaAtual === 'juri') {
-                        renderMetasDashboard();
-                        renderListaMetas();
-                    }
+                    if (currentView === 'metas') renderMetasAcoesPenais();
                 });
 
                 database.ref('.info/connected').on('value', (snapshot) => {
