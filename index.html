@@ -4558,7 +4558,7 @@
 
                         [selectProcesso, selectClasse, selectSituacao].forEach(select => {
                             const option = document.createElement('option');
-                            option.value = index;
+                            option.value = String(index);
                             option.textContent = nomeColuna;
                             select.appendChild(option);
                         });
