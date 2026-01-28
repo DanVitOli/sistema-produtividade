@@ -717,6 +717,7 @@
                     <select id="seletor-meta" onchange="trocarMeta(this.value)" class="border border-gray-300 rounded-md px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white min-w-64">
                         <option value="acoes_penais">Meta 4 - Ações Penais</option>
                         <option value="juri">Meta - Tribunal do Júri</option>
+                        <option value="violencia_domestica">Meta - Violência Doméstica</option>
                     </select>
                 </div>
                 <div id="meta-prazo-badge" class="text-sm text-gray-500">
@@ -1667,6 +1668,28 @@
                     'transitado': { nome: 'Trânsito em Julgado', ordem: 11 },
                     'execucao': { nome: 'Execução', ordem: 12 }
                 }
+            },
+            'violencia_domestica': {
+                id: 'violencia_domestica',
+                nome: 'Meta - Violência Doméstica',
+                prazoFinal: '2026-12-19',
+                descricao: 'Acompanhamento dos processos de violência doméstica e familiar',
+                cor: 'pink',
+                colecaoFirebase: 'processosMetaViolenciaDomestica',
+                fases: {
+                    'inquerito': { nome: 'Inquérito Policial', ordem: 1 },
+                    'medidas_protetivas': { nome: 'Medidas Protetivas', ordem: 2 },
+                    'denuncia': { nome: 'Denúncia Recebida', ordem: 3 },
+                    'citacao': { nome: 'Citação', ordem: 4 },
+                    'resposta': { nome: 'Resposta à Acusação', ordem: 5 },
+                    'audiencia_preliminar': { nome: 'Audiência Preliminar', ordem: 6 },
+                    'instrucao': { nome: 'Instrução', ordem: 7 },
+                    'alegacoes': { nome: 'Alegações Finais', ordem: 8 },
+                    'sentenca': { nome: 'Sentença', ordem: 9 },
+                    'recurso': { nome: 'Recurso', ordem: 10 },
+                    'transitado': { nome: 'Trânsito em Julgado', ordem: 11 },
+                    'execucao': { nome: 'Execução', ordem: 12 }
+                }
             }
         };
 
@@ -1692,6 +1715,7 @@
         function getProcessosMetaAtual() {
             if (metaAtual === 'acoes_penais') return processosMetaAcoesPenais;
             if (metaAtual === 'juri') return processosMetaJuri;
+            if (metaAtual === 'violencia_domestica') return processosMetaViolenciaDomestica;
             return {};
         }
 
@@ -1716,6 +1740,7 @@
         let notificacoesJuiz = {};
         let processosMetaAcoesPenais = {};
         let processosMetaJuri = {};
+        let processosMetaViolenciaDomestica = {};
 
         // ==================== UTILITÁRIOS ====================
         
@@ -4213,6 +4238,8 @@
                     processosMetaAcoesPenais[id] = novoProcesso;
                 } else if (metaAtual === 'juri') {
                     processosMetaJuri[id] = novoProcesso;
+                } else if (metaAtual === 'violencia_domestica') {
+                    processosMetaViolenciaDomestica[id] = novoProcesso;
                 }
                 limparFormularioMeta();
                 showNotification('Processo cadastrado localmente', 'warning');
@@ -4312,6 +4339,8 @@
                     processosMetaAcoesPenais[id] = processoAtualizado;
                 } else if (metaAtual === 'juri') {
                     processosMetaJuri[id] = processoAtualizado;
+                } else if (metaAtual === 'violencia_domestica') {
+                    processosMetaViolenciaDomestica[id] = processoAtualizado;
                 }
                 fecharModalEdicaoProcessoMeta();
                 showNotification('Processo atualizado localmente', 'warning');
@@ -4346,6 +4375,8 @@
                     delete processosMetaAcoesPenais[id];
                 } else if (metaAtual === 'juri') {
                     delete processosMetaJuri[id];
+                } else if (metaAtual === 'violencia_domestica') {
+                    delete processosMetaViolenciaDomestica[id];
                 }
                 showNotification('Processo removido localmente', 'warning');
                 renderMetasAcoesPenais();
@@ -4903,6 +4934,8 @@
                             processosMetaAcoesPenais[id] = novoProcesso;
                         } else if (metaAtual === 'juri') {
                             processosMetaJuri[id] = novoProcesso;
+                        } else if (metaAtual === 'violencia_domestica') {
+                            processosMetaViolenciaDomestica[id] = novoProcesso;
                         }
                     }
                     importados++;
@@ -5230,6 +5263,17 @@
                     log(`Processos Meta Júri carregados: ${Object.keys(processosMetaJuri).length}`);
 
                     if (currentView === 'metas' && metaAtual === 'juri') {
+                        renderMetasDashboard();
+                        renderListaMetas();
+                    }
+                });
+
+                // Listener para processos da Meta de Violência Doméstica
+                database.ref('processosMetaViolenciaDomestica').on('value', (snapshot) => {
+                    processosMetaViolenciaDomestica = snapshot.val() || {};
+                    log(`Processos Meta Violência Doméstica carregados: ${Object.keys(processosMetaViolenciaDomestica).length}`);
+
+                    if (currentView === 'metas' && metaAtual === 'violencia_domestica') {
                         renderMetasDashboard();
                         renderListaMetas();
                     }
