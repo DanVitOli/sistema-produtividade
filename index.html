@@ -4593,22 +4593,25 @@
             const termosClasse = ['classe', 'tipo', 'natureza', 'class'];
             const termosSituacao = ['situação', 'situacao', 'status', 'estado', 'sit'];
 
+            let processoDetectado = false;
+
             for (let i = 0; i < linha.length; i++) {
                 const valor = String(linha[i] || '').toLowerCase().trim();
 
                 if (termosProcesso.some(termo => valor.includes(termo))) {
-                    selectProcesso.value = i;
+                    selectProcesso.value = String(i);
+                    processoDetectado = true;
                 }
                 if (termosClasse.some(termo => valor.includes(termo))) {
-                    selectClasse.value = i;
+                    selectClasse.value = String(i);
                 }
                 if (termosSituacao.some(termo => valor.includes(termo))) {
-                    selectSituacao.value = i;
+                    selectSituacao.value = String(i);
                 }
             }
 
             // Se detectou coluna de processo, atualizar preview
-            if (selectProcesso.value !== '') {
+            if (processoDetectado) {
                 atualizarPreviewImportacao();
             }
         }
