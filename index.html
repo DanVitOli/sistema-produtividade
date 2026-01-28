@@ -4536,13 +4536,30 @@
                     // Converter para JSON
                     dadosXLSXImportacao = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
+                    console.log('Dados brutos do XLSX:', dadosXLSXImportacao);
+
                     if (dadosXLSXImportacao.length === 0) {
                         showNotification('Arquivo vazio ou formato inválido', 'error');
                         return;
                     }
 
-                    // Detectar colunas (primeira linha como cabeçalho)
-                    const primeiraLinha = dadosXLSXImportacao[0];
+                    // Encontrar primeira linha não vazia (cabeçalho)
+                    let indiceCabecalho = 0;
+                    for (let i = 0; i < dadosXLSXImportacao.length; i++) {
+                        const linha = dadosXLSXImportacao[i];
+                        if (linha && linha.length > 0 && linha.some(cel => cel !== null && cel !== undefined && String(cel).trim() !== '')) {
+                            indiceCabecalho = i;
+                            console.log(`Cabeçalho encontrado na linha ${i}:`, linha);
+                            break;
+                        }
+                    }
+
+                    const primeiraLinha = dadosXLSXImportacao[indiceCabecalho];
+
+                    // Remover linhas vazias antes do cabeçalho para processamento posterior
+                    if (indiceCabecalho > 0) {
+                        dadosXLSXImportacao = dadosXLSXImportacao.slice(indiceCabecalho);
+                    }
 
                     // Preencher os 3 dropdowns de colunas
                     const selectProcesso = document.getElementById('meta-coluna-processo');
