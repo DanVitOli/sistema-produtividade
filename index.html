@@ -2976,8 +2976,8 @@
 
             let botoesAcao = '';
             if (pedido.status === 'pendente') {
-                // Se o usuário atual é o assessor responsável, é juiz, ou o pedido foi cadastrado pelo juiz (assessorId null), pode marcar como minutado
-                const podeMinutar = currentUser.isJuiz || pedido.assessorId === currentUser.assessorId || !pedido.assessorId;
+                // Qualquer assessor ou juiz pode marcar pedidos como minutado
+                const podeMinutar = currentUser.isJuiz || currentUser.assessorId;
                 const podeEditarExcluir = pedido.assessorId === currentUser.assessorId || currentUser.isJuiz;
 
                 if (podeEditarExcluir) {
