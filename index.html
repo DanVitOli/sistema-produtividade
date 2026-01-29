@@ -4004,9 +4004,20 @@
             const percentualConcluido = total > 0 ? Math.round((baixados / total) * 100) : 0;
 
             // Cores dinâmicas baseadas na meta
-            const corGradiente = meta.cor === 'purple' ? 'from-purple-600 to-purple-700' : 'from-amber-600 to-amber-700';
-            const corBg = meta.cor === 'purple' ? 'bg-purple-800' : 'bg-amber-800';
-            const corTexto = meta.cor === 'purple' ? 'text-purple-100' : 'text-amber-100';
+            const coresMap = {
+                'amber': { gradiente: 'from-amber-600 to-amber-700', bg: 'bg-amber-800', texto: 'text-amber-100' },
+                'purple': { gradiente: 'from-purple-600 to-purple-700', bg: 'bg-purple-800', texto: 'text-purple-100' },
+                'pink': { gradiente: 'from-pink-600 to-pink-700', bg: 'bg-pink-800', texto: 'text-pink-100' },
+                'red': { gradiente: 'from-red-600 to-red-700', bg: 'bg-red-800', texto: 'text-red-100' },
+                'blue': { gradiente: 'from-blue-600 to-blue-700', bg: 'bg-blue-800', texto: 'text-blue-100' },
+                'green': { gradiente: 'from-green-600 to-green-700', bg: 'bg-green-800', texto: 'text-green-100' },
+                'indigo': { gradiente: 'from-indigo-600 to-indigo-700', bg: 'bg-indigo-800', texto: 'text-indigo-100' },
+                'teal': { gradiente: 'from-teal-600 to-teal-700', bg: 'bg-teal-800', texto: 'text-teal-100' }
+            };
+            const cores = coresMap[meta.cor] || coresMap['amber'];
+            const corGradiente = cores.gradiente;
+            const corBg = cores.bg;
+            const corTexto = cores.texto;
 
             dashboard.innerHTML = `
                 <div class="bg-gradient-to-r ${corGradiente} text-white rounded-lg p-6 mb-4">
@@ -4464,11 +4475,22 @@
             const processosPorDia = diasRestantes > 0 ? (processosRestantes / diasRestantes).toFixed(2) : 0;
 
             // Cores dinâmicas
-            const corBgGradiente = meta.cor === 'purple' ? 'from-purple-50 to-purple-100' : 'from-amber-50 to-amber-100';
-            const corBorda = meta.cor === 'purple' ? 'border-purple-200' : 'border-amber-200';
-            const corTitulo = meta.cor === 'purple' ? 'text-purple-800' : 'text-amber-800';
-            const corTexto = meta.cor === 'purple' ? 'text-purple-700' : 'text-amber-700';
-            const corTextoSec = meta.cor === 'purple' ? 'text-purple-600' : 'text-amber-600';
+            const coresRelatorioMap = {
+                'amber': { bgGrad: 'from-amber-50 to-amber-100', borda: 'border-amber-200', titulo: 'text-amber-800', texto: 'text-amber-700', textoSec: 'text-amber-600' },
+                'purple': { bgGrad: 'from-purple-50 to-purple-100', borda: 'border-purple-200', titulo: 'text-purple-800', texto: 'text-purple-700', textoSec: 'text-purple-600' },
+                'pink': { bgGrad: 'from-pink-50 to-pink-100', borda: 'border-pink-200', titulo: 'text-pink-800', texto: 'text-pink-700', textoSec: 'text-pink-600' },
+                'red': { bgGrad: 'from-red-50 to-red-100', borda: 'border-red-200', titulo: 'text-red-800', texto: 'text-red-700', textoSec: 'text-red-600' },
+                'blue': { bgGrad: 'from-blue-50 to-blue-100', borda: 'border-blue-200', titulo: 'text-blue-800', texto: 'text-blue-700', textoSec: 'text-blue-600' },
+                'green': { bgGrad: 'from-green-50 to-green-100', borda: 'border-green-200', titulo: 'text-green-800', texto: 'text-green-700', textoSec: 'text-green-600' },
+                'indigo': { bgGrad: 'from-indigo-50 to-indigo-100', borda: 'border-indigo-200', titulo: 'text-indigo-800', texto: 'text-indigo-700', textoSec: 'text-indigo-600' },
+                'teal': { bgGrad: 'from-teal-50 to-teal-100', borda: 'border-teal-200', titulo: 'text-teal-800', texto: 'text-teal-700', textoSec: 'text-teal-600' }
+            };
+            const coresRel = coresRelatorioMap[meta.cor] || coresRelatorioMap['amber'];
+            const corBgGradiente = coresRel.bgGrad;
+            const corBorda = coresRel.borda;
+            const corTitulo = coresRel.titulo;
+            const corTexto = coresRel.texto;
+            const corTextoSec = coresRel.textoSec;
 
             content.innerHTML = `
                 <div class="space-y-6">
