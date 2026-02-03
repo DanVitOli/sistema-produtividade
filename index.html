@@ -719,6 +719,7 @@
                         <option value="juri">Meta - Tribunal do Júri</option>
                         <option value="violencia_domestica">Meta - Violência Doméstica</option>
                         <option value="mais_dez_anos">Meta - Processos + 10 Anos</option>
+                        <option value="saude">Meta - Saúde</option>
                     </select>
                 </div>
                 <div id="meta-prazo-badge" class="text-sm text-gray-500">
@@ -1713,6 +1714,28 @@
                     'transitado': { nome: 'Trânsito em Julgado', ordem: 11 },
                     'arquivado': { nome: 'Arquivado/Baixado', ordem: 12 }
                 }
+            },
+            'saude': {
+                id: 'saude',
+                nome: 'Meta - Saúde',
+                prazoFinal: '2026-12-19',
+                descricao: 'Acompanhamento dos processos relacionados à área da saúde',
+                cor: 'teal',
+                colecaoFirebase: 'processosMetaSaude',
+                fases: {
+                    'triagem': { nome: 'Triagem', ordem: 1 },
+                    'tutela_urgencia': { nome: 'Tutela de Urgência', ordem: 2 },
+                    'citacao': { nome: 'Citação', ordem: 3 },
+                    'contestacao': { nome: 'Contestação', ordem: 4 },
+                    'especificacao_provas': { nome: 'Especificação de Provas', ordem: 5 },
+                    'pericia': { nome: 'Perícia Médica', ordem: 6 },
+                    'audiencia': { nome: 'Audiência', ordem: 7 },
+                    'alegacoes': { nome: 'Alegações Finais', ordem: 8 },
+                    'sentenca': { nome: 'Sentença', ordem: 9 },
+                    'recurso': { nome: 'Recurso', ordem: 10 },
+                    'transitado': { nome: 'Trânsito em Julgado', ordem: 11 },
+                    'cumprimento': { nome: 'Cumprimento de Sentença', ordem: 12 }
+                }
             }
         };
 
@@ -1740,6 +1763,7 @@
             if (metaAtual === 'juri') return processosMetaJuri;
             if (metaAtual === 'violencia_domestica') return processosMetaViolenciaDomestica;
             if (metaAtual === 'mais_dez_anos') return processosMetaMaisDezAnos;
+            if (metaAtual === 'saude') return processosMetaSaude;
             return {};
         }
 
@@ -1766,6 +1790,7 @@
         let processosMetaJuri = {};
         let processosMetaViolenciaDomestica = {};
         let processosMetaMaisDezAnos = {};
+        let processosMetaSaude = {};
 
         // ==================== UTILITÁRIOS ====================
         
@@ -4278,6 +4303,8 @@
                     processosMetaViolenciaDomestica[id] = novoProcesso;
                 } else if (metaAtual === 'mais_dez_anos') {
                     processosMetaMaisDezAnos[id] = novoProcesso;
+                } else if (metaAtual === 'saude') {
+                    processosMetaSaude[id] = novoProcesso;
                 }
                 limparFormularioMeta();
                 showNotification('Processo cadastrado localmente', 'warning');
@@ -4381,6 +4408,8 @@
                     processosMetaViolenciaDomestica[id] = processoAtualizado;
                 } else if (metaAtual === 'mais_dez_anos') {
                     processosMetaMaisDezAnos[id] = processoAtualizado;
+                } else if (metaAtual === 'saude') {
+                    processosMetaSaude[id] = processoAtualizado;
                 }
                 fecharModalEdicaoProcessoMeta();
                 showNotification('Processo atualizado localmente', 'warning');
@@ -4419,6 +4448,8 @@
                     delete processosMetaViolenciaDomestica[id];
                 } else if (metaAtual === 'mais_dez_anos') {
                     delete processosMetaMaisDezAnos[id];
+                } else if (metaAtual === 'saude') {
+                    delete processosMetaSaude[id];
                 }
                 showNotification('Processo removido localmente', 'warning');
                 renderMetasAcoesPenais();
@@ -4991,6 +5022,8 @@
                             processosMetaViolenciaDomestica[id] = novoProcesso;
                         } else if (metaAtual === 'mais_dez_anos') {
                             processosMetaMaisDezAnos[id] = novoProcesso;
+                        } else if (metaAtual === 'saude') {
+                            processosMetaSaude[id] = novoProcesso;
                         }
                     }
                     importados++;
@@ -5340,6 +5373,17 @@
                     log(`Processos Meta +10 Anos carregados: ${Object.keys(processosMetaMaisDezAnos).length}`);
 
                     if (currentView === 'metas' && metaAtual === 'mais_dez_anos') {
+                        renderMetasDashboard();
+                        renderListaMetas();
+                    }
+                });
+
+                // Listener para processos da Meta Saúde
+                database.ref('processosMetaSaude').on('value', (snapshot) => {
+                    processosMetaSaude = snapshot.val() || {};
+                    log(`Processos Meta Saúde carregados: ${Object.keys(processosMetaSaude).length}`);
+
+                    if (currentView === 'metas' && metaAtual === 'saude') {
                         renderMetasDashboard();
                         renderListaMetas();
                     }
