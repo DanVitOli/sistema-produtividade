@@ -4012,14 +4012,37 @@
             const emAndamento = processos.filter(p => p.status === 'em_andamento').length;
             const suspensos = processos.filter(p => p.status === 'suspenso' || p.status === 'sobrestado').length;
 
-            // Calcular processos parados (sem movimentação há mais de 30 dias)
+            // Calcular processos parados por faixa de dias
             const hoje = getDataHoraBrasilia();
-            const parados = processos.filter(p => {
-                if (p.status === 'baixado') return false;
-                const ultimaMov = new Date(p.ultimaMovimentacao + 'T00:00:00');
-                const diasParado = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
-                return diasParado > 30;
-            }).length;
+
+            // Função auxiliar para calcular dias parado
+            const calcularDiasParado = (processo) => {
+                if (!processo.ultimaMovimentacao) return 0;
+                const ultimaMov = new Date(processo.ultimaMovimentacao + 'T00:00:00');
+                return Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
+            };
+
+            // Processos ativos (não baixados)
+            const processosAtivos = processos.filter(p => p.status !== 'baixado');
+
+            // Contadores por faixa de dias
+            const parados15dias = processosAtivos.filter(p => {
+                const dias = calcularDiasParado(p);
+                return dias >= 15 && dias < 30;
+            });
+
+            const parados30dias = processosAtivos.filter(p => {
+                const dias = calcularDiasParado(p);
+                return dias >= 30 && dias < 45;
+            });
+
+            const parados45dias = processosAtivos.filter(p => {
+                const dias = calcularDiasParado(p);
+                return dias >= 45;
+            });
+
+            // Total de processos parados (30+ dias para o card existente)
+            const parados = processosAtivos.filter(p => calcularDiasParado(p) > 30).length;
 
             // Calcular dias até o prazo final
             const prazoFinal = new Date(meta.prazoFinal + 'T23:59:59');
@@ -4109,6 +4132,84 @@
                         ${parados > 0 ? '<div class="text-xs text-red-600 mt-2">⚠️ Necessita atenção!</div>' : ''}
                     </div>
                 </div>
+
+                <!-- Painel de Alertas de Processos Parados -->
+                ${(parados15dias.length > 0 || parados30dias.length > 0 || parados45dias.length > 0) ? `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <i data-lucide="bell" class="h-5 w-5 mr-2 text-orange-500"></i>
+                        Alertas de Processos Parados
+                    </h3>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <!-- Alerta 15 dias -->
+                        <div class="border-l-4 border-yellow-400 bg-yellow-50 p-4 rounded-r-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-yellow-800 font-semibold flex items-center">
+                                    <i data-lucide="clock" class="h-4 w-4 mr-1"></i>
+                                    15+ dias
+                                </span>
+                                <span class="bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full text-sm font-bold">${parados15dias.length}</span>
+                            </div>
+                            ${parados15dias.length > 0 ? `
+                                <div class="max-h-32 overflow-y-auto space-y-1">
+                                    ${parados15dias.slice(0, 5).map(p => `
+                                        <div class="text-xs text-yellow-700 truncate" title="${p.numeroProcesso}">
+                                            • ${p.numeroProcesso?.substring(0, 20)}...
+                                        </div>
+                                    `).join('')}
+                                    ${parados15dias.length > 5 ? `<div class="text-xs text-yellow-600 font-medium">+ ${parados15dias.length - 5} outros</div>` : ''}
+                                </div>
+                            ` : '<div class="text-xs text-yellow-600">Nenhum processo</div>'}
+                        </div>
+
+                        <!-- Alerta 30 dias -->
+                        <div class="border-l-4 border-orange-400 bg-orange-50 p-4 rounded-r-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-orange-800 font-semibold flex items-center">
+                                    <i data-lucide="alert-circle" class="h-4 w-4 mr-1"></i>
+                                    30+ dias
+                                </span>
+                                <span class="bg-orange-200 text-orange-800 px-2 py-1 rounded-full text-sm font-bold">${parados30dias.length}</span>
+                            </div>
+                            ${parados30dias.length > 0 ? `
+                                <div class="max-h-32 overflow-y-auto space-y-1">
+                                    ${parados30dias.slice(0, 5).map(p => `
+                                        <div class="text-xs text-orange-700 truncate" title="${p.numeroProcesso}">
+                                            • ${p.numeroProcesso?.substring(0, 20)}...
+                                        </div>
+                                    `).join('')}
+                                    ${parados30dias.length > 5 ? `<div class="text-xs text-orange-600 font-medium">+ ${parados30dias.length - 5} outros</div>` : ''}
+                                </div>
+                            ` : '<div class="text-xs text-orange-600">Nenhum processo</div>'}
+                        </div>
+
+                        <!-- Alerta 45 dias -->
+                        <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-red-800 font-semibold flex items-center">
+                                    <i data-lucide="alert-triangle" class="h-4 w-4 mr-1"></i>
+                                    45+ dias
+                                </span>
+                                <span class="bg-red-200 text-red-800 px-2 py-1 rounded-full text-sm font-bold">${parados45dias.length}</span>
+                            </div>
+                            ${parados45dias.length > 0 ? `
+                                <div class="max-h-32 overflow-y-auto space-y-1">
+                                    ${parados45dias.slice(0, 5).map(p => `
+                                        <div class="text-xs text-red-700 truncate" title="${p.numeroProcesso}">
+                                            • ${p.numeroProcesso?.substring(0, 20)}...
+                                        </div>
+                                    `).join('')}
+                                    ${parados45dias.length > 5 ? `<div class="text-xs text-red-600 font-medium">+ ${parados45dias.length - 5} outros</div>` : ''}
+                                </div>
+                            ` : '<div class="text-xs text-red-600">Nenhum processo</div>'}
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-gray-500 flex items-center">
+                        <i data-lucide="info" class="h-3 w-3 mr-1"></i>
+                        Processos sem movimentação há mais de 15 dias que não estão baixados
+                    </div>
+                </div>
+                ` : ''}
             `;
 
             setTimeout(() => criarIcones(), 100);
@@ -4194,14 +4295,25 @@
 
             let alertaParado = '';
             let borderClass = 'border-gray-200';
-            if (processo.status !== 'baixado' && diasParado > 30) {
-                borderClass = 'border-red-300 bg-red-50';
-                if (diasParado > 90) {
-                    alertaParado = `<span class="px-2 py-1 bg-red-600 text-white text-xs rounded">⚠️ ${diasParado} dias parado!</span>`;
-                } else if (diasParado > 60) {
-                    alertaParado = `<span class="px-2 py-1 bg-red-500 text-white text-xs rounded">⚠️ ${diasParado} dias parado</span>`;
+            if (processo.status !== 'baixado' && diasParado >= 15) {
+                if (diasParado >= 45) {
+                    borderClass = 'border-red-400 bg-red-50';
+                    alertaParado = `<span class="px-2 py-1 bg-red-600 text-white text-xs rounded flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        ${diasParado} dias parado!
+                    </span>`;
+                } else if (diasParado >= 30) {
+                    borderClass = 'border-orange-300 bg-orange-50';
+                    alertaParado = `<span class="px-2 py-1 bg-orange-500 text-white text-xs rounded flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        ${diasParado} dias parado
+                    </span>`;
                 } else {
-                    alertaParado = `<span class="px-2 py-1 bg-yellow-500 text-white text-xs rounded">⏰ ${diasParado} dias parado</span>`;
+                    borderClass = 'border-yellow-300 bg-yellow-50';
+                    alertaParado = `<span class="px-2 py-1 bg-yellow-500 text-white text-xs rounded flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        ${diasParado} dias parado
+                    </span>`;
                 }
             }
 
