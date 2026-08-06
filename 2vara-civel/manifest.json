@@ -1,0 +1,22 @@
+{
+  "name": "2ª Vara Cível de Palmeira dos Índios - Produtividade",
+  "short_name": "2ª Vara Cível",
+  "description": "Sistema de controle de produtividade - 2ª Vara Cível de Palmeira dos Índios",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0891B2",
+  "theme_color": "#0891B2",
+  "orientation": "any",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "pt-BR",
+  "dir": "ltr"
+}
