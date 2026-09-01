@@ -22,8 +22,8 @@ de execução penal**.
   Cível/Criminal); categoria "Crime" substituída por "Fazenda Pública".
 - **"Meta 10" renomeada** para "Impulso Processos Antigos" (1 minuta/semana em
   qualquer dos processos mais antigos), disponível para todos os assessores.
-- **Usuários genéricos** (`juiz`, `assessor1`, `assessor2`) sem exclusividades
-  por assessor — personalize os nomes conforme a equipe da unidade.
+- **Usuários da unidade** (`juiz`, `gilbert`, `laise`) sem exclusividades de
+  categoria por assessor.
 - **Banco de dados próprio**: o sistema NÃO compartilha o Firebase da vara de
   origem; exige um projeto Firebase novo (ver abaixo).
 - Identidade visual própria (ciano), PWA com manifest/ícone/service worker
@@ -49,11 +49,11 @@ de execução penal**.
 No `index.html`, localize `const credenciais` e ajuste nomes, logins e senhas
 da equipe. As senhas padrão de fábrica são:
 
-| Usuário     | Senha             |
-|-------------|-------------------|
-| `juiz`      | `Juiz2VC@2026!`   |
-| `assessor1` | `Assessor1@2026!` |
-| `assessor2` | `Assessor2@2026!` |
+| Usuário   | Nome                          | Senha             |
+|-----------|-------------------------------|-------------------|
+| `juiz`    | Danilo Vital de Oliveira      | `Juiz2VC@2026!`   |
+| `gilbert` | Gilbert Juliano de Sena Lúcio | `Gilbert2VC@2026!`|
+| `laise`   | Laíse Vital da Silva Nunes    | `Laise2VC@2026!`  |
 
 **Troque essas senhas antes de colocar em produção.** Se alterar os nomes de
 exibição, ajuste também `const assessores` (logo abaixo no mesmo arquivo) e as

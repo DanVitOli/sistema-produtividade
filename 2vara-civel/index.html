@@ -187,9 +187,9 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
                     <select id="login-usuario" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Selecione o usuário</option>
-                        <option value="juiz">Juiz</option>
-                        <option value="assessor1">Assessor 1</option>
-                        <option value="assessor2">Assessor 2</option>
+                        <option value="juiz">Danilo Vital de Oliveira (Juiz)</option>
+                        <option value="gilbert">Gilbert Juliano de Sena Lúcio</option>
+                        <option value="laise">Laíse Vital da Silva Nunes</option>
                     </select>
                 </div>
                 
@@ -605,8 +605,8 @@
                     </select>
                     <select id="filtro-balcao-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" onchange="renderBalcaoLista()">
                         <option value="">Todos os assessores</option>
-                        <option value="assessor1">Assessor 1</option>
-                        <option value="assessor2">Assessor 2</option>
+                        <option value="assessor1">Gilbert Juliano</option>
+                        <option value="assessor2">Laíse Vital</option>
                     </select>
                     <select id="filtro-balcao-prazo" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" onchange="renderBalcaoLista()">
                         <option value="">Todos os prazos</option>
@@ -1337,8 +1337,8 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Assessor (opcional)</label>
                     <select id="balcao-relatorio-assessor" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
                         <option value="">Todos os assessores</option>
-                        <option value="assessor1">Assessor 1</option>
-                        <option value="assessor2">Assessor 2</option>
+                        <option value="assessor1">Gilbert Juliano</option>
+                        <option value="assessor2">Laíse Vital</option>
                     </select>
                 </div>
 
@@ -1509,9 +1509,9 @@
 
         // Credenciais seguras
         const credenciais = {
-            'juiz': { senha: 'Juiz2VC@2026!', nome: 'Juiz', tipo: 'juiz' },
-            'assessor1': { senha: 'Assessor1@2026!', nome: 'Assessor 1', tipo: 'assessor', assessorId: 'assessor1' },
-            'assessor2': { senha: 'Assessor2@2026!', nome: 'Assessor 2', tipo: 'assessor', assessorId: 'assessor2' }
+            'juiz': { senha: 'Juiz2VC@2026!', nome: 'Danilo Vital de Oliveira', tipo: 'juiz' },
+            'gilbert': { senha: 'Gilbert2VC@2026!', nome: 'Gilbert Juliano de Sena Lúcio', tipo: 'assessor', assessorId: 'assessor1' },
+            'laise': { senha: 'Laise2VC@2026!', nome: 'Laíse Vital da Silva Nunes', tipo: 'assessor', assessorId: 'assessor2' }
         };
 
         const categorias = {
@@ -1753,8 +1753,8 @@
             diaSelecionado: null
         };
         let assessores = {
-            assessor1: { nome: 'Assessor 1', ativo: true },
-            assessor2: { nome: 'Assessor 2', ativo: true }
+            assessor1: { nome: 'Gilbert Juliano de Sena Lúcio', ativo: true },
+            assessor2: { nome: 'Laíse Vital da Silva Nunes', ativo: true }
         };
         let notificacoesJuiz = {};
         let processosMetaImprobidade = {};
@@ -1978,8 +1978,8 @@
                 if (m.status === 'excluida') return false;
                 
                 return m.assessorId === assessorId || 
-                       (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1')))) ||
-                       (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))));
+                       (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano')))) ||
+                       (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))));
             });
         }
 
@@ -1990,8 +1990,8 @@
                 
                 if (assessorId) {
                     return m.assessorId === assessorId || 
-                           (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1')))) ||
-                           (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))));
+                           (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano')))) ||
+                           (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))));
                 }
                 
                 return true;
@@ -2008,8 +2008,8 @@
                 if (m.status === 'excluida') return false;
                 
                 const isAssessor = !assessorId || m.assessorId === assessorId || 
-                                 (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1')))) ||
-                                 (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))));
+                                 (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano')))) ||
+                                 (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))));
                 
                 if (!isAssessor) return false;
                 
@@ -2127,8 +2127,8 @@
 
                 // Verificar se é do assessor correto
                 const isAssessor = m.assessorId === assessorId ||
-                                  (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1')))) ||
-                                  (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))));
+                                  (assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano')))) ||
+                                  (assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))));
 
                 if (!isAssessor) return false;
 
@@ -2199,12 +2199,12 @@
         function renderPaineisParaJuiz(categoriasAcompanhamento) {
             let html = '';
 
-            // Assessor 1
+            // Gilbert Juliano
             html += `
                 <div class="mb-6">
                     <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
                         <span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
-                        Assessor 1
+                        Gilbert Juliano
                     </h4>
                     <div class="grid md:grid-cols-3 gap-3">
             `;
@@ -2215,12 +2215,12 @@
 
             html += '</div></div>';
 
-            // Assessor 2
+            // Laíse Vital
             html += `
                 <div class="mb-6">
                     <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
                         <span class="w-3 h-3 rounded-full bg-pink-500 mr-2"></span>
-                        Assessor 2
+                        Laíse Vital
                     </h4>
                     <div class="grid md:grid-cols-3 gap-3">
             `;
@@ -2546,8 +2546,8 @@
             const filtroAssessorHtml = currentUser.isJuiz ? `
                 <select id="filtro-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
                     <option value="">Todos os assessores</option>
-                    <option value="assessor1">Assessor 1</option>
-                    <option value="assessor2">Assessor 2</option>
+                    <option value="assessor1">Gilbert Juliano</option>
+                    <option value="assessor2">Laíse Vital</option>
                 </select>
             ` : '';
 
@@ -3503,7 +3503,7 @@
                         <!-- Distribuição por Assessor -->
                         <div class="grid md:grid-cols-2 gap-6">
                             <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                                <h4 class="text-lg font-semibold text-blue-800 mb-4">👨‍💼 Assessor 1</h4>
+                                <h4 class="text-lg font-semibold text-blue-800 mb-4">👨‍💼 Gilbert Juliano</h4>
                                 <div class="space-y-3">
                                     <div class="flex justify-between">
                                         <span>Total de pedidos:</span>
@@ -3525,7 +3525,7 @@
                             </div>
 
                             <div class="bg-green-50 border border-green-200 rounded-lg p-6">
-                                <h4 class="text-lg font-semibold text-green-800 mb-4">👩‍💼 Assessor 2</h4>
+                                <h4 class="text-lg font-semibold text-green-800 mb-4">👩‍💼 Laíse Vital</h4>
                                 <div class="space-y-3">
                                     <div class="flex justify-between">
                                         <span>Total de pedidos:</span>
@@ -5436,11 +5436,11 @@
             minutas = {
                 'demo_1': {
                     assessorId: 'assessor1',
-                    assessorNome: 'Assessor 1',
+                    assessorNome: 'Gilbert Juliano',
                     numeroProcesso: '1234567-89.2024.8.02.3456',
                     tipoMinuta: 'Decisão',
                     categorias: ['meta1'],
-                    observacoes: 'Minuta de exemplo - Assessor 1',
+                    observacoes: 'Minuta de exemplo - Gilbert Juliano',
                     status: 'pendente',
                     data: hoje,
                     timestamp: '09:30:00',
@@ -5448,11 +5448,11 @@
                 },
                 'demo_2': {
                     assessorId: 'assessor2',
-                    assessorNome: 'Assessor 2',
+                    assessorNome: 'Laíse Vital',
                     numeroProcesso: '7654321-10.2024.8.02.7890',
                     tipoMinuta: 'Despacho',
                     categorias: ['meta1', 'sem_movimento'],
-                    observacoes: 'Minuta de exemplo - Assessor 2',
+                    observacoes: 'Minuta de exemplo - Laíse Vital',
                     status: 'assinada',
                     data: hoje,
                     timestamp: '10:15:00',
@@ -5460,7 +5460,7 @@
                 },
                 'demo_3': {
                     assessorId: 'assessor1',
-                    assessorNome: 'Assessor 1',
+                    assessorNome: 'Gilbert Juliano',
                     numeroProcesso: '9876543-21.2024.8.02.1357',
                     tipoMinuta: 'Sentença',
                     categorias: ['meta2'],
@@ -5472,11 +5472,11 @@
                 },
                 'demo_4': {
                     assessorId: 'assessor2',
-                    assessorNome: 'Assessor 2',
+                    assessorNome: 'Laíse Vital',
                     numeroProcesso: '1111111-11.2024.8.02.1111',
                     tipoMinuta: 'Sentença',
                     categorias: ['meta2'],
-                    observacoes: 'Sentença da Meta 2 CNJ - Assessor 2',
+                    observacoes: 'Sentença da Meta 2 CNJ - Laíse Vital',
                     status: 'assinada',
                     data: ontemStr,
                     timestamp: '16:30:00',
@@ -5634,8 +5634,8 @@
                         if (!m || m.status !== 'correcao') return false;
                         
                         return m.assessorId === currentUser.assessorId || 
-                               (currentUser.assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1')))) ||
-                               (currentUser.assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))));
+                               (currentUser.assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano')))) ||
+                               (currentUser.assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))));
                     });
 
                     if (correcoesPendentes.length > 0) {
@@ -5744,10 +5744,10 @@
 
             return `
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-                    <!-- Meta 2 Assessor 1 -->
+                    <!-- Meta 2 Gilbert Juliano -->
                     <div class="bg-white rounded-lg shadow-md p-4 ${meta2Assessor1.metaSemanaCumprida ? 'meta2-success' : 'meta2-alert'}">
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="font-semibold text-sm text-gray-700">Meta 2 CNJ - Assessor 1</h4>
+                            <h4 class="font-semibold text-sm text-gray-700">Meta 2 CNJ - Gilbert Juliano</h4>
                             <span class="text-xs px-2 py-1 rounded-full ${meta2Assessor1.metaSemanaCumprida ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
                                 ${meta2Assessor1.metaSemanaCumprida ? 'OK' : 'Pendente'}
                             </span>
@@ -5758,10 +5758,10 @@
                         <div class="text-xs text-gray-600">Sentença/semana</div>
                     </div>
 
-                    <!-- Meta 2 Assessor 2 -->
+                    <!-- Meta 2 Laíse Vital -->
                     <div class="bg-white rounded-lg shadow-md p-4 ${meta2Assessor2.metaSemanaCumprida ? 'meta2-success' : 'meta2-alert'}">
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="font-semibold text-sm text-gray-700">Meta 2 CNJ - Assessor 2</h4>
+                            <h4 class="font-semibold text-sm text-gray-700">Meta 2 CNJ - Laíse Vital</h4>
                             <span class="text-xs px-2 py-1 rounded-full ${meta2Assessor2.metaSemanaCumprida ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
                                 ${meta2Assessor2.metaSemanaCumprida ? 'OK' : 'Pendente'}
                             </span>
@@ -6045,8 +6045,8 @@
                     const filtroAssessorHtml = currentUser.isJuiz ? `
                         <select id="filtro-assessor" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="renderHistorico()">
                             <option value="">Todos os assessores</option>
-                            <option value="assessor1">Assessor 1</option>
-                            <option value="assessor2">Assessor 2</option>
+                            <option value="assessor1">Gilbert Juliano</option>
+                            <option value="assessor2">Laíse Vital</option>
                         </select>
                     ` : '';
 
@@ -6123,8 +6123,8 @@
                     minutasFiltradas = minutasFiltradas.filter(m => {
                         if (!m.assessorId) return false;
                         return m.assessorId === currentUser.assessorId || 
-                               (currentUser.assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1')))) ||
-                               (currentUser.assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))));
+                               (currentUser.assessorId === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano')))) ||
+                               (currentUser.assessorId === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))));
                     });
                 }
 
@@ -6147,8 +6147,8 @@
                 if (filtroAssessor && currentUser.isJuiz) {
                     minutasFiltradas = minutasFiltradas.filter(m => {
                         return m.assessorId === filtroAssessor ||
-                               (filtroAssessor === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1')))) ||
-                               (filtroAssessor === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))));
+                               (filtroAssessor === 'assessor1' && (m.assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano')))) ||
+                               (filtroAssessor === 'assessor2' && (m.assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))));
                     });
                 }
 
@@ -6269,8 +6269,8 @@
                 // Verificar se a minuta pertence ao assessor atual
                 const isMinutaDoAssessor = !currentUser.isJuiz && (
                     minuta.assessorId === currentUser.assessorId ||
-                    (currentUser.assessorId === 'assessor1' && (minuta.assessorId === 'assessor1' || (minuta.assessorNome && minuta.assessorNome.includes('Assessor 1')))) ||
-                    (currentUser.assessorId === 'assessor2' && (minuta.assessorId === 'assessor2' || (minuta.assessorNome && minuta.assessorNome.includes('Assessor 2'))))
+                    (currentUser.assessorId === 'assessor1' && (minuta.assessorId === 'assessor1' || (minuta.assessorNome && minuta.assessorNome.includes('Gilbert Juliano')))) ||
+                    (currentUser.assessorId === 'assessor2' && (minuta.assessorId === 'assessor2' || (minuta.assessorNome && minuta.assessorNome.includes('Laíse Vital'))))
                 );
 
                 if (currentUser.isJuiz) {
@@ -6629,8 +6629,8 @@
                 // Verificar se a minuta pertence ao assessor atual
                 const isMinutaDoAssessor = (
                     minuta.assessorId === currentUser.assessorId ||
-                    (currentUser.assessorId === 'assessor1' && (minuta.assessorId === 'assessor1' || (minuta.assessorNome && minuta.assessorNome.includes('Assessor 1')))) ||
-                    (currentUser.assessorId === 'assessor2' && (minuta.assessorId === 'assessor2' || (minuta.assessorNome && minuta.assessorNome.includes('Assessor 2'))))
+                    (currentUser.assessorId === 'assessor1' && (minuta.assessorId === 'assessor1' || (minuta.assessorNome && minuta.assessorNome.includes('Gilbert Juliano')))) ||
+                    (currentUser.assessorId === 'assessor2' && (minuta.assessorId === 'assessor2' || (minuta.assessorNome && minuta.assessorNome.includes('Laíse Vital'))))
                 );
 
                 if (!isMinutaDoAssessor) {
@@ -6957,9 +6957,9 @@
                         let assessorId = m.assessorId;
                         
                         // Normalizar IDs antigos
-                        if (assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Assessor 1'))) {
+                        if (assessorId === 'assessor1' || (m.assessorNome && m.assessorNome.includes('Gilbert Juliano'))) {
                             assessorId = 'assessor1';
-                        } else if (assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Assessor 2'))) {
+                        } else if (assessorId === 'assessor2' || (m.assessorNome && m.assessorNome.includes('Laíse Vital'))) {
                             assessorId = 'assessor2';
                         }
                         
@@ -7039,7 +7039,7 @@
                         <!-- Detalhes por Assessor -->
                         <div class="grid md:grid-cols-2 gap-6">
                             <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                                <h4 class="text-lg font-semibold text-blue-800 mb-4">👨‍💼 Assessor 1</h4>
+                                <h4 class="text-lg font-semibold text-blue-800 mb-4">👨‍💼 Gilbert Juliano</h4>
                                 <div class="space-y-3">
                                     <div class="flex justify-between items-center">
                                         <span class="text-sm font-medium">Minutas para meta:</span>
@@ -7096,7 +7096,7 @@
                             </div>
                             
                             <div class="bg-green-50 border border-green-200 rounded-lg p-6">
-                                <h4 class="text-lg font-semibold text-green-800 mb-4">👩‍💼 Assessor 2</h4>
+                                <h4 class="text-lg font-semibold text-green-800 mb-4">👩‍💼 Laíse Vital</h4>
                                 <div class="space-y-3">
                                     <div class="flex justify-between items-center">
                                         <span class="text-sm font-medium">Minutas para meta:</span>
