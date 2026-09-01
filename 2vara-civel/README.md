@@ -2,8 +2,8 @@
 
 Sistema independente de controle de produtividade do gabinete, derivado do
 sistema em operação na vara de origem e adaptado à competência da **2ª Vara
-Cível de Palmeira dos Índios/AL**, que **não possui competência criminal nem
-de execução penal**.
+Cível de Palmeira dos Índios/AL**, que **não possui competência criminal, de
+execução penal nem de execuções fiscais**.
 
 ## O que foi adaptado em relação ao sistema original
 
@@ -12,12 +12,11 @@ de execução penal**.
   validações, relatórios e estatísticas).
 - **Metas de acompanhamento processual cíveis**:
   - Meta 4 - Improbidade Administrativa
-  - Meta - Execuções Fiscais
   - Meta 6 - Ações Coletivas
   - Meta - Processos + 10 Anos
   - Meta - Saúde
 - **Painéis de acompanhamento quinzenal**: Conhecimento > 10 anos, Fazenda
-  Pública, Ações de Saúde, Execuções Fiscais Antigas e Ações Ambientais.
+  Pública, Ações de Saúde e Ações Ambientais.
 - **Balcão Virtual**: classes "Cível" e "Fazenda Pública" (antes
   Cível/Criminal); categoria "Crime" substituída por "Fazenda Pública".
 - **"Meta 10" renomeada** para "Impulso Processos Antigos" (1 minuta/semana em

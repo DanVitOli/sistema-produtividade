@@ -309,10 +309,6 @@
                                         <span class="text-sm">Ações de Saúde</span>
                                     </label>
                                     <label class="flex items-center">
-                                        <input type="checkbox" name="categorias" value="execucoes_fiscais" class="mr-2 h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded">
-                                        <span class="text-sm">Execuções Fiscais Antigas</span>
-                                    </label>
-                                    <label class="flex items-center">
                                         <input type="checkbox" name="categorias" value="acoes_ambientais" class="mr-2 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded">
                                         <span class="text-sm">Ações Ambientais</span>
                                     </label>
@@ -702,7 +698,6 @@
                     <span class="text-sm font-medium text-gray-600">Selecionar Meta:</span>
                     <select id="seletor-meta" onchange="trocarMeta(this.value)" class="border border-gray-300 rounded-md px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white min-w-64">
                         <option value="improbidade">Meta 4 - Improbidade Administrativa</option>
-                        <option value="execucao_fiscal">Meta - Execuções Fiscais</option>
                         <option value="acoes_coletivas">Meta 6 - Ações Coletivas</option>
                         <option value="mais_dez_anos">Meta - Processos + 10 Anos</option>
                         <option value="saude">Meta - Saúde</option>
@@ -1552,14 +1547,6 @@
                 naoContaParaMeta: true,
                 descricao: 'Ações de saúde em acompanhamento especial'
             },
-            'execucoes_fiscais': {
-                nome: 'Execuções Fiscais Antigas',
-                cor: 'bg-amber-700',
-                meta: 1,
-                prazo: 15,
-                naoContaParaMeta: true,
-                descricao: 'Execuções fiscais mais antigas em acompanhamento especial'
-            },
             'acoes_ambientais': {
                 nome: 'Ações Ambientais',
                 cor: 'bg-emerald-700',
@@ -1621,26 +1608,6 @@
                     'recurso': { nome: 'Recurso', ordem: 8 },
                     'transitado': { nome: 'Trânsito em Julgado', ordem: 9 },
                     'cumprimento': { nome: 'Cumprimento de Sentença', ordem: 10 }
-                }
-            },
-            'execucao_fiscal': {
-                id: 'execucao_fiscal',
-                nome: 'Meta - Execuções Fiscais',
-                prazoFinal: '2026-12-19',
-                descricao: 'Acompanhamento das execuções fiscais prioritárias',
-                cor: 'purple',
-                colecaoFirebase: 'processosMetaExecucaoFiscal',
-                fases: {
-                    'triagem': { nome: 'Triagem', ordem: 1 },
-                    'despacho_inicial': { nome: 'Despacho Inicial', ordem: 2 },
-                    'citacao': { nome: 'Citação do Executado', ordem: 3 },
-                    'penhora': { nome: 'Penhora/Bloqueio', ordem: 4 },
-                    'avaliacao': { nome: 'Avaliação de Bens', ordem: 5 },
-                    'embargos': { nome: 'Embargos à Execução', ordem: 6 },
-                    'expropriacao': { nome: 'Leilão/Expropriação', ordem: 7 },
-                    'satisfacao': { nome: 'Satisfação do Crédito', ordem: 8 },
-                    'extincao': { nome: 'Extinção', ordem: 9 },
-                    'arquivado': { nome: 'Arquivado/Baixado', ordem: 10 }
                 }
             },
             'acoes_coletivas': {
@@ -1731,7 +1698,6 @@
 
         function getProcessosMetaAtual() {
             if (metaAtual === 'improbidade') return processosMetaImprobidade;
-            if (metaAtual === 'execucao_fiscal') return processosMetaExecucaoFiscal;
             if (metaAtual === 'acoes_coletivas') return processosMetaAcoesColetivas;
             if (metaAtual === 'mais_dez_anos') return processosMetaMaisDezAnos;
             if (metaAtual === 'saude') return processosMetaSaude;
@@ -1758,7 +1724,6 @@
         };
         let notificacoesJuiz = {};
         let processosMetaImprobidade = {};
-        let processosMetaExecucaoFiscal = {};
         let processosMetaAcoesColetivas = {};
         let processosMetaMaisDezAnos = {};
         let processosMetaSaude = {};
@@ -2580,7 +2545,6 @@
                             <option value="conhecimento_10anos">Conhecimento > 10 anos</option>
                             <option value="fazenda_publica">Fazenda Pública</option>
                             <option value="acoes_saude">Ações de Saúde</option>
-                            <option value="execucoes_fiscais">Execuções Fiscais</option>
                             <option value="acoes_ambientais">Ações Ambientais</option>
                         </optgroup>
                     </select>
@@ -4265,8 +4229,6 @@
                 const id = 'local_' + Date.now();
                 if (metaAtual === 'improbidade') {
                     processosMetaImprobidade[id] = novoProcesso;
-                } else if (metaAtual === 'execucao_fiscal') {
-                    processosMetaExecucaoFiscal[id] = novoProcesso;
                 } else if (metaAtual === 'acoes_coletivas') {
                     processosMetaAcoesColetivas[id] = novoProcesso;
                 } else if (metaAtual === 'mais_dez_anos') {
@@ -4370,8 +4332,6 @@
             } else {
                 if (metaAtual === 'improbidade') {
                     processosMetaImprobidade[id] = processoAtualizado;
-                } else if (metaAtual === 'execucao_fiscal') {
-                    processosMetaExecucaoFiscal[id] = processoAtualizado;
                 } else if (metaAtual === 'acoes_coletivas') {
                     processosMetaAcoesColetivas[id] = processoAtualizado;
                 } else if (metaAtual === 'mais_dez_anos') {
@@ -4410,8 +4370,6 @@
             } else {
                 if (metaAtual === 'improbidade') {
                     delete processosMetaImprobidade[id];
-                } else if (metaAtual === 'execucao_fiscal') {
-                    delete processosMetaExecucaoFiscal[id];
                 } else if (metaAtual === 'acoes_coletivas') {
                     delete processosMetaAcoesColetivas[id];
                 } else if (metaAtual === 'mais_dez_anos') {
@@ -4984,8 +4942,6 @@
                         const id = 'local_' + Date.now() + '_' + i;
                         if (metaAtual === 'improbidade') {
                             processosMetaImprobidade[id] = novoProcesso;
-                        } else if (metaAtual === 'execucao_fiscal') {
-                            processosMetaExecucaoFiscal[id] = novoProcesso;
                         } else if (metaAtual === 'acoes_coletivas') {
                             processosMetaAcoesColetivas[id] = novoProcesso;
                         } else if (metaAtual === 'mais_dez_anos') {
@@ -5308,17 +5264,6 @@
                     log(`Processos Meta Improbidade carregados: ${Object.keys(processosMetaImprobidade).length}`);
 
                     if (currentView === 'metas' && metaAtual === 'improbidade') {
-                        renderMetasDashboard();
-                        renderListaMetas();
-                    }
-                });
-
-                // Listener para processos da Meta de Execuções Fiscais
-                database.ref('processosMetaExecucaoFiscal').on('value', (snapshot) => {
-                    processosMetaExecucaoFiscal = snapshot.val() || {};
-                    log(`Processos Meta Execuções Fiscais carregados: ${Object.keys(processosMetaExecucaoFiscal).length}`);
-
-                    if (currentView === 'metas' && metaAtual === 'execucao_fiscal') {
                         renderMetasDashboard();
                         renderListaMetas();
                     }
@@ -6079,7 +6024,6 @@
                                     <option value="conhecimento_10anos">Conhecimento > 10 anos</option>
                                     <option value="fazenda_publica">Fazenda Pública</option>
                                     <option value="acoes_saude">Ações de Saúde</option>
-                                    <option value="execucoes_fiscais">Execuções Fiscais</option>
                                     <option value="acoes_ambientais">Ações Ambientais</option>
                                 </optgroup>
                             </select>
