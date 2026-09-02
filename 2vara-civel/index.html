@@ -2415,12 +2415,18 @@
                             log('Aplicação inicializada com sucesso');
                         })
                         .catch((error) => {
-                            console.error('❌ Erro na autenticação:', error);
+                            // 02/09/2026: o projeto Firebase está sem o login anônimo habilitado
+                            // (auth/configuration-not-found) e este caminho NÃO ligava os listeners
+                            // do banco — dashboard ficava vazio ("Erro ao carregar dashboard").
+                            // As regras do Realtime Database permitem leitura/escrita sem auth,
+                            // então os listeners funcionam normalmente aqui também.
+                            console.error('❌ Erro na autenticação (seguindo sem auth):', error);
                             setupUserInfo();
                             setupNavigation();
                             setupMeta10Options();
+                            if (database) setupFirebaseListeners();
                             showView('dashboard');
-                            log('Aplicação inicializada sem autenticação Firebase');
+                            log('Aplicação inicializada sem autenticação Firebase (dados via listeners mesmo assim)');
                         });
                         
                 } catch (error) {
