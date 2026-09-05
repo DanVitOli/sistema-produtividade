@@ -688,6 +688,9 @@
         </div>
     </div>
 
+    <!-- Módulo Meta 180 Dias -->
+    <div id="meta180-view" class="hidden"></div>
+
     <!-- Módulo Metas -->
     <div id="metas-view" class="hidden">
         <!-- Seletor de Meta -->
@@ -2480,6 +2483,10 @@
                     <i data-lucide="inbox" class="h-4 w-4 mr-2"></i>
                     Balcão Virtual
                 </button>
+                <button onclick="showView('meta180')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    <i data-lucide="flag" class="h-4 w-4 mr-2"></i>
+                    Meta 180
+                </button>
             `;
 
             if (currentUser.isJuiz) {
@@ -2617,6 +2624,9 @@
                         break;
                     case 'metas':
                         renderMetasProcessos();
+                        break;
+                    case 'meta180':
+                        renderMeta180();
                         break;
                 }
 
@@ -5203,6 +5213,322 @@
             }
         }
 
+
+        // ==================== META 180 DIAS ====================
+        // Lista de processos parados há mais de 180 dias (extração 08/2026).
+        // O painel cruza esta lista com as minutas em tempo real: o processo é
+        // considerado CUMPRIDO quando a minuta correspondente é ASSINADA pelo juiz.
+
+        const META180_REFERENCIA = '08/2026';
+
+        const PROCESSOS_META180 = [
+            { numero: "0700383-35.2018.8.02.0046", classe: "Cumprimento de sentença", assunto: "Desconto em folha de pagamento", ultimaMov: "2025-09-18", tipo: "Decisão", local: "Cartório", sequencial: 0 },
+            { numero: "0702908-77.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Repetição de indébito", ultimaMov: "2026-01-16", tipo: "Despacho", local: "Gabinete", sequencial: 0 },
+            { numero: "0700147-39.2025.8.02.0046", classe: "Execução de Título Extrajudicial", assunto: "Cédula de Crédito Bancário", ultimaMov: "2025-11-24", tipo: "Decisão", local: "Gabinete", sequencial: 1 },
+            { numero: "0700693-41.2018.8.02.0046", classe: "Cumprimento de sentença", assunto: "Títulos de Crédito", ultimaMov: "2026-01-22", tipo: "Despacho", local: "Gabinete", sequencial: 1 },
+            { numero: "0700994-75.2024.8.02.0046", classe: "Cumprimento de sentença", assunto: "Defeito, nulidade ou anulação", ultimaMov: "2026-01-27", tipo: "Despacho", local: "Gabinete", sequencial: 1 },
+            { numero: "0701528-87.2022.8.02.0046", classe: "Cumprimento de sentença", assunto: "Empréstimo consignado", ultimaMov: "2026-01-14", tipo: "Outro", local: "Gabinete", sequencial: 1 },
+            { numero: "0702911-32.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Dissolução", ultimaMov: "2026-01-27", tipo: "Despacho", local: "Gabinete", sequencial: 1 },
+            { numero: "0703147-81.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Regime de Bens Entre os Cônjuges", ultimaMov: "2025-11-25", tipo: "Decisão", local: "Gabinete", sequencial: 1 },
+            { numero: "0703497-69.2024.8.02.0046/0001", classe: "Cumprimento de sentença", assunto: "Contratos Bancários", ultimaMov: "2026-02-23", tipo: "Despacho", local: "Gabinete", sequencial: 1 },
+            { numero: "0700384-44.2023.8.02.0046", classe: "Cumprimento de sentença", assunto: "Empréstimo consignado", ultimaMov: "2026-02-09", tipo: "Despacho", local: "Gabinete", sequencial: 2 },
+            { numero: "0700633-73.2015.8.02.0046", classe: "Cumprimento de sentença", assunto: "Responsabilidade da Administração", ultimaMov: "2026-02-20", tipo: "Outro", local: "Gabinete", sequencial: 2 },
+            { numero: "0702186-09.2025.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Anulação", ultimaMov: "2026-02-03", tipo: "Outro", local: "Gabinete", sequencial: 2 },
+            { numero: "0702688-79.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Material", ultimaMov: "2025-11-25", tipo: "Decisão", local: "Gabinete", sequencial: 2 },
+            { numero: "0001721-61.2013.8.02.0046/0003", classe: "Cumprimento de sentença", assunto: "Espécies de Contratos", ultimaMov: "2026-01-22", tipo: "Despacho", local: "Gabinete", sequencial: 3 },
+            { numero: "0701115-21.2015.8.02.0046/0002", classe: "Cumprimento de sentença", assunto: "Revisão", ultimaMov: "2026-02-12", tipo: "Despacho", local: "Gabinete", sequencial: 3 },
+            { numero: "0701115-21.2015.8.02.0046/0003", classe: "Cumprimento de sentença", assunto: "Revisão", ultimaMov: "2026-02-12", tipo: "Despacho", local: "Gabinete", sequencial: 3 },
+            { numero: "0703971-40.2024.8.02.0046", classe: "Embargos à Execução", assunto: "Constrição / Penhora / Avaliação / Indisponibilidade de Bens", ultimaMov: "2026-02-09", tipo: "Despacho", local: "Gabinete", sequencial: 3 },
+            { numero: "0001402-30.2012.8.02.0046", classe: "Inventário", assunto: "Inventário e Partilha", ultimaMov: "2026-01-13", tipo: "Despacho", local: "Gabinete", sequencial: 4 },
+            { numero: "0700040-97.2022.8.02.0046", classe: "Inventário", assunto: "Inventário e Partilha", ultimaMov: "2026-02-24", tipo: "Outro", local: "Gabinete", sequencial: 4 },
+            { numero: "0700062-87.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "PASEP", ultimaMov: "2026-02-18", tipo: "Despacho", local: "Gabinete", sequencial: 4 },
+            { numero: "0701494-10.2025.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Práticas Abusivas", ultimaMov: "2026-02-20", tipo: "Despacho", local: "Gabinete", sequencial: 4 },
+            { numero: "0703397-17.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Defeito, nulidade ou anulação", ultimaMov: "2026-01-29", tipo: "Despacho", local: "Gabinete", sequencial: 4 },
+            { numero: "0700337-46.2018.8.02.0046/0001", classe: "Cumprimento de sentença", assunto: "Pagamento", ultimaMov: "2026-02-20", tipo: "Despacho", local: "Gabinete", sequencial: 5 },
+            { numero: "0700524-54.2018.8.02.0046/0001", classe: "Cumprimento de sentença", assunto: "Desconto em folha de pagamento", ultimaMov: "2026-02-12", tipo: "Despacho", local: "Gabinete", sequencial: 5 },
+            { numero: "0701366-63.2020.8.02.0046/0002", classe: "Cumprimento de sentença", assunto: "Bancários", ultimaMov: "2026-01-28", tipo: "Despacho", local: "Gabinete", sequencial: 5 },
+            { numero: "0702669-73.2024.8.02.0046", classe: "Usucapião", assunto: "Usucapião Especial (Constitucional)", ultimaMov: "2026-02-13", tipo: "Despacho", local: "Gabinete", sequencial: 5 },
+            { numero: "0704425-20.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Material", ultimaMov: "2026-02-24", tipo: "Despacho", local: "Gabinete", sequencial: 5 },
+            { numero: "0700013-46.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Defeito, nulidade ou anulação", ultimaMov: "2026-01-30", tipo: "Decisão", local: "Gabinete", sequencial: 6 },
+            { numero: "0701312-24.2025.8.02.0046", classe: "Inventário", assunto: "Inventário e Partilha", ultimaMov: "2026-02-25", tipo: "Despacho", local: "Gabinete", sequencial: 6 },
+            { numero: "0701314-96.2022.8.02.0046/0001", classe: "Cumprimento de sentença", assunto: "Dissolução", ultimaMov: "2026-01-28", tipo: "Despacho", local: "Gabinete", sequencial: 6 },
+            { numero: "0701338-27.2022.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Arrolamento de Bens", ultimaMov: "2026-01-27", tipo: "Despacho", local: "Gabinete", sequencial: 6 },
+            { numero: "0702080-81.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "PASEP", ultimaMov: "2026-02-10", tipo: "Despacho", local: "Gabinete", sequencial: 6 },
+            { numero: "0702659-34.2021.8.02.0046/0002", classe: "Cumprimento de sentença", assunto: "Fixação", ultimaMov: "2026-02-25", tipo: "Despacho", local: "Gabinete", sequencial: 6 },
+            { numero: "0703192-85.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Repetição de indébito", ultimaMov: "2026-01-29", tipo: "Outro", local: "Gabinete", sequencial: 6 },
+            { numero: "0701167-02.2024.8.02.0046", classe: "Cumprimento de sentença", assunto: "PASEP", ultimaMov: "2026-02-04", tipo: "Despacho", local: "Gabinete", sequencial: 7 },
+            { numero: "0702195-05.2024.8.02.0046", classe: "Cumprimento de sentença", assunto: "Cartão de Crédito", ultimaMov: "2026-01-14", tipo: "Outro", local: "Gabinete", sequencial: 7 },
+            { numero: "0702535-80.2023.8.02.0046", classe: "Arrolamento Sumário", assunto: "Inventário e Partilha", ultimaMov: "2026-01-23", tipo: "Despacho", local: "Gabinete", sequencial: 7 },
+            { numero: "0702796-74.2025.8.02.0046", classe: "Monitória", assunto: "Contratos Bancários", ultimaMov: "2026-02-05", tipo: "Despacho", local: "Gabinete", sequencial: 7 },
+            { numero: "0700766-03.2024.8.02.0046", classe: "Procedimento Comum Cível", assunto: "Reconhecimento / Dissolução", ultimaMov: "2026-01-23", tipo: "Despacho", local: "Gabinete", sequencial: 8 },
+            { numero: "0701527-73.2020.8.02.0046/0001", classe: "Cumprimento de sentença", assunto: "Obrigações", ultimaMov: "2026-02-04", tipo: "Despacho", local: "Gabinete", sequencial: 8 },
+            { numero: "0702122-67.2023.8.02.0046", classe: "Cumprimento de sentença", assunto: "Contratos Bancários", ultimaMov: "2026-02-06", tipo: "Despacho", local: "Gabinete", sequencial: 8 },
+            { numero: "0700545-83.2025.8.02.0046", classe: "Procedimento Comum Cível", assunto: "PASEP", ultimaMov: "2026-01-24", tipo: "Decisão", local: "Gabinete", sequencial: 9 }
+        ].map(p => {
+            const base = p.numero.split('/')[0];
+            return {
+                ...p,
+                temSufixo: p.numero.includes('/'),
+                chave: p.numero.replace(/\D/g, ''),
+                chaveBase: base.replace(/\D/g, '')
+            };
+        });
+
+        let meta180Filtros = { status: '', tipo: '', busca: '' };
+
+        function normalizarNumeroCNJ(str) {
+            return String(str || '').replace(/\D/g, '');
+        }
+
+        function getStatusMeta180() {
+            const todas = Object.values(minutas).filter(m => m && m.numeroProcesso && m.status !== 'excluida');
+            return PROCESSOS_META180.map(p => {
+                const matches = todas.filter(m => {
+                    const d = normalizarNumeroCNJ(m.numeroProcesso);
+                    // Entrada com sufixo (incidente): exige o número completo.
+                    // Entrada sem sufixo: aceita o número base (com ou sem sufixo digitado).
+                    return p.temSufixo ? d === p.chave : (d === p.chave || d.startsWith(p.chave));
+                });
+                const assinadas = matches.filter(m => m.status === 'assinada')
+                    .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+                const emAndamento = matches.filter(m => m.status === 'pendente' || m.status === 'correcao')
+                    .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+
+                let status = 'pendente';
+                let minutaRef = null;
+                if (assinadas.length > 0) {
+                    status = 'cumprido';
+                    minutaRef = assinadas[0];
+                } else if (emAndamento.length > 0) {
+                    status = 'minutado';
+                    minutaRef = emAndamento[0];
+                }
+                return { ...p, status, minutaRef };
+            });
+        }
+
+        function getResumoMeta180(itens) {
+            const resumo = {
+                total: itens.length,
+                cumpridos: 0,
+                minutados: 0,
+                pendentes: 0,
+                porAssessor: {
+                    assessor1: { cumpridos: 0, minutados: 0 },
+                    assessor2: { cumpridos: 0, minutados: 0 }
+                }
+            };
+            itens.forEach(item => {
+                if (item.status === 'cumprido') resumo.cumpridos++;
+                else if (item.status === 'minutado') resumo.minutados++;
+                else resumo.pendentes++;
+
+                if (item.minutaRef && resumo.porAssessor[item.minutaRef.assessorId]) {
+                    if (item.status === 'cumprido') resumo.porAssessor[item.minutaRef.assessorId].cumpridos++;
+                    if (item.status === 'minutado') resumo.porAssessor[item.minutaRef.assessorId].minutados++;
+                }
+            });
+            resumo.percentual = resumo.total > 0 ? Math.round((resumo.cumpridos / resumo.total) * 100) : 0;
+            resumo.percentualMinutados = resumo.total > 0 ? Math.round((resumo.minutados / resumo.total) * 100) : 0;
+            return resumo;
+        }
+
+        function diasParadoMeta180(ultimaMov) {
+            try {
+                const dias = Math.floor((getDataHoraBrasilia() - new Date(ultimaMov + 'T12:00:00')) / (1000 * 60 * 60 * 24));
+                return dias >= 0 ? dias : 0;
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function renderMeta180ResumoCard() {
+            const resumo = getResumoMeta180(getStatusMeta180());
+            return `
+                <div class="bg-white rounded-lg shadow-md p-4 mt-6 border-l-4 border-cyan-600 cursor-pointer hover:shadow-lg transition-shadow" onclick="showView('meta180')">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold text-gray-700 flex items-center">
+                            <i data-lucide="flag" class="h-4 w-4 mr-2 text-cyan-600"></i>
+                            Meta 180 Dias (lista ${META180_REFERENCIA})
+                        </h4>
+                        <span class="text-sm font-bold text-cyan-700">${resumo.cumpridos}/${resumo.total} assinados (${resumo.percentual}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3 flex overflow-hidden">
+                        <div class="bg-green-500 h-3" style="width: ${resumo.percentual}%"></div>
+                        <div class="bg-yellow-400 h-3" style="width: ${resumo.percentualMinutados}%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-600 mt-1">
+                        <span>🟢 ${resumo.cumpridos} assinados &nbsp; 🟡 ${resumo.minutados} minutados &nbsp; 🔴 ${resumo.pendentes} sem minuta</span>
+                        <span class="text-cyan-700">ver painel →</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function atualizarFiltroMeta180(campo, valor) {
+            meta180Filtros[campo] = valor;
+            renderListaMeta180();
+        }
+
+        function renderMeta180() {
+            const view = document.getElementById('meta180-view');
+            if (!view) return;
+            view.classList.remove('hidden');
+
+            if (!document.getElementById('meta180-resumo')) {
+                view.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center">
+                                <i data-lucide="flag" class="h-6 w-6 text-cyan-600 mr-2"></i>
+                                <div>
+                                    <h2 class="text-xl font-semibold text-gray-800">Meta 180 Dias</h2>
+                                    <p class="text-sm text-gray-600">Processos parados há mais de 180 dias — lista de referência ${META180_REFERENCIA} (${PROCESSOS_META180.length} processos)</p>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded p-2 max-w-md">
+                                💡 O processo é marcado automaticamente: <strong>🟡 minutado</strong> quando a minuta é registrada e
+                                <strong>🟢 cumprido</strong> quando o juiz a marca como <strong>assinada</strong>. Para incidentes
+                                (nº com /0002 etc.), registre a minuta com o número completo.
+                            </div>
+                        </div>
+                    </div>
+                    <div id="meta180-resumo" class="mb-6"></div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex flex-wrap gap-2 mb-4 no-print">
+                            <input type="text" placeholder="Buscar por nº do processo" oninput="atualizarFiltroMeta180('busca', this.value)"
+                                   class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 min-w-56">
+                            <select onchange="atualizarFiltroMeta180('status', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                <option value="">Todos os status</option>
+                                <option value="pendente">🔴 Sem minuta</option>
+                                <option value="minutado">🟡 Minutados (aguardando assinatura)</option>
+                                <option value="cumprido">🟢 Cumpridos (assinados)</option>
+                            </select>
+                            <select onchange="atualizarFiltroMeta180('tipo', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                <option value="">Todas as conclusões</option>
+                                <option value="Despacho">Concluso para Despacho</option>
+                                <option value="Decisão">Concluso para Decisão</option>
+                                <option value="Outro">Outras movimentações</option>
+                            </select>
+                        </div>
+                        <div id="meta180-lista"></div>
+                    </div>
+                `;
+            }
+
+            renderListaMeta180();
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function renderListaMeta180() {
+            const resumoDiv = document.getElementById('meta180-resumo');
+            const listaDiv = document.getElementById('meta180-lista');
+            if (!resumoDiv || !listaDiv) return;
+
+            const itens = getStatusMeta180();
+            const resumo = getResumoMeta180(itens);
+
+            resumoDiv.innerHTML = `
+                <div class="grid md:grid-cols-4 gap-4 mb-4">
+                    <div class="bg-white rounded-lg shadow-md p-4 text-center">
+                        <div class="text-3xl font-bold text-gray-800">${resumo.total}</div>
+                        <div class="text-sm text-gray-600">Processos na lista</div>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-lg shadow-sm p-4 text-center">
+                        <div class="text-3xl font-bold text-green-700">${resumo.cumpridos}</div>
+                        <div class="text-sm text-green-700">🟢 Cumpridos (assinados)</div>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg shadow-sm p-4 text-center">
+                        <div class="text-3xl font-bold text-yellow-700">${resumo.minutados}</div>
+                        <div class="text-sm text-yellow-700">🟡 Aguardando assinatura</div>
+                    </div>
+                    <div class="bg-red-50 border border-red-200 rounded-lg shadow-sm p-4 text-center">
+                        <div class="text-3xl font-bold text-red-700">${resumo.pendentes}</div>
+                        <div class="text-sm text-red-700">🔴 Sem minuta</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <span class="font-medium">Progresso da meta (minutas assinadas)</span>
+                        <span class="font-bold text-cyan-700">${resumo.percentual}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4 flex overflow-hidden">
+                        <div class="bg-green-500 h-4 transition-all duration-500" style="width: ${resumo.percentual}%"></div>
+                        <div class="bg-yellow-400 h-4 transition-all duration-500" style="width: ${resumo.percentualMinutados}%"></div>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4 mt-4 text-sm">
+                        <div class="flex justify-between bg-blue-50 rounded p-2">
+                            <span>👨‍💼 ${assessores.assessor1?.nome || 'Assessor 1'}:</span>
+                            <span><strong class="text-green-700">${resumo.porAssessor.assessor1.cumpridos}</strong> assinados,
+                                  <strong class="text-yellow-700">${resumo.porAssessor.assessor1.minutados}</strong> aguardando</span>
+                        </div>
+                        <div class="flex justify-between bg-pink-50 rounded p-2">
+                            <span>👩‍💼 ${assessores.assessor2?.nome || 'Assessor 2'}:</span>
+                            <span><strong class="text-green-700">${resumo.porAssessor.assessor2.cumpridos}</strong> assinados,
+                                  <strong class="text-yellow-700">${resumo.porAssessor.assessor2.minutados}</strong> aguardando</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const busca = normalizarNumeroCNJ(meta180Filtros.busca);
+            const ordem = { pendente: 0, minutado: 1, cumprido: 2 };
+            const filtrados = itens.filter(item => {
+                if (meta180Filtros.status && item.status !== meta180Filtros.status) return false;
+                if (meta180Filtros.tipo && item.tipo !== meta180Filtros.tipo) return false;
+                if (busca && !item.chave.includes(busca)) return false;
+                return true;
+            }).sort((a, b) => (ordem[a.status] - ordem[b.status]) || a.ultimaMov.localeCompare(b.ultimaMov));
+
+            if (filtrados.length === 0) {
+                listaDiv.innerHTML = resumo.pendentes === 0 && !meta180Filtros.status && !meta180Filtros.tipo && !busca
+                    ? '<div class="text-center py-8 text-green-700 text-lg">🎉 Todos os processos da lista foram minutados e assinados!</div>'
+                    : '<div class="text-center py-8 text-gray-500">Nenhum processo encontrado com os filtros atuais.</div>';
+                return;
+            }
+
+            const badgeStatus = {
+                cumprido: '<span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">🟢 Cumprido</span>',
+                minutado: '<span class="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">🟡 Minutado</span>',
+                pendente: '<span class="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">🔴 Sem minuta</span>'
+            };
+            const badgeTipo = {
+                'Despacho': '<span class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">Despacho</span>',
+                'Decisão': '<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">Decisão</span>',
+                'Outro': '<span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">Outra mov.</span>'
+            };
+
+            listaDiv.innerHTML = filtrados.map(item => {
+                const dias = diasParadoMeta180(item.ultimaMov);
+                const minutaInfo = item.minutaRef ? `
+                    <div class="text-xs ${item.status === 'cumprido' ? 'text-green-700' : 'text-yellow-700'} mt-1">
+                        ${item.status === 'cumprido' ? '✅ Assinada' : '📝 Minutada'} — ${escapeHtml(item.minutaRef.assessorNome || '')}
+                        (${escapeHtml(item.minutaRef.tipoMinuta || '')}${item.minutaRef.data ? ', ' + formatarDataBrasilia(item.minutaRef.data) : ''})
+                    </div>` : '';
+                return `
+                    <div class="border ${item.status === 'cumprido' ? 'border-green-200 bg-green-50' : item.status === 'minutado' ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200'} rounded-lg p-3 mb-2">
+                        <div class="flex items-start justify-between flex-wrap gap-2">
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-mono font-semibold text-gray-800">${item.numero}</span>
+                                    ${badgeStatus[item.status]}
+                                    ${badgeTipo[item.tipo] || ''}
+                                    ${item.local === 'Cartório' ? '<span class="px-2 py-1 rounded text-xs bg-orange-100 text-orange-800">Cartório</span>' : ''}
+                                    <span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600">Seq ${item.sequencial}</span>
+                                </div>
+                                <div class="text-sm text-gray-600 mt-1">${item.classe}${item.assunto ? ' — ' + item.assunto : ''}</div>
+                                ${minutaInfo}
+                            </div>
+                            <div class="text-right text-xs text-gray-500">
+                                <div>Última mov.: ${formatarDataBrasilia(item.ultimaMov)}</div>
+                                <div class="${dias > 300 ? 'text-red-600 font-semibold' : ''}">${dias} dias parado</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
         // ==================== FIREBASE ====================
 
         function setupFirebaseListeners() {
@@ -5215,6 +5541,7 @@
                     if (currentView === 'dashboard') renderDashboard();
                     if (currentView === 'historico') renderHistorico();
                     if (currentView === 'calendario') renderCalendario();
+                    if (currentView === 'meta180') renderMeta180();
                 });
 
                 database.ref('assessores').on('value', (snapshot) => {
@@ -5666,6 +5993,9 @@
                 if (currentUser.isJuiz) {
                     content += renderMetasSemanais();
                 }
+
+                // Resumo da Meta 180 Dias (visível para todos)
+                content += renderMeta180ResumoCard();
 
                 // Painéis de acompanhamento (visíveis para todos)
                 content += renderPaineisAcompanhamento();
