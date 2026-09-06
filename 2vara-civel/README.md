@@ -77,4 +77,8 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
 - **Balcão Virtual**: pedidos de advogados/partes com prazo de 72h.
 - **Metas**: acompanhamento processual por fases, com importação de planilhas
   XLSX, alertas de processos parados e relatórios.
+- **180/120/100**: painel dos processos sem movimentação (lista da
+  Corregedoria) organizados por faixa de dias parados, com cotas por
+  sequencial (Danilo 1-3, Gilbert 4-6, Laíse 7-9) e cumprimento automático em
+  tempo real quando a minuta do processo é assinada.
 - **Calendário e Relatórios**: histórico diário, semanal e mensal.
