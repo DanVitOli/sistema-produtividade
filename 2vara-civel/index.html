@@ -6470,6 +6470,7 @@
                 const totalMinutasHoje = Object.values(minutas).filter(m => m?.data === getHojeString() && m.status !== 'excluida').length;
                 const minutasParaMeta = Object.values(minutas).filter(m => {
                     if (m?.data !== getHojeString() || m.status === 'excluida') return false;
+                    if (m.assessorId === 'juiz') return false; // produção própria do juiz não integra a meta da assessoria
                     const categorias = normalizarCategorias(m);
                     return categorias.some(cat => cat !== 'alem_meta');
                 }).length;
