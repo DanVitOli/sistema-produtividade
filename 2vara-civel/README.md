@@ -70,7 +70,8 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
 
 ## Módulos
 
-- **Dashboard**: produtividade diária (10 minutas/assessor), metas semanais
+- **Dashboard**: produtividade diária (12 minutas/assessor: 4 sentenças
+  Meta 1, 4 sem movimentação 60+ dias e 4 pedidos/atos), metas semanais
   (Meta 2 e Impulso Processos Antigos) e painéis de acompanhamento quinzenal.
 - **Registrar Minuta**: registro com múltiplas categorias/metas por minuta.
 - **Balcão Virtual**: pedidos de advogados/partes com prazo de 72h.
