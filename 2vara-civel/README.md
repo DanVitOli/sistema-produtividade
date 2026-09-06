@@ -73,7 +73,8 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
 - **Dashboard**: produtividade diária (12 minutas/assessor: 4 sentenças
   Meta 1, 4 sem movimentação 60+ dias e 4 pedidos/atos), metas semanais
   (Meta 2 e Impulso Processos Antigos) e painéis de acompanhamento quinzenal.
-- **Registrar Minuta**: registro com múltiplas categorias/metas por minuta.
+- **Registrar Minuta**: registro com múltiplas categorias/metas por minuta,
+  disponível para assessores e também para o juiz (produção própria).
 - **Balcão Virtual**: pedidos de advogados/partes com prazo de 72h.
 - **Metas**: acompanhamento processual por fases, com importação de planilhas
   XLSX, alertas de processos parados e relatórios.
