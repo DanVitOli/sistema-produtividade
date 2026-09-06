@@ -5687,7 +5687,7 @@
         }));
 
         let faixaAtiva = 'todas';
-        let meta180Filtros = { status: '', tipo: '', busca: '', responsavel: '', local: '' };
+        let meta180Filtros = { status: '', tipo: '', busca: '', responsavel: '', local: '', classe: '' };
 
         function normalizarNumeroCNJ(str) {
             return String(str || '').replace(/\D/g, '');
@@ -5809,6 +5809,7 @@
 
         function trocarFaixaAcompanhamento(faixa) {
             faixaAtiva = faixa;
+            meta180Filtros.classe = '';
             const view = document.getElementById('meta180-view');
             if (view) view.innerHTML = '';
             renderMeta180();
@@ -5828,6 +5829,15 @@
                 view.dataset.faixaAtiva = faixaAtiva;
                 const totais = {};
                 PROCESSOS_ACOMPANHAMENTO.forEach(p => { totais[p.faixa] = (totais[p.faixa] || 0) + 1; });
+
+                // Opções do filtro de classe processual (da faixa ativa, por frequência)
+                const procsDaFaixa = faixaAtiva === 'todas' ? PROCESSOS_ACOMPANHAMENTO : PROCESSOS_ACOMPANHAMENTO.filter(p => p.faixa === faixaAtiva);
+                const contagemClasses = {};
+                procsDaFaixa.forEach(p => { contagemClasses[p.classe] = (contagemClasses[p.classe] || 0) + 1; });
+                const opcoesClasse = Object.entries(contagemClasses)
+                    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                    .map(([cl, n]) => `<option value="${cl.replace(/"/g, '&quot;')}">${cl} (${n})</option>`)
+                    .join('');
                 const abas = [`
                     <button onclick="trocarFaixaAcompanhamento('todas')"
                             class="px-4 py-2 rounded-md text-sm font-medium transition-colors ${faixaAtiva === 'todas' ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
@@ -5873,6 +5883,10 @@
                                 <option value="gilbert">Gilbert (Seq 4-6)</option>
                                 <option value="laise">Laíse (Seq 7-9)</option>
                                 <option value="sem">Sem responsável (Seq 0)</option>
+                            </select>
+                            <select onchange="atualizarFiltroMeta180('classe', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 max-w-72">
+                                <option value="">Todas as classes</option>
+                                ${opcoesClasse}
                             </select>
                             <select onchange="atualizarFiltroMeta180('local', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
                                 <option value="">Cartório e Gabinete</option>
@@ -5992,6 +6006,7 @@
                 if (meta180Filtros.status && item.status !== meta180Filtros.status) return false;
                 if (meta180Filtros.tipo && item.tipo !== meta180Filtros.tipo) return false;
                 if (meta180Filtros.responsavel && (item.responsavel || 'sem') !== meta180Filtros.responsavel) return false;
+                if (meta180Filtros.classe && item.classe !== meta180Filtros.classe) return false;
                 if (meta180Filtros.local) {
                     const local = item.local || '__vazio__';
                     if (local !== meta180Filtros.local) return false;
@@ -6004,7 +6019,7 @@
                 a.ultimaMov.localeCompare(b.ultimaMov));
 
             if (filtrados.length === 0) {
-                const semFiltros = !meta180Filtros.status && !meta180Filtros.tipo && !meta180Filtros.responsavel && !meta180Filtros.local && !busca;
+                const semFiltros = !meta180Filtros.status && !meta180Filtros.tipo && !meta180Filtros.responsavel && !meta180Filtros.local && !meta180Filtros.classe && !busca;
                 listaDiv.innerHTML = resumo.pendentes === 0 && semFiltros
                     ? '<div class="text-center py-8 text-green-700 text-lg">🎉 Todos os processos foram minutados e assinados!</div>'
                     : '<div class="text-center py-8 text-gray-500">Nenhum processo encontrado com os filtros atuais.</div>';
