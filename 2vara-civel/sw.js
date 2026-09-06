@@ -1,5 +1,5 @@
 // Service Worker para 2ª Vara Cível de Palmeira dos Índios
-const CACHE_NAME = '2vara-civel-palmeira-v1';
+const CACHE_NAME = '2vara-civel-palmeira-v2';
 
 // Arquivos essenciais para cache
 const STATIC_ASSETS = [
@@ -68,9 +68,14 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Estratégia: Network First com fallback para cache
-  // Isso garante que o sistema sempre busque a versão mais recente quando online
+  // Isso garante que o sistema sempre busque a versão mais recente quando online.
+  // Navegações revalidam no servidor (cache: 'no-cache') para que atualizações
+  // publicadas apareçam imediatamente, sem esperar o cache HTTP expirar.
+  const request = event.request.mode === 'navigate'
+    ? new Request(event.request.url, { cache: 'no-cache' })
+    : event.request;
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
         // Se a resposta for válida, armazena no cache
         if (response.status === 200) {
