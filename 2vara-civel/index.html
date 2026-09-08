@@ -691,6 +691,42 @@
     <!-- Módulo Meta 180 Dias -->
     <div id="meta180-view" class="hidden"></div>
 
+    <!-- Modal: registro rápido de minuta (painel 180/120/100) -->
+    <div id="modal-meta180-registro" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModaisMeta180()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-800 mb-1">✍️ Registrar minuta</h3>
+            <p class="text-sm text-gray-600 mb-4">Processo <span id="meta180-registro-processo" class="font-mono font-semibold text-gray-800"></span></p>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Minuta *</label>
+            <select id="meta180-registro-tipo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <option value="Despacho">Despacho</option>
+                <option value="Decisão">Decisão</option>
+                <option value="Sentença">Sentença</option>
+            </select>
+            <label class="block text-sm font-medium text-gray-700 mb-1 mt-3">Observações (opcional)</label>
+            <textarea id="meta180-registro-obs" rows="2" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+            <p class="text-xs text-gray-500 mt-2">A minuta será registrada em seu nome na categoria "Sem movimentação 60+ dias" (Sentença também conta na Meta 1) e ficará pendente de assinatura.</p>
+            <div class="flex gap-2 mt-4">
+                <button onclick="confirmarRegistroMeta180()" class="flex-1 bg-cyan-600 text-white py-2 px-4 rounded-md hover:bg-cyan-700 transition-colors font-medium">Registrar</button>
+                <button onclick="fecharModaisMeta180()" class="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: observação do processo (painel 180/120/100) -->
+    <div id="modal-meta180-obs" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModaisMeta180()">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-800 mb-1">💬 Observação do processo</h3>
+            <p class="text-sm text-gray-600 mb-4">Processo <span id="meta180-obs-processo" class="font-mono font-semibold text-gray-800"></span></p>
+            <textarea id="meta180-obs-texto" rows="4" placeholder="Ex.: aguardando devolução de AR; intimar autor para emendar; analisado, falta certidão do cartório..." class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+            <p class="text-xs text-gray-500 mt-2">A observação fica visível para toda a equipe no painel, com autor e data.</p>
+            <div class="flex gap-2 mt-4">
+                <button onclick="salvarObsMeta180()" class="flex-1 bg-cyan-600 text-white py-2 px-4 rounded-md hover:bg-cyan-700 transition-colors font-medium">Salvar</button>
+                <button id="meta180-obs-excluir" onclick="excluirObsMeta180()" class="bg-red-100 text-red-700 py-2 px-4 rounded-md hover:bg-red-200 transition-colors hidden">Excluir</button>
+                <button onclick="fecharModaisMeta180()" class="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Módulo Metas -->
     <div id="metas-view" class="hidden">
         <!-- Seletor de Meta -->
@@ -5700,6 +5736,8 @@
         }));
 
         let faixaAtiva = 'todas';
+        let obsAcompanhamento = {};
+        let meta180ProcessoModal = null;
         let meta180Filtros = { status: '', tipo: '', busca: '', responsavel: '', local: '', classe: '' };
 
         function normalizarNumeroCNJ(str) {
@@ -5786,6 +5824,109 @@
             } catch (e) {
                 return 0;
             }
+        }
+
+        function acharProcessoAcompanhamento(chave) {
+            return PROCESSOS_ACOMPANHAMENTO.find(p => p.chave === chave) || null;
+        }
+
+        function abrirRegistroRapidoMeta180(chave) {
+            const item = acharProcessoAcompanhamento(chave);
+            if (!item) return;
+            if (!database) {
+                showNotification('Sem conexão com o banco de dados — tente novamente em instantes.', 'error');
+                return;
+            }
+            meta180ProcessoModal = item;
+            document.getElementById('meta180-registro-processo').textContent = item.numero;
+            document.getElementById('meta180-registro-tipo').value =
+                item.tipo === 'Decisão' ? 'Decisão' : 'Despacho';
+            document.getElementById('meta180-registro-obs').value = '';
+            document.getElementById('modal-meta180-registro').classList.remove('hidden');
+        }
+
+        function confirmarRegistroMeta180() {
+            const item = meta180ProcessoModal;
+            if (!item || !database) return;
+            const tipoMinuta = document.getElementById('meta180-registro-tipo').value;
+            const observacoes = document.getElementById('meta180-registro-obs').value.trim();
+            const categorias = tipoMinuta === 'Sentença' ? ['meta1', 'sem_movimento'] : ['sem_movimento'];
+
+            const novaMinuta = {
+                assessorId: currentUser.assessorId || 'juiz',
+                assessorNome: currentUser.nome,
+                numeroProcesso: item.numero,
+                tipoMinuta,
+                categorias,
+                observacoes,
+                substituicao: false,
+                status: 'pendente',
+                data: getHojeString(),
+                timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
+                origem: 'painel_180_120_100'
+            };
+
+            database.ref('minutas').push({
+                ...novaMinuta,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                fecharModaisMeta180();
+                showNotification('✍️ Minuta registrada para o processo ' + item.numero + '! Pendente de assinatura.', 'success');
+            }).catch((error) => {
+                log('Erro ao registrar minuta pelo painel:', error);
+                showNotification('⚠️ NÃO foi possível salvar no banco. Verifique a conexão e tente novamente.', 'error');
+            });
+        }
+
+        function abrirObsMeta180(chave) {
+            const item = acharProcessoAcompanhamento(chave);
+            if (!item) return;
+            if (!database) {
+                showNotification('Sem conexão com o banco de dados — tente novamente em instantes.', 'error');
+                return;
+            }
+            meta180ProcessoModal = item;
+            const atual = obsAcompanhamento[item.chave];
+            document.getElementById('meta180-obs-processo').textContent = item.numero;
+            document.getElementById('meta180-obs-texto').value = atual?.texto || '';
+            document.getElementById('meta180-obs-excluir').classList.toggle('hidden', !atual?.texto);
+            document.getElementById('modal-meta180-obs').classList.remove('hidden');
+        }
+
+        function salvarObsMeta180() {
+            const item = meta180ProcessoModal;
+            if (!item || !database) return;
+            const texto = document.getElementById('meta180-obs-texto').value.trim();
+            if (!texto) {
+                excluirObsMeta180();
+                return;
+            }
+            database.ref('obsAcompanhamento/' + item.chave).set({
+                texto,
+                autorId: currentUser.assessorId || 'juiz',
+                autorNome: currentUser.nome,
+                atualizadoEm: getHojeString()
+            }).then(() => {
+                fecharModaisMeta180();
+                showNotification('💬 Observação salva.', 'success');
+            }).catch(() => {
+                showNotification('⚠️ Não foi possível salvar a observação.', 'error');
+            });
+        }
+
+        function excluirObsMeta180() {
+            const item = meta180ProcessoModal;
+            if (!item || !database) return;
+            database.ref('obsAcompanhamento/' + item.chave).remove().then(() => {
+                fecharModaisMeta180();
+                showNotification('Observação excluída.', 'success');
+            });
+        }
+
+        function fecharModaisMeta180() {
+            meta180ProcessoModal = null;
+            document.getElementById('modal-meta180-registro')?.classList.add('hidden');
+            document.getElementById('modal-meta180-obs')?.classList.add('hidden');
         }
 
         function renderMeta180ResumoCard() {
@@ -6057,6 +6198,12 @@
                         ${item.status === 'cumprido' ? '✅ Assinada' : '📝 Minutada'} — ${escapeHtml(item.minutaRef.assessorNome || '')}
                         (${escapeHtml(item.minutaRef.tipoMinuta || '')}${item.minutaRef.data ? ', ' + formatarDataBrasilia(item.minutaRef.data) : ''})
                     </div>` : '';
+                const obs = obsAcompanhamento[item.chave];
+                const obsInfo = obs && obs.texto ? `
+                    <div class="text-xs bg-cyan-50 border border-cyan-200 rounded p-2 mt-1 text-gray-700 max-w-xl">
+                        💬 ${escapeHtml(obs.texto)}
+                        <span class="text-gray-400">— ${escapeHtml(obs.autorNome || '')}${obs.atualizadoEm ? ', ' + formatarDataBrasilia(obs.atualizadoEm) : ''}</span>
+                    </div>` : '';
                 return `
                     <div class="border ${item.status === 'cumprido' ? 'border-green-200 bg-green-50' : item.status === 'minutado' ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200'} rounded-lg p-3 mb-2">
                         <div class="flex items-start justify-between flex-wrap gap-2">
@@ -6072,10 +6219,22 @@
                                 </div>
                                 <div class="text-sm text-gray-600 mt-1">${item.classe}${item.assunto ? ' — ' + item.assunto : ''}</div>
                                 ${minutaInfo}
+                                ${obsInfo}
                             </div>
-                            <div class="text-right text-xs text-gray-500">
+                            <div class="text-right text-xs text-gray-500 flex flex-col items-end gap-1">
                                 <div>Última mov.: ${formatarDataBrasilia(item.ultimaMov)}</div>
                                 <div class="${dias > 300 ? 'text-red-600 font-semibold' : ''}">${dias} dias parado</div>
+                                <div class="flex gap-1 mt-1 no-print">
+                                    ${item.status === 'pendente' ? `
+                                        <button onclick="abrirRegistroRapidoMeta180('${item.chave}')"
+                                                class="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700 transition-colors">
+                                            ✍️ Minutei
+                                        </button>` : ''}
+                                    <button onclick="abrirObsMeta180('${item.chave}')"
+                                            class="${obs && obs.texto ? 'bg-cyan-100 text-cyan-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-xs hover:bg-cyan-200 transition-colors">
+                                        💬 ${obs && obs.texto ? 'Editar obs' : 'Obs'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -6096,6 +6255,12 @@
                     if (currentView === 'historico') renderHistorico();
                     if (currentView === 'calendario') renderCalendario();
                     if (currentView === 'meta180') renderMeta180();
+                });
+
+                // Listener das observações do painel 180/120/100
+                database.ref('obsAcompanhamento').on('value', (snapshot) => {
+                    obsAcompanhamento = snapshot.val() || {};
+                    if (currentView === 'meta180') renderListaMeta180();
                 });
 
                 database.ref('assessores').on('value', (snapshot) => {
