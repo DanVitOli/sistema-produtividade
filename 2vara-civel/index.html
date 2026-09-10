@@ -691,6 +691,9 @@
     <!-- Módulo Meta 180 Dias -->
     <div id="meta180-view" class="hidden"></div>
 
+    <!-- Módulo Painel Meta 2 -->
+    <div id="meta2-view" class="hidden"></div>
+
     <!-- Modal: registro rápido de minuta (painel 180/120/100) -->
     <div id="modal-meta180-registro" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModaisMeta180()">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
@@ -704,7 +707,7 @@
             </select>
             <label class="block text-sm font-medium text-gray-700 mb-1 mt-3">Observações (opcional)</label>
             <textarea id="meta180-registro-obs" rows="2" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
-            <p class="text-xs text-gray-500 mt-2">A minuta será registrada em seu nome na categoria "Sem movimentação 60+ dias" (Sentença também conta na Meta 1) e ficará pendente de assinatura.</p>
+            <p id="meta180-registro-nota" class="text-xs text-gray-500 mt-2">A minuta será registrada em seu nome na categoria "Sem movimentação 60+ dias" (Sentença também conta na Meta 1) e ficará pendente de assinatura.</p>
             <div class="flex gap-2 mt-4">
                 <button onclick="confirmarRegistroMeta180()" class="flex-1 bg-cyan-600 text-white py-2 px-4 rounded-md hover:bg-cyan-700 transition-colors font-medium">Registrar</button>
                 <button onclick="fecharModaisMeta180()" class="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors">Cancelar</button>
@@ -2527,6 +2530,10 @@
                     <i data-lucide="flag" class="h-4 w-4 mr-2"></i>
                     180/120/100
                 </button>
+                <button onclick="showView('meta2')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    <i data-lucide="gavel" class="h-4 w-4 mr-2"></i>
+                    Meta 2
+                </button>
             `;
 
             if (currentUser.isJuiz) {
@@ -2667,6 +2674,9 @@
                         break;
                     case 'meta180':
                         renderMeta180();
+                        break;
+                    case 'meta2':
+                        renderMeta2Painel();
                         break;
                 }
 
@@ -5738,6 +5748,7 @@
         let faixaAtiva = 'todas';
         let obsAcompanhamento = {};
         let meta180ProcessoModal = null;
+        let meta180ModalContexto = null;
         let meta180Filtros = { status: '', tipo: '', busca: '', responsavel: '', local: '', classe: '' };
 
         function normalizarNumeroCNJ(str) {
@@ -5827,7 +5838,9 @@
         }
 
         function acharProcessoAcompanhamento(chave) {
-            return PROCESSOS_ACOMPANHAMENTO.find(p => p.chave === chave) || null;
+            return PROCESSOS_ACOMPANHAMENTO.find(p => p.chave === chave)
+                || PROCESSOS_META2.find(p => p.chave === chave)
+                || null;
         }
 
         function abrirRegistroRapidoMeta180(chave) {
@@ -5838,19 +5851,25 @@
                 return;
             }
             meta180ProcessoModal = item;
+            meta180ModalContexto = 'meta180';
             document.getElementById('meta180-registro-processo').textContent = item.numero;
-            document.getElementById('meta180-registro-tipo').value =
-                item.tipo === 'Decisão' ? 'Decisão' : 'Despacho';
+            const tipoSel = document.getElementById('meta180-registro-tipo');
+            tipoSel.disabled = false;
+            tipoSel.value = item.tipo === 'Decisão' ? 'Decisão' : 'Despacho';
             document.getElementById('meta180-registro-obs').value = '';
+            document.getElementById('meta180-registro-nota').textContent =
+                'A minuta será registrada em seu nome na categoria "Sem movimentação 60+ dias" (Sentença também conta na Meta 1) e ficará pendente de assinatura.';
             document.getElementById('modal-meta180-registro').classList.remove('hidden');
         }
 
         function confirmarRegistroMeta180() {
             const item = meta180ProcessoModal;
             if (!item || !database) return;
-            const tipoMinuta = document.getElementById('meta180-registro-tipo').value;
+            const tipoMinuta = meta180ModalContexto === 'meta2' ? 'Sentença' : document.getElementById('meta180-registro-tipo').value;
             const observacoes = document.getElementById('meta180-registro-obs').value.trim();
-            const categorias = tipoMinuta === 'Sentença' ? ['meta1', 'sem_movimento'] : ['sem_movimento'];
+            const categorias = meta180ModalContexto === 'meta2'
+                ? ['meta1', 'meta2']
+                : (tipoMinuta === 'Sentença' ? ['meta1', 'sem_movimento'] : ['sem_movimento']);
 
             const novaMinuta = {
                 assessorId: currentUser.assessorId || 'juiz',
@@ -5863,7 +5882,7 @@
                 status: 'pendente',
                 data: getHojeString(),
                 timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
-                origem: 'painel_180_120_100'
+                origem: meta180ModalContexto === 'meta2' ? 'painel_meta2' : 'painel_180_120_100'
             };
 
             database.ref('minutas').push({
@@ -5925,6 +5944,9 @@
 
         function fecharModaisMeta180() {
             meta180ProcessoModal = null;
+            meta180ModalContexto = null;
+            const tipoSel = document.getElementById('meta180-registro-tipo');
+            if (tipoSel) tipoSel.disabled = false;
             document.getElementById('modal-meta180-registro')?.classList.add('hidden');
             document.getElementById('modal-meta180-obs')?.classList.add('hidden');
         }
@@ -6242,6 +6264,569 @@
             }).join('');
         }
 
+        // ==================== PAINEL META 2 CNJ ====================
+        // Acervo da Meta 2 (planilha SAJ 09/2026): processos distribuídos até
+        // 2022 pendentes de julgamento (grupo 'a_julgar') e já julgados
+        // (grupo 'julgado'). Um processo 'a julgar' é CUMPRIDO quando uma
+        // minuta de SENTENÇA dele é ASSINADA pelo juiz.
+
+        const META2_REFERENCIA = '09/2026';
+        // Alvo do índice da Meta 2 (ajuste conforme o glossário anual do CNJ)
+        const META2_ALVO = 0.80;
+
+        const PROCESSOS_META2 = [
+            { numero: "0700013-19.2022.8.02.0013", grupo: "a_julgar", classe: "Inventário", assunto: "Sucessões" },
+            { numero: "0700040-97.2022.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700060-88.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Arrolamento de Bens" },
+            { numero: "0700062-29.2020.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700067-80.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Negatória de Paternidade" },
+            { numero: "0700097-18.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Moral" },
+            { numero: "0700120-61.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Dissolução" },
+            { numero: "0700177-84.2019.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700198-26.2020.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Moral" },
+            { numero: "0700210-11.2018.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Investigação de Paternidade" },
+            { numero: "0700237-52.2022.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700266-10.2019.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700385-97.2021.8.02.0046", grupo: "a_julgar", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0700387-33.2022.8.02.0046", grupo: "a_julgar", classe: "Divórcio Consensual", assunto: "Partilha" },
+            { numero: "0700403-26.2018.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Acidente de Trânsito" },
+            { numero: "0700454-03.2019.8.02.0046", grupo: "a_julgar", classe: "Arrolamento Sumário", assunto: "Inventário e Partilha" },
+            { numero: "0700482-68.2019.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700483-53.2019.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700514-73.2019.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Sucessões" },
+            { numero: "0700545-93.2019.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Pedidos Genéricos Relativos aos Benefícios em Espécie" },
+            { numero: "0700546-73.2022.8.02.0046", grupo: "a_julgar", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Alimentos" },
+            { numero: "0700556-20.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0700575-65.2018.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0700581-33.2022.8.02.0046", grupo: "a_julgar", classe: "Usucapião", assunto: "Usucapião Extraordinária" },
+            { numero: "0700586-60.2019.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "DIREITO CIVIL" },
+            { numero: "0700819-52.2022.8.02.0046", grupo: "a_julgar", classe: "Alvará Judicial - Lei 6858/80", assunto: "Levantamento de Valor" },
+            { numero: "0700840-62.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0700855-65.2020.8.02.0046", grupo: "a_julgar", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0700867-79.2020.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Espécies de Contratos" },
+            { numero: "0700892-24.2022.8.02.0046", grupo: "a_julgar", classe: "Interdição/Curatela", assunto: "Internação compulsória" },
+            { numero: "0700923-83.2018.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Responsabilidade Civil" },
+            { numero: "0700949-81.2018.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "DIREITO PREVIDENCIÁRIO" },
+            { numero: "0700964-79.2020.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Sucessões" },
+            { numero: "0700966-83.2019.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "DIREITO CIVIL" },
+            { numero: "0700996-50.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Moral" },
+            { numero: "0701039-50.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Rescisão do contrato e devolução do dinheiro" },
+            { numero: "0701054-19.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Material" },
+            { numero: "0701066-67.2021.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701104-45.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Usucapião Ordinária" },
+            { numero: "0701113-07.2022.8.02.0046", grupo: "a_julgar", classe: "Interdição/Curatela", assunto: "Internação compulsória" },
+            { numero: "0701152-04.2022.8.02.0046", grupo: "a_julgar", classe: "Alvará Judicial - Lei 6858/80", assunto: "Levantamento de Valor" },
+            { numero: "0701154-76.2019.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Cartão de Crédito" },
+            { numero: "0701187-03.2018.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701272-47.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Empréstimo consignado" },
+            { numero: "0701278-59.2019.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Erro Médico" },
+            { numero: "0701307-17.2016.8.02.0046", grupo: "a_julgar", classe: "Desapropriação", assunto: "Intervenção do Estado na Propriedade" },
+            { numero: "0701309-84.2016.8.02.0046", grupo: "a_julgar", classe: "Desapropriação", assunto: "Intervenção do Estado na Propriedade" },
+            { numero: "0701312-39.2016.8.02.0046", grupo: "a_julgar", classe: "Desapropriação", assunto: "Intervenção do Estado na Propriedade" },
+            { numero: "0701322-73.2022.8.02.0046", grupo: "a_julgar", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Revisão" },
+            { numero: "0701338-27.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Arrolamento de Bens" },
+            { numero: "0701431-24.2021.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701442-87.2020.8.02.0046", grupo: "a_julgar", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Fixação" },
+            { numero: "0701450-30.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "DIREITO CIVIL" },
+            { numero: "0701457-85.2022.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701487-67.2015.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701562-62.2022.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701602-78.2021.8.02.0046", grupo: "a_julgar", classe: "Usucapião", assunto: "Usucapião Especial (Constitucional)" },
+            { numero: "0701627-91.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Guarda" },
+            { numero: "0701683-32.2018.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Obrigações" },
+            { numero: "0701739-26.2022.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701790-37.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0701796-44.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0701828-49.2022.8.02.0046", grupo: "a_julgar", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0701836-26.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0701846-70.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0701847-55.2022.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701856-90.2017.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701895-48.2021.8.02.0046", grupo: "a_julgar", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0701922-94.2022.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701961-91.2022.8.02.0046", grupo: "a_julgar", classe: "Usucapião", assunto: "Usucapião Ordinária" },
+            { numero: "0702051-02.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0702069-57.2021.8.02.0046", grupo: "a_julgar", classe: "Interdição/Curatela", assunto: "DIREITO CIVIL" },
+            { numero: "0702079-04.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Alimentos" },
+            { numero: "0702121-19.2022.8.02.0046", grupo: "a_julgar", classe: "Interdição/Curatela", assunto: "Nomeação" },
+            { numero: "0702132-82.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0702137-70.2022.8.02.0046", grupo: "a_julgar", classe: "Monitória", assunto: "Prestação de Serviços" },
+            { numero: "0702418-26.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Serviços Hospitalares" },
+            { numero: "0702469-37.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Material" },
+            { numero: "0702515-26.2022.8.02.0046", grupo: "a_julgar", classe: "Usucapião", assunto: "Usucapião Ordinária" },
+            { numero: "0702516-11.2022.8.02.0046", grupo: "a_julgar", classe: "Usucapião", assunto: "Usucapião Ordinária" },
+            { numero: "0702525-07.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Investigação de Paternidade" },
+            { numero: "0702548-50.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0702570-74.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Auxílio-Doença Acidentário" },
+            { numero: "0702622-07.2021.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Previdência privada" },
+            { numero: "0702709-60.2021.8.02.0046", grupo: "a_julgar", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0702752-94.2021.8.02.0046", grupo: "a_julgar", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0800080-24.2021.8.02.0046", grupo: "a_julgar", classe: "Ação Civil Pública", assunto: "Dano ao Erário" },
+            { numero: "0800089-49.2022.8.02.0046", grupo: "a_julgar", classe: "Procedimento Comum Cível", assunto: "Crimes Previstos no Estatuto do Idoso" },
+            { numero: "0000212-61.2014.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0505451-33.2007.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700015-55.2020.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Fixação" },
+            { numero: "0700091-45.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Moral" },
+            { numero: "0700118-91.2022.8.02.0046", grupo: "julgado", classe: "Imissão na Posse", assunto: "Imissão" },
+            { numero: "0700128-72.2021.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Liquidação / Cumprimento / Execução" },
+            { numero: "0700129-23.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Arrolamento de Bens" },
+            { numero: "0700160-24.2014.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700177-79.2022.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0700184-71.2022.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0700199-11.2020.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0700205-18.2020.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Empréstimo consignado" },
+            { numero: "0700229-75.2022.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Alimentos" },
+            { numero: "0700284-65.2018.8.02.0046", grupo: "julgado", classe: "Tutela e Curatela - Nomeação", assunto: "Tutela e Curatela" },
+            { numero: "0700316-02.2020.8.02.0046", grupo: "julgado", classe: "Retificação ou Suprimento ou Restauração de Registro Civil", assunto: "Registro Civil das Pessoas Naturais" },
+            { numero: "0700350-74.2020.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700356-49.2021.8.02.0013", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Regulamentação de Visitas" },
+            { numero: "0700384-78.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Dissolução" },
+            { numero: "0700414-60.2015.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Perdas e Danos" },
+            { numero: "0700426-30.2022.8.02.0046", grupo: "julgado", classe: "Retificação ou Suprimento ou Restauração de Registro Civil", assunto: "Retificação de Nome" },
+            { numero: "0700439-10.2014.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Evicção ou Vicio Redibitório" },
+            { numero: "0700439-63.2021.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700467-51.2022.8.02.0028", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0700494-77.2022.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700504-31.2019.8.02.0013", grupo: "julgado", classe: "Guarda de Família", assunto: "Guarda" },
+            { numero: "0700550-13.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Arrolamento de Bens" },
+            { numero: "0700550-18.2019.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0700575-60.2021.8.02.0046", grupo: "julgado", classe: "Monitória", assunto: "Contratos Bancários" },
+            { numero: "0700609-98.2022.8.02.0046", grupo: "julgado", classe: "Guarda de Família", assunto: "Guarda" },
+            { numero: "0700614-23.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Guarda" },
+            { numero: "0700621-25.2016.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0700627-90.2020.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Liquidação / Cumprimento / Execução" },
+            { numero: "0700642-25.2021.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0700660-46.2021.8.02.0046", grupo: "julgado", classe: "Reconhecimento e Extinção de União Estável", assunto: "Alimentos" },
+            { numero: "0700673-11.2022.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0700688-77.2022.8.02.0046", grupo: "julgado", classe: "Reconhecimento e Extinção de União Estável", assunto: "Dissolução" },
+            { numero: "0700692-17.2022.8.02.0046", grupo: "julgado", classe: "Monitória", assunto: "Pagamento" },
+            { numero: "0700694-84.2022.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Negatória de Paternidade" },
+            { numero: "0700714-75.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Cobrança de Aluguéis - Sem despejo" },
+            { numero: "0700761-83.2021.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0700796-09.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Promessa de Compra e Venda" },
+            { numero: "0700817-15.2022.8.02.0036", grupo: "julgado", classe: "Guarda de Família", assunto: "Busca e Apreensão de Menores" },
+            { numero: "0700837-73.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Tratamento da Própria Saúde" },
+            { numero: "0700873-52.2021.8.02.0046", grupo: "julgado", classe: "Interdição/Curatela", assunto: "Tutela e Curatela" },
+            { numero: "0700899-16.2022.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0700915-67.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Prestação de Serviços" },
+            { numero: "0700942-50.2022.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Partilha" },
+            { numero: "0700959-86.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Dissolução" },
+            { numero: "0701038-65.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Nomeação" },
+            { numero: "0701069-85.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Guarda" },
+            { numero: "0701070-70.2022.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0701096-39.2020.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Benefícios em Espécie" },
+            { numero: "0701119-48.2021.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Sucessões" },
+            { numero: "0701128-10.2021.8.02.0046", grupo: "julgado", classe: "Arrolamento Comum", assunto: "Inventário e Partilha" },
+            { numero: "0701150-05.2020.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701177-17.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Guarda" },
+            { numero: "0701188-46.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Defeito, nulidade ou anulação" },
+            { numero: "0701193-39.2020.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0701194-24.2020.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Sucessões" },
+            { numero: "0701204-68.2020.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Obrigação de Fazer / Não Fazer" },
+            { numero: "0701218-81.2022.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0701242-12.2022.8.02.0046", grupo: "julgado", classe: "Arrolamento Sumário", assunto: "Arrolamento de Bens" },
+            { numero: "0701260-43.2016.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Família" },
+            { numero: "0701265-26.2020.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Obrigações" },
+            { numero: "0701267-25.2022.8.02.0046", grupo: "julgado", classe: "Sonegados", assunto: "Inventário e Partilha" },
+            { numero: "0701284-03.2018.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Indenização por Dano Moral" },
+            { numero: "0701296-12.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Reconhecimento / Dissolução" },
+            { numero: "0701335-09.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0701339-12.2022.8.02.0046", grupo: "julgado", classe: "Monitória", assunto: "Prestação de Serviços" },
+            { numero: "0701341-55.2017.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0701369-47.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Rescisão do contrato e devolução do dinheiro" },
+            { numero: "0701390-57.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "DIREITO CIVIL" },
+            { numero: "0701410-14.2022.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Alimentos" },
+            { numero: "0701430-39.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "União Estável ou Concubinato" },
+            { numero: "0701434-18.2017.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701470-21.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Guarda" },
+            { numero: "0701478-95.2021.8.02.0046", grupo: "julgado", classe: "Arrolamento Sumário", assunto: "Inventário e Partilha" },
+            { numero: "0701593-58.2017.8.02.0046", grupo: "julgado", classe: "Usucapião", assunto: "Usucapião Extraordinária" },
+            { numero: "0701595-86.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "DIREITO CIVIL" },
+            { numero: "0701601-59.2022.8.02.0046", grupo: "julgado", classe: "Alvará Judicial - Lei 6858/80", assunto: "Levantamento de Valor" },
+            { numero: "0701639-47.2017.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701664-21.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Empréstimo consignado" },
+            { numero: "0701666-54.2022.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0701668-58.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Empréstimo consignado" },
+            { numero: "0701679-53.2022.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0701710-10.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Empréstimo consignado" },
+            { numero: "0701731-54.2019.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701734-09.2019.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Obrigações" },
+            { numero: "0701745-67.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Empréstimo consignado" },
+            { numero: "0701757-47.2022.8.02.0046", grupo: "julgado", classe: "Despejo por Falta de Pagamento Cumulado Com Cobrança", assunto: "Imputação do Pagamento" },
+            { numero: "0701787-82.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Negatória de Paternidade" },
+            { numero: "0701794-74.2022.8.02.0046", grupo: "julgado", classe: "Usucapião", assunto: "Usucapião Extraordinária" },
+            { numero: "0701808-92.2021.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Revisão" },
+            { numero: "0701812-32.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0701817-20.2022.8.02.0046", grupo: "julgado", classe: "Interdição/Curatela", assunto: "Internação compulsória" },
+            { numero: "0701834-56.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Empréstimo consignado" },
+            { numero: "0701896-96.2022.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0701931-56.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Reconhecimento / Dissolução" },
+            { numero: "0701943-70.2022.8.02.0046", grupo: "julgado", classe: "Alvará Judicial - Lei 6858/80", assunto: "Levantamento de Valor" },
+            { numero: "0701954-02.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Interdição" },
+            { numero: "0701955-21.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "DIREITO CIVIL" },
+            { numero: "0701956-69.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Arrolamento de Bens" },
+            { numero: "0701958-39.2022.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701958-73.2021.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0701984-37.2022.8.02.0046", grupo: "julgado", classe: "Interdição/Curatela", assunto: "Internação compulsória" },
+            { numero: "0701993-04.2019.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Guarda" },
+            { numero: "0701998-26.2019.8.02.0046", grupo: "julgado", classe: "Habilitação", assunto: "Curadoria dos bens do ausente" },
+            { numero: "0702004-62.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Revisão" },
+            { numero: "0702007-80.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Assistência à Saúde" },
+            { numero: "0702020-79.2022.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0702022-83.2021.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0702023-34.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Obrigação de Fazer / Não Fazer" },
+            { numero: "0702047-96.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Investigação de Paternidade" },
+            { numero: "0702052-21.2021.8.02.0046", grupo: "julgado", classe: "Alvará Judicial - Lei 6858/80", assunto: "Quitação" },
+            { numero: "0702052-89.2019.8.02.0046", grupo: "julgado", classe: "Monitória", assunto: "Títulos de Crédito" },
+            { numero: "0702069-23.2022.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0702075-30.2022.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Medidas de Urgência" },
+            { numero: "0702078-19.2021.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0702088-29.2022.8.02.0046", grupo: "julgado", classe: "Monitória", assunto: "Prestação de Serviços" },
+            { numero: "0702088-63.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "DIREITO CIVIL" },
+            { numero: "0702093-85.2021.8.02.0046", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Oferta" },
+            { numero: "0702129-93.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Reconhecimento de Paternidade/Maternidade Socioafetiva" },
+            { numero: "0702136-85.2022.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0702144-96.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0702152-73.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Nulidade e Anulação de Partilha e Adjudicação de Herança" },
+            { numero: "0702157-95.2021.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0702158-46.2022.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0702177-86.2021.8.02.0046", grupo: "julgado", classe: "Alvará Judicial - Lei 6858/80", assunto: "DIREITO CIVIL" },
+            { numero: "0702188-18.2021.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0702207-87.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Cláusulas Abusivas" },
+            { numero: "0702220-86.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Inclusão Indevida em Cadastro de Inadimplentes" },
+            { numero: "0702227-78.2022.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0702287-51.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Dano Moral" },
+            { numero: "0702288-36.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0702302-54.2021.8.02.0046", grupo: "julgado", classe: "Arrolamento Sumário", assunto: "Sucessões" },
+            { numero: "0702303-39.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Alimentos" },
+            { numero: "0702304-87.2022.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0702316-38.2021.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0702321-26.2022.8.02.0046", grupo: "julgado", classe: "Interdição/Curatela", assunto: "Nomeação" },
+            { numero: "0702330-22.2021.8.02.0046", grupo: "julgado", classe: "Divórcio Litigioso", assunto: "Dissolução" },
+            { numero: "0702339-47.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Fornecimento de Água" },
+            { numero: "0702359-38.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Revisão" },
+            { numero: "0702365-45.2022.8.02.0046", grupo: "julgado", classe: "Busca e Apreensão em Alienação Fiduciária", assunto: "Alienação Fiduciária" },
+            { numero: "0702366-30.2022.8.02.0046", grupo: "julgado", classe: "Averiguação de Paternidade", assunto: "Investigação de Paternidade" },
+            { numero: "0702405-27.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Fornecimento de Energia Elétrica" },
+            { numero: "0702437-66.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Obrigações" },
+            { numero: "0702438-17.2022.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Repetição de indébito" },
+            { numero: "0702446-28.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "DIREITO DO CONSUMIDOR" },
+            { numero: "0702463-64.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Fornecimento de Medicamentos" },
+            { numero: "0702500-57.2022.8.02.0046", grupo: "julgado", classe: "Regulamentação de Visitas", assunto: "Regulamentação de Visitas" },
+            { numero: "0702533-47.2022.8.02.0046", grupo: "julgado", classe: "Interdição/Curatela", assunto: "Medidas de Urgência" },
+            { numero: "0702558-60.2022.8.02.0046", grupo: "julgado", classe: "Monitória", assunto: "Prestação de Serviços" },
+            { numero: "0702615-15.2021.8.02.0046", grupo: "julgado", classe: "Inventário", assunto: "Inventário e Partilha" },
+            { numero: "0702641-13.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Guarda" },
+            { numero: "0702678-40.2021.8.02.0046", grupo: "julgado", classe: "Interdição/Curatela", assunto: "DIREITO CIVIL" },
+            { numero: "0702794-46.2021.8.02.0046", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Inventário e Partilha" },
+            { numero: "0702801-38.2021.8.02.0046", grupo: "julgado", classe: "Interdição/Curatela", assunto: "DIREITO CIVIL" },
+            { numero: "0710117-43.2021.8.02.0001", grupo: "julgado", classe: "Procedimento Comum Cível", assunto: "Interpretação / Revisão de Contrato" },
+            { numero: "0735271-39.2016.8.02.0001", grupo: "julgado", classe: "Alimentos - Lei Especial Nº 5.478/68", assunto: "Fixação" }
+        ].map(p => ({
+            ...p,
+            temSufixo: p.numero.includes('/'),
+            chave: p.numero.replace(/\D/g, '')
+        }));
+
+        let meta2Aba = 'a_julgar';
+        let meta2Filtros = { status: '', classe: '', busca: '' };
+
+        function getStatusMeta2P() {
+            const todas = Object.values(minutas).filter(m => m && m.numeroProcesso && m.status !== 'excluida');
+            return PROCESSOS_META2.map(p => {
+                if (p.grupo === 'julgado') {
+                    return { ...p, status: 'julgado', minutaRef: null, outraMinuta: null };
+                }
+                const matches = todas.filter(m => {
+                    const d = normalizarNumeroCNJ(m.numeroProcesso);
+                    return p.temSufixo ? d === p.chave : (d === p.chave || d.startsWith(p.chave));
+                });
+                const sentencas = matches.filter(m => m.tipoMinuta === 'Sentença');
+                const assinadas = sentencas.filter(m => m.status === 'assinada')
+                    .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+                const emAndamento = sentencas.filter(m => m.status === 'pendente' || m.status === 'correcao')
+                    .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+                const outras = matches.filter(m => m.tipoMinuta !== 'Sentença')
+                    .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+
+                let status = 'pendente';
+                let minutaRef = null;
+                if (assinadas.length > 0) {
+                    status = 'cumprido';
+                    minutaRef = assinadas[0];
+                } else if (emAndamento.length > 0) {
+                    status = 'minutado';
+                    minutaRef = emAndamento[0];
+                }
+                return { ...p, status, minutaRef, outraMinuta: outras[0] || null };
+            });
+        }
+
+        function getResumoMeta2P(itens) {
+            const resumo = {
+                acervo: itens.length,
+                julgadosPlanilha: 0,
+                cumpridos: 0,
+                minutados: 0,
+                pendentes: 0
+            };
+            itens.forEach(item => {
+                if (item.status === 'julgado') resumo.julgadosPlanilha++;
+                else if (item.status === 'cumprido') resumo.cumpridos++;
+                else if (item.status === 'minutado') resumo.minutados++;
+                else resumo.pendentes++;
+            });
+            resumo.julgadosTotal = resumo.julgadosPlanilha + resumo.cumpridos;
+            resumo.indice = resumo.acervo > 0 ? (resumo.julgadosTotal / resumo.acervo) : 0;
+            resumo.indicePct = Math.round(resumo.indice * 1000) / 10;
+            resumo.pctMinutados = resumo.acervo > 0 ? Math.round((resumo.minutados / resumo.acervo) * 1000) / 10 : 0;
+            resumo.alvoPct = Math.round(META2_ALVO * 100);
+            resumo.faltamParaAlvo = Math.max(0, Math.ceil(META2_ALVO * resumo.acervo) - resumo.julgadosTotal);
+            return resumo;
+        }
+
+        function renderMeta2ResumoCard() {
+            const resumo = getResumoMeta2P(getStatusMeta2P());
+            return `
+                <div class="bg-white rounded-lg shadow-md p-4 mt-4 border-l-4 border-purple-600 cursor-pointer hover:shadow-lg transition-shadow" onclick="showView('meta2')">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold text-gray-700 flex items-center">
+                            <i data-lucide="gavel" class="h-4 w-4 mr-2 text-purple-600"></i>
+                            Meta 2 CNJ — Julgamento de Processos Antigos
+                        </h4>
+                        <span class="text-sm font-bold text-purple-700">${resumo.indicePct}% <span class="font-normal text-xs text-gray-500">(alvo ${resumo.alvoPct}%)</span></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
+                        <div class="bg-green-500 h-2.5" style="width: ${resumo.indicePct}%"></div>
+                        <div class="bg-yellow-400 h-2.5" style="width: ${resumo.pctMinutados}%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-600 mt-1">
+                        <span>🟢 ${resumo.julgadosTotal} julgados de ${resumo.acervo} · 🟡 ${resumo.minutados} sentenças aguardando</span>
+                        <span>${resumo.faltamParaAlvo > 0 ? `faltam ${resumo.faltamParaAlvo} p/ o alvo` : '🎉 alvo atingido'} · ver painel →</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function trocarAbaMeta2(aba) {
+            meta2Aba = aba;
+            meta2Filtros = { status: '', classe: '', busca: '' };
+            const view = document.getElementById('meta2-view');
+            if (view) view.innerHTML = '';
+            renderMeta2Painel();
+        }
+
+        function atualizarFiltroMeta2(campo, valor) {
+            meta2Filtros[campo] = valor;
+            renderListaMeta2P();
+        }
+
+        function renderMeta2Painel() {
+            const view = document.getElementById('meta2-view');
+            if (!view) return;
+            view.classList.remove('hidden');
+
+            if (!document.getElementById('meta2-resumo') || view.dataset.aba !== meta2Aba) {
+                view.dataset.aba = meta2Aba;
+                const nAJulgar = PROCESSOS_META2.filter(p => p.grupo === 'a_julgar').length;
+                const nJulgados = PROCESSOS_META2.filter(p => p.grupo === 'julgado').length;
+
+                const procsDaAba = PROCESSOS_META2.filter(p => p.grupo === (meta2Aba === 'a_julgar' ? 'a_julgar' : 'julgado'));
+                const contagemClasses = {};
+                procsDaAba.forEach(p => { contagemClasses[p.classe] = (contagemClasses[p.classe] || 0) + 1; });
+                const opcoesClasse = Object.entries(contagemClasses)
+                    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                    .map(([cl, n]) => `<option value="${cl.replace(/"/g, '&quot;')}">${cl} (${n})</option>`)
+                    .join('');
+
+                const filtroStatus = meta2Aba === 'a_julgar' ? `
+                            <select onchange="atualizarFiltroMeta2('status', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <option value="">Todos os status</option>
+                                <option value="pendente">🔴 Sem sentença minutada</option>
+                                <option value="minutado">🟡 Sentença aguardando assinatura</option>
+                                <option value="cumprido">🟢 Cumpridos (sentença assinada)</option>
+                            </select>` : '';
+
+                view.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+                            <div class="flex items-center">
+                                <i data-lucide="gavel" class="h-6 w-6 text-purple-600 mr-2"></i>
+                                <div>
+                                    <h2 class="text-xl font-semibold text-gray-800">Meta 2 CNJ — Julgamento de Processos Antigos</h2>
+                                    <p class="text-sm text-gray-600">Distribuídos até 2022 (planilha SAJ, referência ${META2_REFERENCIA})</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 flex-wrap no-print">
+                                <button onclick="trocarAbaMeta2('a_julgar')"
+                                        class="px-4 py-2 rounded-md text-sm font-medium transition-colors ${meta2Aba === 'a_julgar' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                    A julgar (${nAJulgar})
+                                </button>
+                                <button onclick="trocarAbaMeta2('julgados')"
+                                        class="px-4 py-2 rounded-md text-sm font-medium transition-colors ${meta2Aba === 'julgados' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                    Já julgados (${nJulgados})
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">
+                            💡 O processo é cumprido quando uma minuta de <strong>SENTENÇA</strong> dele é registrada e
+                            <strong>assinada</strong> pelo juiz. O botão "✍️ Sentença minutada" registra a sentença já nas
+                            categorias Meta 1 + Meta 2. Despachos/decisões aparecem como informação, mas não cumprem a meta.
+                        </div>
+                    </div>
+                    <div id="meta2-resumo" class="mb-6"></div>
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex flex-wrap gap-2 mb-4 no-print">
+                            <input type="text" placeholder="Buscar por nº do processo" oninput="atualizarFiltroMeta2('busca', this.value)"
+                                   class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 min-w-56">
+                            ${filtroStatus}
+                            <select onchange="atualizarFiltroMeta2('classe', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 max-w-72">
+                                <option value="">Todas as classes</option>
+                                ${opcoesClasse}
+                            </select>
+                        </div>
+                        <div id="meta2-lista"></div>
+                    </div>
+                `;
+            }
+
+            renderListaMeta2P();
+            setTimeout(() => criarIcones(), 100);
+        }
+
+        function renderListaMeta2P() {
+            const resumoDiv = document.getElementById('meta2-resumo');
+            const listaDiv = document.getElementById('meta2-lista');
+            if (!resumoDiv || !listaDiv) return;
+
+            const todosItens = getStatusMeta2P();
+            const resumo = getResumoMeta2P(todosItens);
+
+            resumoDiv.innerHTML = `
+                <div class="grid md:grid-cols-5 gap-4 mb-4">
+                    <div class="bg-white rounded-lg shadow-md p-4 text-center">
+                        <div class="text-3xl font-bold text-gray-800">${resumo.acervo}</div>
+                        <div class="text-sm text-gray-600">Acervo Meta 2</div>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-lg shadow-sm p-4 text-center">
+                        <div class="text-3xl font-bold text-green-700">${resumo.julgadosTotal}</div>
+                        <div class="text-sm text-green-700">🟢 Julgados (${resumo.julgadosPlanilha} + ${resumo.cumpridos} novos)</div>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg shadow-sm p-4 text-center">
+                        <div class="text-3xl font-bold text-yellow-700">${resumo.minutados}</div>
+                        <div class="text-sm text-yellow-700">🟡 Sentenças aguardando</div>
+                    </div>
+                    <div class="bg-red-50 border border-red-200 rounded-lg shadow-sm p-4 text-center">
+                        <div class="text-3xl font-bold text-red-700">${resumo.pendentes}</div>
+                        <div class="text-sm text-red-700">🔴 Sem sentença</div>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-200 rounded-lg shadow-sm p-4 text-center">
+                        <div class="text-3xl font-bold text-purple-700">${resumo.indicePct}%</div>
+                        <div class="text-sm text-purple-700">Índice (alvo ${resumo.alvoPct}%)</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <span class="font-medium">Índice da Meta 2 (julgados / acervo)</span>
+                        <span class="font-bold text-purple-700">${resumo.indicePct}% ${resumo.faltamParaAlvo > 0 ? `· faltam ${resumo.faltamParaAlvo} sentenças para o alvo de ${resumo.alvoPct}%` : '· 🎉 alvo atingido!'}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4 flex overflow-hidden relative">
+                        <div class="bg-green-500 h-4 transition-all duration-500" style="width: ${resumo.indicePct}%"></div>
+                        <div class="bg-yellow-400 h-4 transition-all duration-500" style="width: ${resumo.pctMinutados}%"></div>
+                        <div class="absolute top-0 bottom-0 border-l-2 border-purple-700" style="left: ${resumo.alvoPct}%" title="Alvo ${resumo.alvoPct}%"></div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">A linha roxa marca o alvo de ${resumo.alvoPct}% do acervo (${Math.ceil(META2_ALVO * resumo.acervo)} processos julgados).</div>
+                </div>
+            `;
+
+            const grupoAba = meta2Aba === 'a_julgar' ? 'a_julgar' : 'julgado';
+            const busca = normalizarNumeroCNJ(meta2Filtros.busca);
+            const ordem = { pendente: 0, minutado: 1, cumprido: 2, julgado: 3 };
+            const filtrados = todosItens.filter(item => {
+                if (item.grupo !== grupoAba) return false;
+                if (meta2Filtros.status && item.status !== meta2Filtros.status) return false;
+                if (meta2Filtros.classe && item.classe !== meta2Filtros.classe) return false;
+                if (busca && !item.chave.includes(busca)) return false;
+                return true;
+            }).sort((a, b) => (ordem[a.status] - ordem[b.status]) || a.numero.localeCompare(b.numero));
+
+            if (filtrados.length === 0) {
+                listaDiv.innerHTML = '<div class="text-center py-8 text-gray-500">Nenhum processo encontrado com os filtros atuais.</div>';
+                return;
+            }
+
+            const badgeStatus = {
+                cumprido: '<span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">🟢 Cumprido</span>',
+                minutado: '<span class="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">🟡 Sentença aguardando assinatura</span>',
+                pendente: '<span class="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">🔴 Sem sentença</span>',
+                julgado: '<span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✔ Julgado</span>'
+            };
+
+            listaDiv.innerHTML = `<div class="text-xs text-gray-500 mb-2">${filtrados.length} processo(s) exibido(s)</div>` + filtrados.map(item => {
+                const minutaInfo = item.minutaRef ? `
+                    <div class="text-xs ${item.status === 'cumprido' ? 'text-green-700' : 'text-yellow-700'} mt-1">
+                        ${item.status === 'cumprido' ? '✅ Sentença assinada' : '📝 Sentença minutada'} — ${escapeHtml(item.minutaRef.assessorNome || '')}${item.minutaRef.data ? ' (' + formatarDataBrasilia(item.minutaRef.data) + ')' : ''}
+                    </div>` : '';
+                const outraInfo = !item.minutaRef && item.outraMinuta ? `
+                    <div class="text-xs text-gray-500 mt-1">
+                        ℹ️ Há minuta de ${escapeHtml(item.outraMinuta.tipoMinuta || '')} (${escapeHtml(item.outraMinuta.assessorNome || '')}) — não cumpre a Meta 2
+                    </div>` : '';
+                const obs = obsAcompanhamento[item.chave];
+                const obsInfo = obs && obs.texto ? `
+                    <div class="text-xs bg-purple-50 border border-purple-200 rounded p-2 mt-1 text-gray-700 max-w-xl">
+                        💬 ${escapeHtml(obs.texto)}
+                        <span class="text-gray-400">— ${escapeHtml(obs.autorNome || '')}${obs.atualizadoEm ? ', ' + formatarDataBrasilia(obs.atualizadoEm) : ''}</span>
+                    </div>` : '';
+                return `
+                    <div class="border ${item.status === 'cumprido' || item.status === 'julgado' ? 'border-green-200 bg-green-50' : item.status === 'minutado' ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200'} rounded-lg p-3 mb-2">
+                        <div class="flex items-start justify-between flex-wrap gap-2">
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-mono font-semibold text-gray-800">${item.numero}</span>
+                                    ${badgeStatus[item.status]}
+                                </div>
+                                <div class="text-sm text-gray-600 mt-1">${item.classe}${item.assunto ? ' — ' + item.assunto : ''}</div>
+                                ${minutaInfo}
+                                ${outraInfo}
+                                ${obsInfo}
+                            </div>
+                            ${item.grupo === 'a_julgar' ? `
+                                <div class="flex gap-1 no-print">
+                                    ${item.status === 'pendente' ? `
+                                        <button onclick="abrirRegistroRapidoMeta2('${item.chave}')"
+                                                class="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition-colors">
+                                            ✍️ Sentença minutada
+                                        </button>` : ''}
+                                    <button onclick="abrirObsMeta180('${item.chave}')"
+                                            class="${obs && obs.texto ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-xs hover:bg-purple-200 transition-colors">
+                                        💬 ${obs && obs.texto ? 'Editar obs' : 'Obs'}
+                                    </button>
+                                </div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function abrirRegistroRapidoMeta2(chave) {
+            const item = PROCESSOS_META2.find(p => p.chave === chave);
+            if (!item) return;
+            if (!database) {
+                showNotification('Sem conexão com o banco de dados — tente novamente em instantes.', 'error');
+                return;
+            }
+            meta180ProcessoModal = item;
+            meta180ModalContexto = 'meta2';
+            document.getElementById('meta180-registro-processo').textContent = item.numero;
+            const tipoSel = document.getElementById('meta180-registro-tipo');
+            tipoSel.value = 'Sentença';
+            tipoSel.disabled = true;
+            document.getElementById('meta180-registro-obs').value = '';
+            document.getElementById('meta180-registro-nota').textContent =
+                'A sentença será registrada em seu nome nas categorias Meta 1 e Meta 2 CNJ e ficará pendente de assinatura do juiz.';
+            document.getElementById('modal-meta180-registro').classList.remove('hidden');
+        }
+
         // ==================== FIREBASE ====================
 
         function setupFirebaseListeners() {
@@ -6255,12 +6840,14 @@
                     if (currentView === 'historico') renderHistorico();
                     if (currentView === 'calendario') renderCalendario();
                     if (currentView === 'meta180') renderMeta180();
+                    if (currentView === 'meta2') renderMeta2Painel();
                 });
 
                 // Listener das observações do painel 180/120/100
                 database.ref('obsAcompanhamento').on('value', (snapshot) => {
                     obsAcompanhamento = snapshot.val() || {};
                     if (currentView === 'meta180') renderListaMeta180();
+                    if (currentView === 'meta2') renderListaMeta2P();
                 });
 
                 database.ref('assessores').on('value', (snapshot) => {
@@ -6716,6 +7303,9 @@
 
                 // Resumo dos processos parados 180/120/100 (visível para todos)
                 content += renderMeta180ResumoCard();
+
+                // Resumo da Meta 2 (visível para todos)
+                content += renderMeta2ResumoCard();
 
                 // Painéis de acompanhamento (visíveis para todos)
                 content += renderPaineisAcompanhamento();

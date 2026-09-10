@@ -78,6 +78,9 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
 - **Balcão Virtual**: pedidos de advogados/partes com prazo de 72h.
 - **Metas**: acompanhamento processual por fases, com importação de planilhas
   XLSX, alertas de processos parados e relatórios.
+- **Meta 2**: painel do acervo da Meta 2 CNJ (distribuídos até 2022) com
+  índice de julgamento em tempo real, alvo de 80%, abas "A julgar"/"Já
+  julgados" e registro rápido de sentença (Meta 1 + Meta 2).
 - **180/120/100**: painel dos processos sem movimentação (lista da
   Corregedoria) organizados por faixa de dias parados, com cotas por
   sequencial (Danilo 1-3, Gilbert 4-6, Laíse 7-9) e cumprimento automático em
