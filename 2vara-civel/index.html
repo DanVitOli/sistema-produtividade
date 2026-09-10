@@ -6514,7 +6514,7 @@
         }));
 
         let meta2Aba = 'a_julgar';
-        let meta2Filtros = { status: '', classe: '', busca: '' };
+        let meta2Filtros = { status: '', classe: '', busca: '', assessor: '' };
 
         function getStatusMeta2P() {
             const todas = Object.values(minutas).filter(m => m && m.numeroProcesso && m.status !== 'excluida');
@@ -6595,7 +6595,7 @@
 
         function trocarAbaMeta2(aba) {
             meta2Aba = aba;
-            meta2Filtros = { status: '', classe: '', busca: '' };
+            meta2Filtros = { status: '', classe: '', busca: '', assessor: '' };
             const view = document.getElementById('meta2-view');
             if (view) view.innerHTML = '';
             renderMeta2Painel();
@@ -6630,6 +6630,12 @@
                                 <option value="pendente">🔴 Sem sentença minutada</option>
                                 <option value="minutado">🟡 Sentença aguardando assinatura</option>
                                 <option value="cumprido">🟢 Cumpridos (sentença assinada)</option>
+                            </select>
+                            <select onchange="atualizarFiltroMeta2('assessor', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <option value="">Sentença de qualquer autor</option>
+                                <option value="juiz">Minutadas pelo Juiz</option>
+                                <option value="assessor1">Minutadas por Gilbert</option>
+                                <option value="assessor2">Minutadas por Laíse</option>
                             </select>` : '';
 
                 view.innerHTML = `
@@ -6730,6 +6736,7 @@
             const filtrados = todosItens.filter(item => {
                 if (item.grupo !== grupoAba) return false;
                 if (meta2Filtros.status && item.status !== meta2Filtros.status) return false;
+                if (meta2Filtros.assessor && (!item.minutaRef || item.minutaRef.assessorId !== meta2Filtros.assessor)) return false;
                 if (meta2Filtros.classe && item.classe !== meta2Filtros.classe) return false;
                 if (busca && !item.chave.includes(busca)) return false;
                 return true;
