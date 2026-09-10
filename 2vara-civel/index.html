@@ -5734,7 +5734,7 @@
         let obsAcompanhamento = {};
         let meta180ProcessoModal = null;
         let meta180ModalContexto = null;
-        let meta180Filtros = { status: '', tipo: '', busca: '', responsavel: '', local: '', classe: '' };
+        let meta180Filtros = { status: '', tipo: '', busca: '', responsavel: '', local: '', classe: '', cruzamento: '' };
 
         function normalizarNumeroCNJ(str) {
             return String(str || '').replace(/\D/g, '');
@@ -6061,6 +6061,10 @@
                                 <option value="Decisão">Concluso para Decisão</option>
                                 <option value="Outro">Outras movimentações</option>
                             </select>
+                            <select onchange="atualizarFiltroMeta180('cruzamento', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                <option value="">Com e sem Meta 2</option>
+                                <option value="meta2">⚖️ Também na Meta 2 (a julgar)</option>
+                            </select>
                         </div>
                         <div id="meta180-lista"></div>
                     </div>
@@ -6157,6 +6161,8 @@
                             ${resumo.porResponsavel.sem.cumpridos} cumprido(s), ${resumo.porResponsavel.sem.minutados} aguardando, ${resumo.porResponsavel.sem.pendentes} sem minuta
                         </div>
                     ` : ''}
+                    ${(() => { const n = todosItens.filter(i => i.status !== 'cumprido' && CHAVES_META2_A_JULGAR.has(i.chave)).length;
+                        return n > 0 ? `<div class="text-xs text-purple-700 mt-1 font-medium">🔗 ${n} processo(s) desta lista também estão na Meta 2 (a julgar) — priorize sentenças neles (filtro "Também na Meta 2").</div>` : ''; })()}
                 </div>
             `;
 
@@ -6168,6 +6174,7 @@
                 if (meta180Filtros.tipo && item.tipo !== meta180Filtros.tipo) return false;
                 if (meta180Filtros.responsavel && (item.responsavel || 'sem') !== meta180Filtros.responsavel) return false;
                 if (meta180Filtros.classe && item.classe !== meta180Filtros.classe) return false;
+                if (meta180Filtros.cruzamento === 'meta2' && !CHAVES_META2_A_JULGAR.has(item.chave)) return false;
                 if (meta180Filtros.local) {
                     const local = item.local || '__vazio__';
                     if (local !== meta180Filtros.local) return false;
@@ -6221,6 +6228,7 @@
                                     <span class="px-2 py-1 rounded text-xs font-medium ${ACOMP_FAIXA_CORES[item.faixa]?.chip || 'bg-gray-100 text-gray-700'}">${item.faixa}</span>
                                     ${badgeTipo[item.tipo] || ''}
                                     ${item.local === 'Cartório' ? '<span class="px-2 py-1 rounded text-xs bg-orange-100 text-orange-800">Cartório</span>' : ''}
+                                    ${CHAVES_META2_A_JULGAR.has(item.chave) ? '<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800 font-medium">⚖️ Meta 2</span>' : ''}
                                     ${item.responsavel ? `<span class="px-2 py-1 rounded text-xs bg-${META180_RESPONSAVEIS[item.responsavel].cor}-100 text-${META180_RESPONSAVEIS[item.responsavel].cor}-800 font-medium">${META180_RESPONSAVEIS[item.responsavel].nome} · Seq ${item.sequencial}</span>`
                                                        : `<span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600">Seq ${item.sequencial}</span>`}
                                 </div>
@@ -6513,8 +6521,13 @@
             chave: p.numero.replace(/\D/g, '')
         }));
 
+        // Cruzamento entre as listas: Meta 2 'a julgar' x parados 180/120/100
+        const CHAVES_META2_A_JULGAR = new Set(PROCESSOS_META2.filter(p => p.grupo === 'a_julgar').map(p => p.chave));
+        const FAIXA_PARADOS_POR_CHAVE = {};
+        PROCESSOS_ACOMPANHAMENTO.forEach(p => { FAIXA_PARADOS_POR_CHAVE[p.chave] = p.faixa; });
+
         let meta2Aba = 'a_julgar';
-        let meta2Filtros = { status: '', classe: '', busca: '', assessor: '' };
+        let meta2Filtros = { status: '', classe: '', busca: '', assessor: '', cruzamento: '' };
 
         function getStatusMeta2P() {
             const todas = Object.values(minutas).filter(m => m && m.numeroProcesso && m.status !== 'excluida');
@@ -6595,7 +6608,7 @@
 
         function trocarAbaMeta2(aba) {
             meta2Aba = aba;
-            meta2Filtros = { status: '', classe: '', busca: '', assessor: '' };
+            meta2Filtros = { status: '', classe: '', busca: '', assessor: '', cruzamento: '' };
             const view = document.getElementById('meta2-view');
             if (view) view.innerHTML = '';
             renderMeta2Painel();
@@ -6636,6 +6649,10 @@
                                 <option value="juiz">Minutadas pelo Juiz</option>
                                 <option value="assessor1">Minutadas por Gilbert</option>
                                 <option value="assessor2">Minutadas por Laíse</option>
+                            </select>
+                            <select onchange="atualizarFiltroMeta2('cruzamento', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <option value="">Parados ou não</option>
+                                <option value="parados">⏱ Também parados +100 dias</option>
                             </select>` : '';
 
                 view.innerHTML = `
@@ -6727,6 +6744,8 @@
                         <div class="absolute top-0 bottom-0 border-l-2 border-purple-700" style="left: ${resumo.alvoPct}%" title="Alvo ${resumo.alvoPct}%"></div>
                     </div>
                     <div class="text-xs text-gray-500 mt-1">A linha roxa marca o alvo de ${resumo.alvoPct}% do acervo (${Math.ceil(META2_ALVO * resumo.acervo)} processos julgados).</div>
+                    ${(() => { const n = todosItens.filter(i => i.grupo === 'a_julgar' && i.status !== 'cumprido' && FAIXA_PARADOS_POR_CHAVE[i.chave]).length;
+                        return n > 0 ? `<div class="text-xs text-purple-700 mt-1 font-medium">🔗 ${n} processo(s) a julgar também estão parados há +100 dias — a sentença neles cumpre os dois painéis (use o filtro "Também parados").</div>` : ''; })()}
                 </div>
             `;
 
@@ -6737,6 +6756,7 @@
                 if (item.grupo !== grupoAba) return false;
                 if (meta2Filtros.status && item.status !== meta2Filtros.status) return false;
                 if (meta2Filtros.assessor && (!item.minutaRef || item.minutaRef.assessorId !== meta2Filtros.assessor)) return false;
+                if (meta2Filtros.cruzamento === 'parados' && !FAIXA_PARADOS_POR_CHAVE[item.chave]) return false;
                 if (meta2Filtros.classe && item.classe !== meta2Filtros.classe) return false;
                 if (busca && !item.chave.includes(busca)) return false;
                 return true;
@@ -6776,6 +6796,7 @@
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <span class="font-mono font-semibold text-gray-800">${item.numero}</span>
                                     ${badgeStatus[item.status]}
+                                    ${FAIXA_PARADOS_POR_CHAVE[item.chave] ? `<span class="px-2 py-1 rounded text-xs font-medium ${(ACOMP_FAIXA_CORES[FAIXA_PARADOS_POR_CHAVE[item.chave]] || {}).chip || 'bg-gray-100 text-gray-700'}">⏱ Parado ${FAIXA_PARADOS_POR_CHAVE[item.chave]}</span>` : ''}
                                 </div>
                                 <div class="text-sm text-gray-600 mt-1">${item.classe}${item.assunto ? ' — ' + item.assunto : ''}</div>
                                 ${minutaInfo}
