@@ -6868,26 +6868,24 @@
         let metasJuizDiario = {};
 
         const METAS_JUIZ_CONFIG = [
-            { id: 'revisoes', nome: 'Revisões de minutas dos assessores', meta: 5, tipo: 'auto', dica: 'Conta ao assinar, devolver para correção ou excluir minuta de assessor' },
+            { id: 'revisoes', nome: 'Revisões de minutas dos assessores', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada minuta revisada' },
             { id: 'distribuicao', nome: 'Fila de distribuição automática', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada processo despachado da fila' },
             { id: 'ato_inicial', nome: 'Fila de ato inicial', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada processo despachado da fila' },
             { id: 'sem_movimento', nome: 'Sem movimentação 60+ dias', meta: 5, tipo: 'auto', dica: 'Conta suas minutas próprias de hoje na categoria "Sem movimentação"' },
-            { id: 'urgentes', nome: 'Urgentes / pedidos de advogados', meta: 3, tipo: 'auto', dica: 'Conta suas minutas próprias de hoje na categoria "Pedidos/Atos/Urgentes"' }
+            { id: 'urgentes', nome: 'Urgentes / pedidos de advogados', meta: 3, tipo: 'manual', dica: 'Use os botões − / + a cada urgência ou pedido atendido' }
         ];
 
         function getMetasJuizStatus() {
             const hoje = getHojeString();
             const manuais = metasJuizDiario[hoje] || {};
-            const revisoes = Object.values(minutas).filter(m =>
-                m && m.revisadoEm === hoje && m.assessorId !== 'juiz').length;
             const minhasHoje = Object.values(minutas).filter(m =>
                 m && m.assessorId === 'juiz' && m.data === hoje && m.status !== 'excluida');
             const valores = {
-                revisoes,
+                revisoes: manuais.revisoes || 0,
                 distribuicao: manuais.distribuicao || 0,
                 ato_inicial: manuais.ato_inicial || 0,
                 sem_movimento: minhasHoje.filter(m => normalizarCategorias(m).includes('sem_movimento')).length,
-                urgentes: minhasHoje.filter(m => normalizarCategorias(m).includes('outros')).length
+                urgentes: manuais.urgentes || 0
             };
             const itens = METAS_JUIZ_CONFIG.map(cfg => ({
                 ...cfg,

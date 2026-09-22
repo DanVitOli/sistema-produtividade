@@ -75,8 +75,8 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
   (Meta 2 e Impulso Processos Antigos) e painéis de acompanhamento quinzenal.
 - **Metas do Magistrado**: quadro diário pessoal do juiz (visível apenas no
   login dele): 5 revisões de minutas, 5 da fila de distribuição automática,
-  5 da fila de ato inicial (contadores manuais +/-), 5 sem movimentação 60+ e
-  3 urgentes/pedidos (automáticos pelas minutas próprias).
+  5 da fila de ato inicial e 3 urgentes/pedidos (contadores manuais +/-);
+  5 sem movimentação 60+ dias (automática pelas minutas próprias do dia).
 - **Registrar Minuta**: registro com múltiplas categorias/metas por minuta,
   disponível para assessores e também para o juiz (produção própria).
 - **Balcão Virtual**: pedidos de advogados/partes com prazo de 72h.
