@@ -73,6 +73,10 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
 - **Dashboard**: produtividade diária (12 minutas/assessor: 4 sentenças
   Meta 1, 4 sem movimentação 60+ dias e 4 pedidos/atos), metas semanais
   (Meta 2 e Impulso Processos Antigos) e painéis de acompanhamento quinzenal.
+- **Metas do Magistrado**: quadro diário pessoal do juiz (visível apenas no
+  login dele): 5 revisões de minutas, 5 da fila de distribuição automática,
+  5 da fila de ato inicial (contadores manuais +/-), 5 sem movimentação 60+ e
+  3 urgentes/pedidos (automáticos pelas minutas próprias).
 - **Registrar Minuta**: registro com múltiplas categorias/metas por minuta,
   disponível para assessores e também para o juiz (produção própria).
 - **Balcão Virtual**: pedidos de advogados/partes com prazo de 72h.

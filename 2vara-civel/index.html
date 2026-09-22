@@ -6859,6 +6859,101 @@
             document.getElementById('modal-meta180-registro').classList.remove('hidden');
         }
 
+        // ==================== METAS DIÁRIAS DO MAGISTRADO ====================
+        // Quadro pessoal do juiz, exibido apenas no login dele. As metas de
+        // revisão e de minutas próprias são contadas automaticamente; as filas
+        // do SAJ (distribuição automática e ato inicial) usam contadores
+        // manuais (+/-) gravados por dia em metasJuizDiario/{data}.
+
+        let metasJuizDiario = {};
+
+        const METAS_JUIZ_CONFIG = [
+            { id: 'revisoes', nome: 'Revisões de minutas dos assessores', meta: 5, tipo: 'auto', dica: 'Conta ao assinar, devolver para correção ou excluir minuta de assessor' },
+            { id: 'distribuicao', nome: 'Fila de distribuição automática', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada processo despachado da fila' },
+            { id: 'ato_inicial', nome: 'Fila de ato inicial', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada processo despachado da fila' },
+            { id: 'sem_movimento', nome: 'Sem movimentação 60+ dias', meta: 5, tipo: 'auto', dica: 'Conta suas minutas próprias de hoje na categoria "Sem movimentação"' },
+            { id: 'urgentes', nome: 'Urgentes / pedidos de advogados', meta: 3, tipo: 'auto', dica: 'Conta suas minutas próprias de hoje na categoria "Pedidos/Atos/Urgentes"' }
+        ];
+
+        function getMetasJuizStatus() {
+            const hoje = getHojeString();
+            const manuais = metasJuizDiario[hoje] || {};
+            const revisoes = Object.values(minutas).filter(m =>
+                m && m.revisadoEm === hoje && m.assessorId !== 'juiz').length;
+            const minhasHoje = Object.values(minutas).filter(m =>
+                m && m.assessorId === 'juiz' && m.data === hoje && m.status !== 'excluida');
+            const valores = {
+                revisoes,
+                distribuicao: manuais.distribuicao || 0,
+                ato_inicial: manuais.ato_inicial || 0,
+                sem_movimento: minhasHoje.filter(m => normalizarCategorias(m).includes('sem_movimento')).length,
+                urgentes: minhasHoje.filter(m => normalizarCategorias(m).includes('outros')).length
+            };
+            const itens = METAS_JUIZ_CONFIG.map(cfg => ({
+                ...cfg,
+                atual: Math.min(valores[cfg.id] || 0, 99),
+                cumprida: (valores[cfg.id] || 0) >= cfg.meta
+            }));
+            const totalAtual = itens.reduce((s, i) => s + Math.min(i.atual, i.meta), 0);
+            const totalMeta = itens.reduce((s, i) => s + i.meta, 0);
+            return { itens, totalAtual, totalMeta,
+                     percentual: Math.round((totalAtual / totalMeta) * 100) };
+        }
+
+        function ajustarMetaJuiz(campo, delta) {
+            if (!currentUser?.isJuiz) return;
+            if (!database) {
+                showNotification('Sem conexão com o banco de dados.', 'error');
+                return;
+            }
+            const hoje = getHojeString();
+            database.ref(`metasJuizDiario/${hoje}/${campo}`)
+                .transaction(v => Math.max(0, (v || 0) + delta));
+        }
+
+        function renderMetasJuizCard() {
+            if (!currentUser?.isJuiz) return '';
+            const status = getMetasJuizStatus();
+            const linhas = status.itens.map(item => {
+                const pct = Math.min(Math.round((item.atual / item.meta) * 100), 100);
+                return `
+                    <div class="flex items-center gap-3 py-2 border-b border-indigo-100 last:border-b-0">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-700" title="${item.dica}">${item.nome}</span>
+                                <span class="font-bold ${item.cumprida ? 'text-green-600' : 'text-gray-800'}">${item.atual}/${item.meta} ${item.cumprida ? '✅' : ''}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                <div class="${item.cumprida ? 'bg-green-500' : 'bg-indigo-500'} h-2 rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+                            </div>
+                        </div>
+                        ${item.tipo === 'manual' ? `
+                            <div class="flex gap-1 no-print">
+                                <button onclick="ajustarMetaJuiz('${item.id}', -1)" class="bg-gray-200 text-gray-700 w-7 h-7 rounded hover:bg-gray-300 font-bold">−</button>
+                                <button onclick="ajustarMetaJuiz('${item.id}', 1)" class="bg-indigo-600 text-white w-7 h-7 rounded hover:bg-indigo-700 font-bold">+</button>
+                            </div>` : `
+                            <span class="text-xs text-gray-400 no-print" title="${item.dica}">auto</span>`}
+                    </div>
+                `;
+            }).join('');
+            return `
+                <div class="bg-white rounded-lg shadow-md p-5 mb-6 border-l-4 border-indigo-600">
+                    <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
+                        <h3 class="font-semibold text-gray-800 flex items-center">
+                            <i data-lucide="crosshair" class="h-5 w-5 mr-2 text-indigo-600"></i>
+                            Metas do Magistrado
+                            <span class="ml-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">🔒 visível apenas no seu login</span>
+                        </h3>
+                        <span class="text-sm font-bold ${status.totalAtual >= status.totalMeta ? 'text-green-600' : 'text-indigo-700'}">${status.totalAtual}/${status.totalMeta} (${status.percentual}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-3">
+                        <div class="${status.totalAtual >= status.totalMeta ? 'bg-green-500' : 'bg-indigo-600'} h-2.5 rounded-full transition-all duration-500" style="width: ${status.percentual}%"></div>
+                    </div>
+                    ${linhas}
+                </div>
+            `;
+        }
+
         // ==================== FIREBASE ====================
 
         function setupFirebaseListeners() {
@@ -6873,6 +6968,12 @@
                     if (currentView === 'calendario') renderCalendario();
                     if (currentView === 'meta180') renderMeta180();
                     if (currentView === 'meta2') renderMeta2Painel();
+                });
+
+                // Listener dos contadores manuais das metas do magistrado
+                database.ref('metasJuizDiario').on('value', (snapshot) => {
+                    metasJuizDiario = snapshot.val() || {};
+                    if (currentView === 'dashboard' && currentUser?.isJuiz) renderDashboard();
                 });
 
                 // Listener das observações do painel 180/120/100
@@ -7324,6 +7425,11 @@
                         </div>
                     </div>
                 `;
+
+                // Metas pessoais do magistrado (visível apenas para o juiz)
+                if (currentUser.isJuiz) {
+                    content += renderMetasJuizCard();
+                }
 
                 // Cards dos assessores
                 content += renderAssessoresCards();
@@ -8240,6 +8346,10 @@
                     excluidaEm: getDataHoraBrasilia().getTime(),
                     excluidaPor: currentUser.nome
                 };
+                if (currentUser.isJuiz && minuta.assessorId !== 'juiz' && !minuta.revisadoEm) {
+                    minutaAtualizada.revisadoEm = getHojeString();
+                    minutaAtualizada.revisadoPor = 'juiz';
+                }
 
                 if (database) {
                     database.ref(`minutas/${id}`).update(minutaAtualizada)
@@ -8301,6 +8411,10 @@
                     excluidaEm: getDataHoraBrasilia().getTime(),
                     excluidaPor: currentUser.nome
                 };
+                if (currentUser.isJuiz && minuta.assessorId !== 'juiz' && !minuta.revisadoEm) {
+                    minutaAtualizada.revisadoEm = getHojeString();
+                    minutaAtualizada.revisadoPor = 'juiz';
+                }
 
                 if (database) {
                     database.ref(`minutas/${id}`).update(minutaAtualizada)
@@ -8342,6 +8456,12 @@
                     atualizadaEm: getDataHoraBrasilia().getTime(),
                     atualizadaPor: currentUser.nome
                 };
+
+                // Meta pessoal do magistrado: registrar a revisão do dia
+                if (currentUser.isJuiz && minuta.assessorId !== 'juiz' && !minuta.revisadoEm) {
+                    minutaAtualizada.revisadoEm = getHojeString();
+                    minutaAtualizada.revisadoPor = 'juiz';
+                }
 
                 if (database) {
                     database.ref(`minutas/${id}`).update(minutaAtualizada)
