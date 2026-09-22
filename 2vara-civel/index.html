@@ -268,6 +268,19 @@
                                 ℹ️ Selecione todas as categorias que se aplicam a esta minuta. Para a meta diária, contará como 1 única minuta.
                             </div>
                             <div class="space-y-2 border border-gray-300 rounded-md p-3 bg-gray-50" id="categorias-container">
+                                <!-- Grupo exclusivo do magistrado -->
+                                <div id="grupo-metas-magistrado" class="border border-indigo-200 bg-indigo-50 rounded-md p-2 mb-2" style="display: none;">
+                                    <p class="text-xs text-indigo-700 mb-2 font-medium">🎯 Metas do Magistrado (somam automaticamente no seu quadro diário):</p>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="categorias" value="juiz_distribuicao" class="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <span class="text-sm">Fila de Distribuição Automática (5/dia)</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="categorias" value="juiz_ato_inicial" class="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                        <span class="text-sm">Fila de Ato Inicial (5/dia)</span>
+                                    </label>
+                                    <p class="text-xs text-indigo-600 mt-2">💡 "Sem movimentação 60+" e "Pedidos/Atos/Urgentes": marque as categorias padrão abaixo — também somam no quadro. Atos feitos direto no SAJ, sem registro de minuta, continuam pelos botões − / + do quadro.</p>
+                                </div>
                                 <label class="flex items-center">
                                     <input type="checkbox" name="categorias" value="meta1" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                                     <span class="text-sm">Meta 1 CNJ (4/dia)</span>
@@ -1238,6 +1251,8 @@
                         <option value="sem_movimento">Sem movimentação 60+ dias</option>
                         <option value="outros">Pedidos/Atos/Urgentes</option>
                         <option value="alem_meta">Além da Meta (produtividade adicional)</option>
+                        <option value="juiz_distribuicao" id="edit-juiz-distribuicao-option" class="hidden">Fila de Distribuição Automática (magistrado)</option>
+                        <option value="juiz_ato_inicial" id="edit-juiz-ato-inicial-option" class="hidden">Fila de Ato Inicial (magistrado)</option>
                     </select>
                 </div>
                 
@@ -1563,6 +1578,8 @@
             },
             'sem_movimento': { nome: 'Sem movimentação 60+ dias', cor: 'bg-orange-500', meta: 4 },
             'outros': { nome: 'Pedidos/Atos/Urgentes', cor: 'bg-blue-500', meta: 4 },
+            'juiz_distribuicao': { nome: 'Fila de Distribuição Automática (magistrado)', cor: 'bg-indigo-600', meta: 5, naoContaParaMeta: true },
+            'juiz_ato_inicial': { nome: 'Fila de Ato Inicial (magistrado)', cor: 'bg-violet-600', meta: 5, naoContaParaMeta: true },
             'alem_meta': { nome: 'Além da Meta (produtividade adicional)', cor: 'bg-gray-500', meta: 0, semMeta: true, naoContaParaMeta: true },
             // Painéis de Acompanhamento Especiais (meta: minutar a cada 15 dias)
             'conhecimento_10anos': {
@@ -2497,6 +2514,12 @@
             // Todos os usuários podem registrar o impulso semanal dos processos mais antigos
             meta10Checkbox?.style.setProperty('display', 'block');
             editMeta10Option?.classList.remove('hidden');
+
+            // Grupo de categorias das metas do magistrado: apenas para o juiz
+            const grupoMagistrado = document.getElementById('grupo-metas-magistrado');
+            if (grupoMagistrado) grupoMagistrado.style.display = currentUser.isJuiz ? 'block' : 'none';
+            document.getElementById('edit-juiz-distribuicao-option')?.classList.toggle('hidden', !currentUser.isJuiz);
+            document.getElementById('edit-juiz-ato-inicial-option')?.classList.toggle('hidden', !currentUser.isJuiz);
         }
 
         function setupNavigation() {
@@ -2595,6 +2618,8 @@
                         <option value="sem_movimento">Sem movimentação 60+</option>
                         <option value="outros">Pedidos/Atos</option>
                         <option value="alem_meta">Além da Meta</option>
+                                <option value="juiz_distribuicao">Fila Distribuição (magistrado)</option>
+                                <option value="juiz_ato_inicial">Fila Ato Inicial (magistrado)</option>
                         <optgroup label="Painéis de Acompanhamento">
                             <option value="conhecimento_10anos">Conhecimento > 10 anos</option>
                             <option value="fazenda_publica">Fazenda Pública</option>
@@ -6869,10 +6894,10 @@
 
         const METAS_JUIZ_CONFIG = [
             { id: 'revisoes', nome: 'Revisões de minutas dos assessores', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada minuta revisada' },
-            { id: 'distribuicao', nome: 'Fila de distribuição automática', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada processo despachado da fila' },
-            { id: 'ato_inicial', nome: 'Fila de ato inicial', meta: 5, tipo: 'manual', dica: 'Use os botões − / + a cada processo despachado da fila' },
+            { id: 'distribuicao', nome: 'Fila de distribuição automática', meta: 5, tipo: 'manual', dica: 'Registrar minuta nesta categoria soma sozinho; use − / + para atos feitos direto no SAJ' },
+            { id: 'ato_inicial', nome: 'Fila de ato inicial', meta: 5, tipo: 'manual', dica: 'Registrar minuta nesta categoria soma sozinho; use − / + para atos feitos direto no SAJ' },
             { id: 'sem_movimento', nome: 'Sem movimentação 60+ dias', meta: 5, tipo: 'auto', dica: 'Conta suas minutas próprias de hoje na categoria "Sem movimentação"' },
-            { id: 'urgentes', nome: 'Urgentes / pedidos de advogados', meta: 3, tipo: 'manual', dica: 'Use os botões − / + a cada urgência ou pedido atendido' }
+            { id: 'urgentes', nome: 'Urgentes / pedidos de advogados', meta: 3, tipo: 'manual', dica: 'Sua minuta em Pedidos/Atos/Urgentes soma sozinha; use − / + para atos feitos direto no SAJ' }
         ];
 
         function getMetasJuizStatus() {
@@ -7246,6 +7271,11 @@
                 return;
             }
 
+            if (!currentUser.isJuiz && (categoriasSelecionadas.includes('juiz_distribuicao') || categoriasSelecionadas.includes('juiz_ato_inicial'))) {
+                showNotification('As categorias das metas do magistrado são exclusivas do juiz.', 'error');
+                return;
+            }
+
             const novaMinuta = {
                 assessorId: currentUser.assessorId || 'juiz',
                 assessorNome: currentUser.nome,
@@ -7283,6 +7313,13 @@
                             mensagem += ` Aplicada a ${categoriasSelecionadas.length} categorias.`;
                         }
                         
+                        // Metas do magistrado: registro soma no quadro diário
+                        if (currentUser.isJuiz) {
+                            if (categoriasSelecionadas.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
+                            if (categoriasSelecionadas.includes('juiz_ato_inicial')) ajustarMetaJuiz('ato_inicial', 1);
+                            if (categoriasSelecionadas.includes('outros')) ajustarMetaJuiz('urgentes', 1);
+                        }
+
                         showNotification(mensagem, tipo);
                         showView('dashboard');
                         log('Minuta registrada no Firebase', numeroProcesso + ' - Categorias: ' + categoriasSelecionadas.join(', '));
@@ -7827,6 +7864,8 @@
                                 <option value="sem_movimento">Sem movimentação 60+</option>
                                 <option value="outros">Pedidos/Atos</option>
                                 <option value="alem_meta">Além da Meta</option>
+                                <option value="juiz_distribuicao">Fila Distribuição (magistrado)</option>
+                                <option value="juiz_ato_inicial">Fila Ato Inicial (magistrado)</option>
                                 <optgroup label="Painéis de Acompanhamento">
                                     <option value="conhecimento_10anos">Conhecimento > 10 anos</option>
                                     <option value="fazenda_publica">Fazenda Pública</option>

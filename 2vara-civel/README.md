@@ -78,7 +78,10 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
   5 da fila de ato inicial e 3 urgentes/pedidos (contadores manuais +/-);
   5 sem movimentação 60+ dias (automática pelas minutas próprias do dia).
 - **Registrar Minuta**: registro com múltiplas categorias/metas por minuta,
-  disponível para assessores e também para o juiz (produção própria).
+  disponível para assessores e também para o juiz (produção própria). No
+  login do juiz, o formulário exibe o grupo "Metas do Magistrado" (filas de
+  distribuição automática e ato inicial) e o registro soma automaticamente
+  no quadro diário dele.
 - **Balcão Virtual**: pedidos de advogados/partes com prazo de 72h.
 - **Metas**: acompanhamento processual por fases, com importação de planilhas
   XLSX, alertas de processos parados e relatórios.
