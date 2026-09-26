@@ -6015,13 +6015,13 @@
                     .map(([cl, n]) => `<option value="${cl.replace(/"/g, '&quot;')}">${cl} (${n})</option>`)
                     .join('');
                 const abas = [`
-                    <button onclick="trocarFaixaAcompanhamento('todas')"
+                    <button onclick="trocarFaixaAcompanhamento('todas')" title="Número = processos ainda sem minuta"
                             class="px-4 py-2 rounded-md text-sm font-medium transition-colors ${faixaAtiva === 'todas' ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
-                        Todas (${PROCESSOS_ACOMPANHAMENTO.length})
+                        Todas (<span id="meta180-aba-n-todas">${PROCESSOS_ACOMPANHAMENTO.length}</span>)
                     </button>`].concat(ACOMP_FAIXAS.map(f => `
-                    <button onclick="trocarFaixaAcompanhamento('${f}')"
+                    <button onclick="trocarFaixaAcompanhamento('${f}')" title="Número = processos ainda sem minuta"
                             class="px-4 py-2 rounded-md text-sm font-medium transition-colors ${faixaAtiva === f ? ACOMP_FAIXA_CORES[f].ativa : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
-                        ${f.replace('+', '')} (${totais[f] || 0})
+                        ${f.replace('+', '')} (<span id="meta180-aba-n-${f.replace(/\D/g, '')}">${totais[f] || 0}</span>)
                     </button>`)).join('');
 
                 view.innerHTML = `
@@ -6097,6 +6097,22 @@
 
             const todosItens = getStatusMeta180();
             const resumoGlobal = getResumoMeta180(todosItens);
+
+            // Abas: número = processos ainda sem minuta (atualiza em tempo real)
+            const pendPorFaixa = {};
+            let pendTotal = 0;
+            todosItens.forEach(i => {
+                if (i.status === 'pendente') {
+                    pendTotal++;
+                    pendPorFaixa[i.faixa] = (pendPorFaixa[i.faixa] || 0) + 1;
+                }
+            });
+            const abaTodas = document.getElementById('meta180-aba-n-todas');
+            if (abaTodas) abaTodas.textContent = pendTotal;
+            for (const f of ACOMP_FAIXAS) {
+                const el = document.getElementById('meta180-aba-n-' + f.replace(/\D/g, ''));
+                if (el) el.textContent = pendPorFaixa[f] || 0;
+            }
             const itens = faixaAtiva === 'todas' ? todosItens : todosItens.filter(i => i.faixa === faixaAtiva);
             const resumo = faixaAtiva === 'todas' ? resumoGlobal : getResumoMeta180(itens);
 
@@ -6681,13 +6697,13 @@
                                 </div>
                             </div>
                             <div class="flex gap-2 flex-wrap no-print">
-                                <button onclick="trocarAbaMeta2('a_julgar')"
+                                <button onclick="trocarAbaMeta2('a_julgar')" title="Número = processos ainda sem sentença minutada"
                                         class="px-4 py-2 rounded-md text-sm font-medium transition-colors ${meta2Aba === 'a_julgar' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
-                                    A julgar (${nAJulgar})
+                                    A julgar (<span id="meta2-aba-n-ajulgar">${nAJulgar}</span>)
                                 </button>
-                                <button onclick="trocarAbaMeta2('julgados')"
+                                <button onclick="trocarAbaMeta2('julgados')" title="Número = julgados da planilha + sentenças assinadas no sistema"
                                         class="px-4 py-2 rounded-md text-sm font-medium transition-colors ${meta2Aba === 'julgados' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
-                                    Já julgados (${nJulgados})
+                                    Já julgados (<span id="meta2-aba-n-julgados">${nJulgados}</span>)
                                 </button>
                             </div>
                         </div>
@@ -6724,6 +6740,12 @@
 
             const todosItens = getStatusMeta2P();
             const resumo = getResumoMeta2P(todosItens);
+
+            // Abas: 'A julgar' = sem sentença minutada; 'Já julgados' = planilha + assinadas
+            const abaAJ = document.getElementById('meta2-aba-n-ajulgar');
+            if (abaAJ) abaAJ.textContent = resumo.pendentes;
+            const abaJG = document.getElementById('meta2-aba-n-julgados');
+            if (abaJG) abaJG.textContent = resumo.julgadosTotal;
 
             resumoDiv.innerHTML = `
                 <div class="grid md:grid-cols-5 gap-4 mb-4">
