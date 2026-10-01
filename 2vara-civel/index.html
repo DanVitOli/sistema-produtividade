@@ -6939,6 +6939,15 @@
                     if (currentView === 'calendario') renderCalendario();
                     if (currentView === 'meta180') renderMeta180();
                     if (currentView === 'meta2') renderMeta2Painel();
+                }, (error) => {
+                    // Permissão negada = regras do Realtime Database expiradas/incorretas.
+                    // Sem este aviso o sistema abre "vazio" silenciosamente.
+                    log('ERRO de permissão ao ler minutas:', error);
+                    const statusDiv = document.getElementById('connection-status');
+                    if (statusDiv) {
+                        statusDiv.innerHTML = '<div class="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-medium pulse">🔒 Banco bloqueado — regras do Firebase expiradas</div>';
+                    }
+                    showNotification('⚠️ O banco de dados NEGOU o acesso — as regras do Firebase provavelmente expiraram (modo de teste dura 30 dias). Nada foi apagado: publique novas regras no console do Firebase (Realtime Database → Regras) e os dados voltam. NÃO registre minutas até corrigir.', 'error');
                 });
 
                 // Listener dos contadores manuais das metas do magistrado
