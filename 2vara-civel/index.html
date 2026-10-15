@@ -6976,10 +6976,13 @@
                 alvo.innerHTML = `<ul class="mt-3 space-y-1 text-sm">${resultados.map(r => `
                     <li class="flex justify-between gap-3"><span class="font-mono">${escapeHtml(r.numero)}</span>
                     <span class="${r.ok ? 'text-green-700' : 'text-red-600'}">${escapeHtml(r.texto)}</span></li>`).join('')}</ul>
-                    <p class="text-xs text-gray-500 mt-2">Para o Painel confirmar, use "Copiar código para o Painel" e cole lá.</p>`;
+                    <p class="text-xs text-gray-500 mt-2">O Painel confirma sozinho na próxima rodada do executor. Para confirmar na hora, aperte Ctrl+V no Painel.</p>`;
             }
+            // deixa a confirmação pronta na área de transferência: no Painel, basta Ctrl+V
+            let copiou = false;
+            try { await navigator.clipboard.writeText(JSON.stringify(gerarSnapshotPainelIA())); copiou = true; } catch (e) {}
             showNotification(okN === resultados.length
-                ? `${okN} ${okN === 1 ? 'minuta lançada' : 'minutas lançadas'} em seu nome, já assinadas.`
+                ? `${okN} ${okN === 1 ? 'minuta lançada' : 'minutas lançadas'} em seu nome, já assinadas.${copiou ? ' Para atualizar o Painel agora, aperte Ctrl+V nele.' : ''}`
                 : `${okN} de ${resultados.length} lançadas. Veja os detalhes no Painel IA.`, okN === resultados.length ? 'success' : 'warning');
         }
 
