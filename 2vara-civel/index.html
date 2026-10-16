@@ -7822,12 +7822,43 @@
             };
         }
 
+        // Aviso de duplicidade: outra minuta ativa do mesmo processo (só os dígitos, sem o sufixo
+        // de incidente /0001), registrada por qualquer usuário nos últimos 7 dias. O lançamento pelo
+        // Painel não é automático nesses casos: o juiz confirma item a item ("Lançar mesmo assim").
+        const PAINEL_IA_JANELA_DUPLICIDADE_DIAS = 7;
+
+        function chaveProcessoSemIncidente(numero) {
+            return normalizarNumeroCNJ(numero).slice(0, 20);
+        }
+
+        function duplicidadesPainelIA(numero, { painelId = '', extras = [] } = {}) {
+            const chave = chaveProcessoSemIncidente(numero);
+            if (chave.length < 20) return [];
+            const hoje = getHojeString();
+            const limite = new Date(new Date(`${hoje}T12:00:00Z`).getTime() - PAINEL_IA_JANELA_DUPLICIDADE_DIAS * 86400000).toISOString().slice(0, 10);
+            const nomeAutor = m => m.assessorNome || assessores[m.assessorId]?.nome || (m.assessorId === 'juiz' ? 'Juiz' : (m.assessorId || 'autor não informado'));
+            return [...Object.values(minutas), ...extras]
+                .filter(m => m && m.status !== 'excluida' && m.numeroProcesso
+                    && !(painelId && m.painelId === painelId)
+                    && (m.data || '') >= limite && (m.data || '') <= hoje
+                    && chaveProcessoSemIncidente(m.numeroProcesso) === chave)
+                .sort((a, b) => (b.data || '').localeCompare(a.data || ''))
+                .map(m => ({ autor: nomeAutor(m), tipoMinuta: m.tipoMinuta || 'ato', data: m.data,
+                    doPainel: m.origem === 'painel-gabinete' || !!m.painelId }));
+        }
+
+        function textoDuplicidadesPainelIA(lista) {
+            return 'possível duplicidade: ' + lista.map(d =>
+                `${d.tipoMinuta} de ${d.autor}${d.doPainel ? ' (pelo Painel)' : ''} em ${formatarDataBrasilia(d.data)}`).join('; ');
+        }
+
         // Lança, em nome do juiz e já assinadas, as minutas que ele marcou como assinadas no Painel.
         // A chave no banco deriva do painelId, então lançar de novo não duplica.
+        let painelIALancamento = { resultados: [], aguardando: {} };
+
         async function lancarAssinadasPainelIA() {
             if (!currentUser?.isJuiz) return;
             if (!database) { showNotification('Sem conexão com o banco de dados.', 'error'); return; }
-            const alvo = document.getElementById('painelia-lancamento');
             let texto = '';
             try {
                 texto = await navigator.clipboard.readText();
@@ -7845,95 +7876,139 @@
                 showNotification('A área de transferência não tem minutas assinadas do Painel. No Painel, marque como assinada (ou use "Copiar assinadas") e tente de novo.', 'warning');
                 return;
             }
-            const hoje = getHojeString();
-            const resultados = [];
+            painelIALancamento = { resultados: [], aguardando: {} };
+            const lancadasAgora = [];
             for (const m of dados.minutas) {
-                const painelId = String(m.painelId || '');
-                const numero = String(m.numeroProcesso || '').trim();
-                const cats = (Array.isArray(m.categorias) ? m.categorias : []).filter(c => categorias[c]);
-                let problema = '';
-                if (!/^[A-Za-z0-9_-]{1,120}$/.test(painelId)) problema = 'identificação do Painel inválida';
-                else if (!validarNumeroProcesso(numero)) problema = 'número inválido';
-                else if (!['Despacho', 'Decisão', 'Sentença'].includes(m.tipoMinuta)) problema = 'tipo inválido';
-                else if (!cats.length) problema = 'sem categoria válida';
-                else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
-                if (problema) { resultados.push({ numero, texto: problema, ok: false }); continue; }
-                // o processo também conta onde ele está listado (Meta 2 a julgar, 180/120/100)
-                const extras = categoriasPeloProcesso(numero, m.tipoMinuta).filter(c => !cats.includes(c));
-                cats.push(...extras);
-                const notaExtras = extras.length ? ' · + ' + extras.map(c => categorias[c]?.nome || c).join(', ') : '';
-                const sincronizar = async (id, base) => {
-                    const feitos = await sincronizarAbasPorMinuta({ ...base, numeroProcesso: numero, tipoMinuta: m.tipoMinuta, assessorNome: currentUser.nome }, id);
-                    return feitos.length ? ' · ' + feitos.join(' · ') : '';
-                };
-
-                // já lançada antes (pelo botão ou pelo envio manual da IA): só garante a assinatura
-                const existente = Object.entries(minutas).find(([, x]) => x && x.painelId === painelId && x.status !== 'excluida');
-                try {
-                    if (existente) {
-                        const [id, x] = existente;
-                        // relançamento corrige o tipo do ato e as categorias quando o Painel mandou outros
-                        const catsAntes = normalizarCategorias(x);
-                        const mudouTipo = x.tipoMinuta !== m.tipoMinuta;
-                        const mudouCats = catsAntes.length !== cats.length || cats.some(c => !catsAntes.includes(c));
-                        if (x.status !== 'assinada' || mudouTipo || mudouCats) {
-                            await database.ref(`minutas/${id}`).update({
-                                status: 'assinada', tipoMinuta: m.tipoMinuta, categorias: cats,
-                                atualizadaEm: getDataHoraBrasilia().getTime(), atualizadaPor: currentUser.nome
-                            });
-                            const partes = [];
-                            if (mudouTipo) partes.push(`ato corrigido: ${x.tipoMinuta} → ${m.tipoMinuta}`);
-                            if (mudouCats) partes.push('categorias atualizadas');
-                            if (x.status !== 'assinada') partes.push('marcada como assinada');
-                            resultados.push({ numero, texto: 'já estava no sistema · ' + partes.join(' · ') + notaExtras + await sincronizar(id, x), ok: true });
-                        } else {
-                            resultados.push({ numero, texto: 'já lançada antes' + await sincronizar(id, x), ok: true });
-                        }
-                        continue;
-                    }
-                    const obs = ('Minuta elaborada com o Claude (IA) no Painel do Gabinete, revisada e assinada pelo juiz. ' + String(m.observacoes || '')).trim().slice(0, 500);
-                    await database.ref(`minutas/painel-${painelId}`).set({
-                        assessorId: 'juiz',
-                        assessorNome: currentUser.nome,
-                        numeroProcesso: numero,
-                        tipoMinuta: m.tipoMinuta,
-                        categorias: cats,
-                        observacoes: obs,
-                        substituicao: false,
-                        status: 'assinada',
-                        data: hoje,
-                        timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
-                        createdAt: firebase.database.ServerValue.TIMESTAMP,
-                        atualizadaEm: getDataHoraBrasilia().getTime(),
-                        atualizadaPor: currentUser.nome,
-                        painelId,
-                        origem: 'painel-gabinete'
-                    });
-                    // mesmo efeito do "Registrar Minuta" feito pelo juiz
-                    if (cats.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
-                    if (cats.includes('juiz_ato_inicial')) ajustarMetaJuiz('ato_inicial', 1);
-                    if (cats.includes('outros')) ajustarMetaJuiz('urgentes', 1);
-                    resultados.push({ numero, texto: `${m.tipoMinuta} lançada e assinada` + notaExtras + await sincronizar(`painel-${painelId}`, {}), ok: true });
-                } catch (e) {
-                    log('Erro ao lançar assinada do Painel', e);
-                    resultados.push({ numero, texto: 'erro ao gravar; tente de novo', ok: false });
-                }
+                const r = await lancarItemAssinadoPainelIA(m, { lancadasAgora });
+                painelIALancamento.resultados.push(r);
+                if (r.aguardando) painelIALancamento.aguardando[r.painelId] = m;
             }
-            const okN = resultados.filter(r => r.ok).length;
             const entrada = document.getElementById('painelia-lancar-entrada');
             if (entrada) { entrada.value = ''; entrada.classList.add('hidden'); }
-            if (alvo) {
-                alvo.innerHTML = `<ul class="mt-3 space-y-1 text-sm">${resultados.map(r => `
-                    <li class="flex justify-between gap-3"><span class="font-mono">${escapeHtml(r.numero)}</span>
-                    <span class="${r.ok ? 'text-green-700' : 'text-red-600'}">${escapeHtml(r.texto)}</span></li>`).join('')}</ul>
-                    <p class="text-xs text-gray-500 mt-2">O Painel confirma sozinho na próxima rodada do executor. Para confirmar na hora, aperte Ctrl+V no Painel.</p>`;
+            renderLancamentoPainelIA();
+            await concluirLancamentoPainelIA();
+        }
+
+        // Grava uma minuta assinada do Painel. Sem "forcar", para antes de gravar se houver duplicidade.
+        async function lancarItemAssinadoPainelIA(m, { forcar = false, lancadasAgora = [] } = {}) {
+            const hoje = getHojeString();
+            const painelId = String(m.painelId || '');
+            const numero = String(m.numeroProcesso || '').trim();
+            const cats = (Array.isArray(m.categorias) ? m.categorias : []).filter(c => categorias[c]);
+            let problema = '';
+            if (!/^[A-Za-z0-9_-]{1,120}$/.test(painelId)) problema = 'identificação do Painel inválida';
+            else if (!validarNumeroProcesso(numero)) problema = 'número inválido';
+            else if (!['Despacho', 'Decisão', 'Sentença'].includes(m.tipoMinuta)) problema = 'tipo inválido';
+            else if (!cats.length) problema = 'sem categoria válida';
+            else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
+            if (problema) return { numero, painelId, texto: problema, ok: false };
+            // o processo também conta onde ele está listado (Meta 2 a julgar, 180/120/100)
+            const extras = categoriasPeloProcesso(numero, m.tipoMinuta).filter(c => !cats.includes(c));
+            cats.push(...extras);
+            const notaExtras = extras.length ? ' · + ' + extras.map(c => categorias[c]?.nome || c).join(', ') : '';
+            const sincronizar = async (id, base) => {
+                const feitos = await sincronizarAbasPorMinuta({ ...base, numeroProcesso: numero, tipoMinuta: m.tipoMinuta, assessorNome: currentUser.nome }, id);
+                return feitos.length ? ' · ' + feitos.join(' · ') : '';
+            };
+
+            // já lançada antes (pelo botão ou pelo envio manual da IA): só garante a assinatura
+            const existente = Object.entries(minutas).find(([, x]) => x && x.painelId === painelId && x.status !== 'excluida');
+            try {
+                if (existente) {
+                    const [id, x] = existente;
+                    // relançamento corrige o tipo do ato e as categorias quando o Painel mandou outros
+                    const catsAntes = normalizarCategorias(x);
+                    const mudouTipo = x.tipoMinuta !== m.tipoMinuta;
+                    const mudouCats = catsAntes.length !== cats.length || cats.some(c => !catsAntes.includes(c));
+                    if (x.status !== 'assinada' || mudouTipo || mudouCats) {
+                        await database.ref(`minutas/${id}`).update({
+                            status: 'assinada', tipoMinuta: m.tipoMinuta, categorias: cats,
+                            atualizadaEm: getDataHoraBrasilia().getTime(), atualizadaPor: currentUser.nome
+                        });
+                        const partes = [];
+                        if (mudouTipo) partes.push(`ato corrigido: ${x.tipoMinuta} → ${m.tipoMinuta}`);
+                        if (mudouCats) partes.push('categorias atualizadas');
+                        if (x.status !== 'assinada') partes.push('marcada como assinada');
+                        return { numero, painelId, texto: 'já estava no sistema · ' + partes.join(' · ') + notaExtras + await sincronizar(id, x), ok: true };
+                    }
+                    return { numero, painelId, texto: 'já lançada antes' + await sincronizar(id, x), ok: true };
+                }
+                if (!forcar) {
+                    const dup = duplicidadesPainelIA(numero, { painelId, extras: lancadasAgora });
+                    if (dup.length) return { numero, painelId, texto: `não lançada · ${textoDuplicidadesPainelIA(dup)}`, ok: false, aguardando: true };
+                }
+                const obs = ('Minuta elaborada com o Claude (IA) no Painel do Gabinete, revisada e assinada pelo juiz. ' + String(m.observacoes || '')).trim().slice(0, 500);
+                const registro = {
+                    assessorId: 'juiz',
+                    assessorNome: currentUser.nome,
+                    numeroProcesso: numero,
+                    tipoMinuta: m.tipoMinuta,
+                    categorias: cats,
+                    observacoes: obs,
+                    substituicao: false,
+                    status: 'assinada',
+                    data: hoje,
+                    timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    atualizadaEm: getDataHoraBrasilia().getTime(),
+                    atualizadaPor: currentUser.nome,
+                    painelId,
+                    origem: 'painel-gabinete'
+                };
+                if (forcar) registro.duplicidadeConfirmada = true;
+                await database.ref(`minutas/painel-${painelId}`).set(registro);
+                lancadasAgora.push(registro);
+                // mesmo efeito do "Registrar Minuta" feito pelo juiz
+                if (cats.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
+                if (cats.includes('juiz_ato_inicial')) ajustarMetaJuiz('ato_inicial', 1);
+                if (cats.includes('outros')) ajustarMetaJuiz('urgentes', 1);
+                return { numero, painelId, texto: `${m.tipoMinuta} lançada e assinada${forcar ? ' (duplicidade confirmada)' : ''}` + notaExtras + await sincronizar(`painel-${painelId}`, {}), ok: true };
+            } catch (e) {
+                log('Erro ao lançar assinada do Painel', e);
+                return { numero, painelId, texto: 'erro ao gravar; tente de novo', ok: false };
             }
+        }
+
+        // "Lançar mesmo assim" de um item retido por duplicidade
+        async function confirmarDuplicadaPainelIA(painelId) {
+            if (!currentUser?.isJuiz || !database) return;
+            const m = painelIALancamento.aguardando[painelId];
+            if (!m) return;
+            delete painelIALancamento.aguardando[painelId];
+            const r = await lancarItemAssinadoPainelIA(m, { forcar: true });
+            const idx = painelIALancamento.resultados.findIndex(x => x.painelId === painelId && x.aguardando);
+            if (idx >= 0) painelIALancamento.resultados[idx] = r; else painelIALancamento.resultados.push(r);
+            renderLancamentoPainelIA();
+            await concluirLancamentoPainelIA();
+        }
+
+        function renderLancamentoPainelIA() {
+            const alvo = document.getElementById('painelia-lancamento');
+            if (!alvo) return;
+            const resultados = painelIALancamento.resultados;
+            if (!resultados.length) { alvo.innerHTML = ''; return; }
+            alvo.innerHTML = `<ul class="mt-3 space-y-1 text-sm">${resultados.map(r => `
+                <li class="flex justify-between items-start gap-3"><span class="font-mono">${escapeHtml(r.numero)}</span>
+                <span class="text-right ${r.ok ? 'text-green-700' : r.aguardando ? 'text-amber-700' : 'text-red-600'}">${r.aguardando ? '⚠️ ' : ''}${escapeHtml(r.texto)}${r.aguardando ? `
+                    <button onclick="confirmarDuplicadaPainelIA('${escapeHtml(r.painelId)}')" class="ml-2 bg-amber-600 text-white px-2 py-0.5 rounded text-xs hover:bg-amber-700 whitespace-nowrap">Lançar mesmo assim</button>` : ''}</span></li>`).join('')}</ul>
+                ${resultados.some(r => r.aguardando) ? '<p class="text-xs text-amber-700 mt-2">Antes de lançar, confira se o ato já registrado não é o mesmo: a produtividade contaria duas vezes.</p>' : ''}
+                <p class="text-xs text-gray-500 mt-2">O Painel confirma sozinho na próxima rodada do executor. Para confirmar na hora, aperte Ctrl+V no Painel.</p>`;
+        }
+
+        async function concluirLancamentoPainelIA() {
+            const resultados = painelIALancamento.resultados;
+            const okN = resultados.filter(r => r.ok).length;
+            const aguardandoN = resultados.filter(r => r.aguardando).length;
             // deixa a confirmação pronta na área de transferência: no Painel, basta Ctrl+V
             let copiou = false;
             try { await navigator.clipboard.writeText(JSON.stringify(gerarSnapshotPainelIA())); copiou = true; } catch (e) {}
-            showNotification(okN === resultados.length
-                ? `${okN} ${okN === 1 ? 'minuta lançada' : 'minutas lançadas'} em seu nome, já assinadas.${copiou ? ' Para atualizar o Painel agora, aperte Ctrl+V nele.' : ''}`
-                : `${okN} de ${resultados.length} lançadas. Veja os detalhes no Painel IA.`, okN === resultados.length ? 'success' : 'warning');
+            if (okN === resultados.length) {
+                showNotification(`${okN} ${okN === 1 ? 'minuta lançada' : 'minutas lançadas'} em seu nome, já assinadas.${copiou ? ' Para atualizar o Painel agora, aperte Ctrl+V nele.' : ''}`, 'success');
+            } else if (aguardandoN) {
+                showNotification(`${okN} de ${resultados.length} lançadas. ${aguardandoN} ${aguardandoN === 1 ? 'aguarda' : 'aguardam'} sua confirmação por possível duplicidade: veja no Painel IA.`, 'warning');
+            } else {
+                showNotification(`${okN} de ${resultados.length} lançadas. Veja os detalhes no Painel IA.`, 'warning');
+            }
         }
 
         async function copiarSnapshotPainelIA() {
@@ -7973,8 +8048,17 @@
                 else if (jaRegistradas.has(m.painelId)) problema = 'já registrada';
                 return { painelId: String(m.painelId || ''), numeroProcesso: String(m.numeroProcesso || '').trim(), tipoMinuta: m.tipoMinuta,
                     categorias: cats, observacoes: String(m.observacoes || '').slice(0, 400),
-                    pedidoBalcaoId: m.pedidoBalcaoId && pedidosBalcao[m.pedidoBalcaoId] ? m.pedidoBalcaoId : '', problema };
+                    pedidoBalcaoId: m.pedidoBalcaoId && pedidosBalcao[m.pedidoBalcaoId] ? m.pedidoBalcaoId : '', problema,
+                    duplicidades: [], confirmada: false };
             });
+            // duplicidade com minutas já no sistema ou com outra do mesmo código: só registra com confirmação
+            const anteriores = [];
+            for (const i of itens) {
+                if (i.problema) continue;
+                i.duplicidades = duplicidadesPainelIA(i.numeroProcesso, { painelId: i.painelId, extras: anteriores });
+                anteriores.push({ numeroProcesso: i.numeroProcesso, tipoMinuta: i.tipoMinuta, data: getHojeString(),
+                    assessorNome: 'Claude (IA), neste mesmo código' });
+            }
             painelIAImportacao = itens;
             renderPreviaImportacaoPainelIA();
         }
@@ -7986,33 +8070,54 @@
                 alvo.innerHTML = `<p class="text-sm text-gray-500">${escapeHtml(mensagem || '')}</p>`;
                 return;
             }
-            const validas = painelIAImportacao.filter(i => !i.problema);
+            const validas = painelIAImportacao.filter(importacaoLiberadaPainelIA);
+            const situacao = (i, idx) => {
+                if (i.problema) return `<span class="text-red-600">${escapeHtml(i.problema)}</span>`;
+                const balcao = i.pedidoBalcaoId ? ' · baixa o pedido do balcão' : '';
+                if (!i.duplicidades.length) return `<span class="text-green-700">pronta para registrar${balcao}</span>`;
+                if (i.confirmada) return `<span class="text-green-700">duplicidade confirmada · será registrada${balcao}</span>
+                    <button onclick="confirmarDuplicadaImportacaoPainelIA(${idx}, false)" class="ml-2 text-xs text-gray-500 underline">desfazer</button>`;
+                return `<span class="text-amber-700">⚠️ ${escapeHtml(textoDuplicidadesPainelIA(i.duplicidades))}</span>
+                    <button onclick="confirmarDuplicadaImportacaoPainelIA(${idx}, true)" class="ml-2 bg-amber-600 text-white px-2 py-0.5 rounded text-xs hover:bg-amber-700 whitespace-nowrap">Lançar mesmo assim</button>`;
+            };
             alvo.innerHTML = `
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead><tr class="text-left text-gray-500 border-b">
                             <th class="py-2 pr-3">Processo</th><th class="py-2 pr-3">Tipo</th><th class="py-2 pr-3">Categorias</th><th class="py-2">Situação</th>
                         </tr></thead>
-                        <tbody>${painelIAImportacao.map(i => `
+                        <tbody>${painelIAImportacao.map((i, idx) => `
                             <tr class="border-b last:border-b-0">
                                 <td class="py-2 pr-3 font-mono">${escapeHtml(i.numeroProcesso)}</td>
                                 <td class="py-2 pr-3">${escapeHtml(i.tipoMinuta || '')}</td>
                                 <td class="py-2 pr-3">${i.categorias.map(c => escapeHtml(categorias[c]?.nome || c)).join(', ')}</td>
-                                <td class="py-2 ${i.problema ? 'text-red-600' : 'text-green-700'}">${i.problema ? escapeHtml(i.problema) : 'pronta para registrar'}${i.pedidoBalcaoId ? ' · baixa o pedido do balcão' : ''}</td>
+                                <td class="py-2">${situacao(i, idx)}</td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
                 </div>
+                ${painelIAImportacao.some(i => !i.problema && i.duplicidades.length && !i.confirmada) ? '<p class="text-xs text-amber-700 mt-2">As minutas com aviso de duplicidade só entram se você confirmar uma a uma: a produtividade contaria duas vezes.</p>' : ''}
                 <button onclick="registrarImportacaoPainelIA()" ${validas.length ? '' : 'disabled'}
                     class="mt-3 bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800 transition-colors disabled:opacity-40">
                     Registrar ${validas.length} ${validas.length === 1 ? 'minuta' : 'minutas'} como Claude (IA)
                 </button>`;
         }
 
+        function importacaoLiberadaPainelIA(i) {
+            return !i.problema && (!i.duplicidades.length || i.confirmada);
+        }
+
+        function confirmarDuplicadaImportacaoPainelIA(idx, confirmar) {
+            const i = painelIAImportacao?.[idx];
+            if (!i) return;
+            i.confirmada = !!confirmar;
+            renderPreviaImportacaoPainelIA();
+        }
+
         async function registrarImportacaoPainelIA() {
             if (!currentUser?.isJuiz || !painelIAImportacao) return;
             if (!database) { showNotification('Sem conexão com o banco de dados.', 'error'); return; }
-            const validas = painelIAImportacao.filter(i => !i.problema);
+            const validas = painelIAImportacao.filter(importacaoLiberadaPainelIA);
             let ok = 0;
             for (const i of validas) {
                 const obs = ('Minuta elaborada pelo Claude (IA) no Painel do Gabinete e aprovada pelo juiz para revisão. ' + i.observacoes).trim().slice(0, 500);
@@ -8030,7 +8135,8 @@
                         timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
                         createdAt: firebase.database.ServerValue.TIMESTAMP,
                         painelId: i.painelId,
-                        registradoPor: currentUser.nome
+                        registradoPor: currentUser.nome,
+                        ...(i.duplicidades.length ? { duplicidadeConfirmada: true } : {})
                     });
                     await novaRefIA;
                     await sincronizarAbasPorMinuta({ numeroProcesso: i.numeroProcesso, tipoMinuta: i.tipoMinuta, assessorNome: PAINEL_IA_ASSESSOR_NOME }, novaRefIA.key);
