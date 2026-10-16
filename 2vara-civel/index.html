@@ -6812,6 +6812,69 @@
             `;
         }
 
+        // ==================== SINCRONIZAÇÃO DAS ABAS POR MINUTA ====================
+        // Chamada sempre que uma minuta é registrada ou lançada (tela Registrar Minuta e Painel IA).
+        // Meta 2 e 180/120/100 já leem as minutas pelo número do processo; aqui se atualiza o que
+        // depende de gravação: pedidos do Balcão Virtual e processos acompanhados nas Metas.
+        // Idempotente: rodar de novo para a mesma minuta não muda nada.
+
+        function mesmoProcesso(item, numero) {
+            const d = normalizarNumeroCNJ(numero);
+            const chave = item.chave || normalizarNumeroCNJ(item.numero || item.numeroProcesso);
+            const temSufixo = item.temSufixo ?? String(item.numero || item.numeroProcesso || '').includes('/');
+            if (d.length < 20 || chave.length < 20) return false;
+            // item sem sufixo aceita a minuta do incidente (/0001); item com sufixo exige o número completo
+            return temSufixo ? d === chave : (d === chave || d.startsWith(chave));
+        }
+
+        // Categorias que a minuta deve ter pelo processo a que se refere (usado nos lançamentos do Painel)
+        function categoriasPeloProcesso(numero, tipoMinuta) {
+            const extra = [];
+            if (tipoMinuta === 'Sentença' && PROCESSOS_META2.some(p => p.grupo === 'a_julgar' && mesmoProcesso(p, numero))) extra.push('meta2');
+            if (PROCESSOS_ACOMPANHAMENTO.some(p => mesmoProcesso(p, numero))) extra.push('sem_movimento');
+            return extra;
+        }
+
+        async function sincronizarAbasPorMinuta(minuta, minutaId) {
+            if (!database || !minuta?.numeroProcesso) return [];
+            const feitos = [];
+            const hoje = getHojeString();
+            const agora = getDataHoraBrasilia().getTime();
+            const autor = minuta.assessorNome || currentUser?.nome || '';
+
+            // Balcão Virtual: pedido pendente do mesmo processo passa a "minutado"
+            for (const [id, p] of Object.entries(pedidosBalcao)) {
+                if (!p || p.status !== 'pendente' || !mesmoProcesso(p, minuta.numeroProcesso)) continue;
+                await database.ref(`pedidosBalcao/${id}`).update({
+                    status: 'minutado', dataMinutado: hoje, minutadoPor: autor, minutadoEm: agora, minutaId: minutaId || null
+                });
+                feitos.push('balcão: pedido marcado como minutado');
+            }
+
+            // Metas acompanhadas (improbidade, coletivas, +10 anos, saúde): última movimentação e, se sentença, a fase
+            for (const meta of Object.values(METAS_CONFIG)) {
+                const lista = { processosMetaImprobidade, processosMetaAcoesColetivas, processosMetaMaisDezAnos, processosMetaSaude }[meta.colecaoFirebase] || {};
+                for (const [id, p] of Object.entries(lista)) {
+                    if (!p || !mesmoProcesso(p, minuta.numeroProcesso)) continue;
+                    if (p.ultimaMinutaId === minutaId && p.ultimaMovimentacao === hoje) continue;
+                    const upd = { ultimaMovimentacao: hoje, ultimaMinutaId: minutaId || null, ultimaMinutaTipo: minuta.tipoMinuta,
+                                  editadoPor: autor, editadoEm: agora };
+                    if (minuta.tipoMinuta === 'Sentença' && meta.fases.sentenca && (meta.fases[p.fase]?.ordem || 0) < meta.fases.sentenca.ordem) upd.fase = 'sentenca';
+                    await database.ref(`${meta.colecaoFirebase}/${id}`).update(upd);
+                    feitos.push(`${meta.nome}: movimentação de hoje${upd.fase ? ' · fase Sentença' : ''}`);
+                }
+            }
+
+            // Notificações de despacho virtual do mesmo processo ficam como lidas
+            for (const [id, n] of Object.entries(notificacoesJuiz)) {
+                if (n && !n.lida && n.tipo === 'despacho_virtual' && mesmoProcesso(n, minuta.numeroProcesso)) {
+                    await database.ref(`notificacoesJuiz/${id}/lida`).set(true);
+                    feitos.push('notificação de despacho virtual lida');
+                }
+            }
+            return feitos;
+        }
+
         // ==================== PAINEL IA (SINCRONIZAÇÃO COM O PAINEL DO GABINETE) ====================
         // Ponte manual, exclusiva do juiz, com o Painel do Gabinete (artifact privado no claude.ai).
         // Sem credenciais e sem robô gravando no banco: o juiz copia um código daqui e cola no Painel
@@ -6927,6 +6990,14 @@
                 else if (!cats.length) problema = 'sem categoria válida';
                 else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
                 if (problema) { resultados.push({ numero, texto: problema, ok: false }); continue; }
+                // o processo também conta onde ele está listado (Meta 2 a julgar, 180/120/100)
+                const extras = categoriasPeloProcesso(numero, m.tipoMinuta).filter(c => !cats.includes(c));
+                cats.push(...extras);
+                const notaExtras = extras.length ? ' · + ' + extras.map(c => categorias[c]?.nome || c).join(', ') : '';
+                const sincronizar = async (id, base) => {
+                    const feitos = await sincronizarAbasPorMinuta({ ...base, numeroProcesso: numero, tipoMinuta: m.tipoMinuta, assessorNome: currentUser.nome }, id);
+                    return feitos.length ? ' · ' + feitos.join(' · ') : '';
+                };
 
                 // já lançada antes (pelo botão ou pelo envio manual da IA): só garante a assinatura
                 const existente = Object.entries(minutas).find(([, x]) => x && x.painelId === painelId && x.status !== 'excluida');
@@ -6946,9 +7017,9 @@
                             if (mudouTipo) partes.push(`ato corrigido: ${x.tipoMinuta} → ${m.tipoMinuta}`);
                             if (mudouCats) partes.push('categorias atualizadas');
                             if (x.status !== 'assinada') partes.push('marcada como assinada');
-                            resultados.push({ numero, texto: 'já estava no sistema · ' + partes.join(' · '), ok: true });
+                            resultados.push({ numero, texto: 'já estava no sistema · ' + partes.join(' · ') + notaExtras + await sincronizar(id, x), ok: true });
                         } else {
-                            resultados.push({ numero, texto: 'já lançada antes', ok: true });
+                            resultados.push({ numero, texto: 'já lançada antes' + await sincronizar(id, x), ok: true });
                         }
                         continue;
                     }
@@ -6974,7 +7045,7 @@
                     if (cats.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
                     if (cats.includes('juiz_ato_inicial')) ajustarMetaJuiz('ato_inicial', 1);
                     if (cats.includes('outros')) ajustarMetaJuiz('urgentes', 1);
-                    resultados.push({ numero, texto: `${m.tipoMinuta} lançada e assinada`, ok: true });
+                    resultados.push({ numero, texto: `${m.tipoMinuta} lançada e assinada` + notaExtras + await sincronizar(`painel-${painelId}`, {}), ok: true });
                 } catch (e) {
                     log('Erro ao lançar assinada do Painel', e);
                     resultados.push({ numero, texto: 'erro ao gravar; tente de novo', ok: false });
@@ -7078,7 +7149,7 @@
             for (const i of validas) {
                 const obs = ('Minuta elaborada pelo Claude (IA) no Painel do Gabinete e aprovada pelo juiz para revisão. ' + i.observacoes).trim().slice(0, 500);
                 try {
-                    await database.ref('minutas').push({
+                    const novaRefIA = database.ref('minutas').push({
                         assessorId: PAINEL_IA_ASSESSOR_ID,
                         assessorNome: PAINEL_IA_ASSESSOR_NOME,
                         numeroProcesso: i.numeroProcesso,
@@ -7093,6 +7164,8 @@
                         painelId: i.painelId,
                         registradoPor: currentUser.nome
                     });
+                    await novaRefIA;
+                    await sincronizarAbasPorMinuta({ numeroProcesso: i.numeroProcesso, tipoMinuta: i.tipoMinuta, assessorNome: PAINEL_IA_ASSESSOR_NOME }, novaRefIA.key);
                     if (i.pedidoBalcaoId && pedidosBalcao[i.pedidoBalcaoId]?.status === 'pendente') {
                         await database.ref(`pedidosBalcao/${i.pedidoBalcaoId}`).update({
                             status: 'minutado', dataMinutado: getHojeString(),
@@ -7511,10 +7584,15 @@
 
             try {
                 if (database) {
-                    database.ref('minutas').push({
+                    const novaRef = database.ref('minutas').push({
                         ...novaMinuta,
                         createdAt: firebase.database.ServerValue.TIMESTAMP
-                    }).then(() => {
+                    });
+                    novaRef.then(() => {
+                        // balcão, metas e notificações do mesmo processo acompanham o registro
+                        sincronizarAbasPorMinuta(novaMinuta, novaRef.key)
+                            .then(feitos => { if (feitos.length) showNotification('Abas atualizadas: ' + feitos.join('; '), 'info'); })
+                            .catch(e => log('Erro ao sincronizar abas da minuta', e));
                         limparFormularioRegistro();
                         
                         let mensagem = 'Minuta registrada com sucesso!';
