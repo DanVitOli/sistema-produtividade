@@ -6887,7 +6887,7 @@
                 // minutas lançadas pelo botão "Lançar assinadas do Painel" (confirmação de volta ao Painel)
                 assinadasPainel: Object.entries(minutas)
                     .filter(([, m]) => m && m.painelId && m.assessorId !== PAINEL_IA_ASSESSOR_ID)
-                    .map(([id, m]) => ({ id, painelId: m.painelId, status: m.status }))
+                    .map(([id, m]) => ({ id, painelId: m.painelId, status: m.status, tipoMinuta: m.tipoMinuta }))
             };
         }
 
@@ -6933,9 +6933,20 @@
                 try {
                     if (existente) {
                         const [id, x] = existente;
-                        if (x.status !== 'assinada') {
-                            await database.ref(`minutas/${id}`).update({ status: 'assinada', atualizadaEm: getDataHoraBrasilia().getTime(), atualizadaPor: currentUser.nome });
-                            resultados.push({ numero, texto: 'já estava no sistema · marcada como assinada', ok: true });
+                        // relançamento corrige o tipo do ato e as categorias quando o Painel mandou outros
+                        const catsAntes = normalizarCategorias(x);
+                        const mudouTipo = x.tipoMinuta !== m.tipoMinuta;
+                        const mudouCats = catsAntes.length !== cats.length || cats.some(c => !catsAntes.includes(c));
+                        if (x.status !== 'assinada' || mudouTipo || mudouCats) {
+                            await database.ref(`minutas/${id}`).update({
+                                status: 'assinada', tipoMinuta: m.tipoMinuta, categorias: cats,
+                                atualizadaEm: getDataHoraBrasilia().getTime(), atualizadaPor: currentUser.nome
+                            });
+                            const partes = [];
+                            if (mudouTipo) partes.push(`ato corrigido: ${x.tipoMinuta} → ${m.tipoMinuta}`);
+                            if (mudouCats) partes.push('categorias atualizadas');
+                            if (x.status !== 'assinada') partes.push('marcada como assinada');
+                            resultados.push({ numero, texto: 'já estava no sistema · ' + partes.join(' · '), ok: true });
                         } else {
                             resultados.push({ numero, texto: 'já lançada antes', ok: true });
                         }
