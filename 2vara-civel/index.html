@@ -221,6 +221,31 @@
             #trilho-fundo.mostra{ display:block; }
         }
         @media (prefers-reduced-motion: reduce){ .trilho{ transition:none; } }
+
+        /* ==================== PELE INTERNA DOS MÓDULOS ==================== */
+        .miolo{ font-variant-numeric: tabular-nums; }
+        /* cartões: borda fina no lugar de sombra */
+        .miolo .shadow-sm, .miolo .shadow-md, .miolo .shadow-lg{ box-shadow:none !important; }
+        .miolo .bg-white.rounded-lg, .miolo .bg-white.rounded-md{ border:1px solid var(--linha); }
+        #login-screen .shadow-lg{ box-shadow:none !important; }
+        #login-screen .bg-white{ border:1px solid var(--linha); }
+        /* acento único: azul/roxo/índigo dos módulos viram o ciano institucional */
+        .miolo .bg-blue-600, .miolo .bg-blue-500, .miolo .bg-purple-600, .miolo .bg-cyan-600,
+        .miolo .bg-indigo-600, .miolo .bg-indigo-500,
+        #login-screen .bg-blue-600{ background-color: var(--acento) !important; }
+        .miolo .hover\:bg-blue-700:hover, .miolo .hover\:bg-blue-600:hover,
+        .miolo .hover\:bg-purple-700:hover, .miolo .hover\:bg-cyan-700:hover,
+        .miolo .hover\:bg-indigo-700:hover, .miolo .hover\:bg-indigo-600:hover,
+        #login-screen .hover\:bg-blue-700:hover{ background-color:#0a5a73 !important; }
+        .miolo .text-blue-600, .miolo .text-purple-600, .miolo .text-cyan-600, .miolo .text-indigo-600,
+        #login-screen .text-blue-600{ color: var(--acento) !important; }
+        .miolo .bg-blue-100, #login-screen .bg-blue-100{ background-color: var(--acentoclaro) !important; }
+        .miolo .border-purple-500, .miolo .border-blue-500, .miolo .border-cyan-600{ border-color: var(--acento) !important; }
+        /* gradientes achatados na cor institucional */
+        .miolo [class*="bg-gradient"]{ background-image:none !important; background-color: var(--acento) !important; }
+        /* campos de formulário e foco */
+        .miolo input, .miolo select, .miolo textarea{ border-color: var(--linha); }
+        .miolo *:focus, #login-screen *:focus{ --tw-ring-color: rgba(14,116,144,.35); }
     </style>
 </head>
 <body class="min-h-screen">
