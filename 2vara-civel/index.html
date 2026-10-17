@@ -7698,6 +7698,74 @@
             return feitos;
         }
 
+        // ==================== INTEGRAÇÃO AUTOMÁTICA COM O GABINETE ====================
+        // O executor do gabinete grava minutas direto em minutas/ pela REST do
+        // Firebase, com origem 'gabinete-auto' (contrato em INTEGRACAO-GABINETE.md).
+        // A sessão do juiz aberta no sistema completa os efeitos que exigem a
+        // lógica daqui — categorias dos painéis (Meta 2, 180/120/100), sincronização
+        // das abas, baixa no Balcão e contadores das metas do magistrado — e publica
+        // o snapshot do Painel em snapshotPainel/ para o executor ler, sem copiar
+        // e colar. A trava efeitosAplicados (transação) impede efeito duplicado
+        // quando houver mais de uma aba aberta.
+
+        let processandoGabinete = false;
+
+        async function processarMinutasDoGabinete() {
+            if (!currentUser?.isJuiz || !database || processandoGabinete) return;
+            const novas = Object.entries(minutas).filter(([, m]) =>
+                m && m.origem === 'gabinete-auto' && !m.efeitosAplicados && m.status !== 'excluida');
+            if (!novas.length) return;
+            processandoGabinete = true;
+            try {
+                for (const [id, m] of novas) {
+                    const trava = await database.ref(`minutas/${id}/efeitosAplicados`)
+                        .transaction(v => (v ? undefined : `${currentUser.nome} em ${getHojeString()}`));
+                    if (!trava.committed) continue;
+
+                    const cats = normalizarCategorias(m);
+                    // o processo também conta onde está listado (Meta 2 a julgar, 180/120/100)
+                    const extras = categoriasPeloProcesso(m.numeroProcesso, m.tipoMinuta).filter(cat => !cats.includes(cat));
+                    if (extras.length) {
+                        cats.push(...extras);
+                        try { await database.ref(`minutas/${id}/categorias`).set(cats); } catch (e) { log('extras falharam', e); }
+                    }
+                    try { await sincronizarAbasPorMinuta({ ...m, categorias: cats }, id); } catch (e) { log('sincronizar falhou', e); }
+
+                    if (m.pedidoBalcaoId && pedidosBalcao[m.pedidoBalcaoId]?.status === 'pendente') {
+                        try {
+                            await database.ref(`pedidosBalcao/${m.pedidoBalcaoId}`).update({
+                                status: 'minutado', dataMinutado: getHojeString(),
+                                minutadoPor: m.assessorNome || 'Gabinete', minutadoEm: getDataHoraBrasilia().getTime()
+                            });
+                        } catch (e) { log('baixa no balcão falhou', e); }
+                    }
+
+                    if (m.assessorId === 'juiz') {
+                        if (cats.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
+                        if (cats.includes('juiz_ato_inicial')) ajustarMetaJuiz('ato_inicial', 1);
+                        if (cats.includes('outros')) ajustarMetaJuiz('urgentes', 1);
+                    }
+                    log(`Minuta do gabinete processada: ${m.numeroProcesso}`);
+                }
+            } finally {
+                processandoGabinete = false;
+            }
+        }
+
+        let snapshotPainelTimer = null;
+        function agendarSnapshotPainel() {
+            if (!currentUser?.isJuiz || !database) return;
+            clearTimeout(snapshotPainelTimer);
+            snapshotPainelTimer = setTimeout(() => {
+                try {
+                    database.ref('snapshotPainel').set({
+                        ...gerarSnapshotPainelIA(),
+                        publicadoEm: firebase.database.ServerValue.TIMESTAMP
+                    });
+                } catch (e) { log('snapshot do Painel falhou', e); }
+            }, 4000);
+        }
+
         // ==================== PAINEL IA (SINCRONIZAÇÃO COM O PAINEL DO GABINETE) ====================
         // Ponte manual, exclusiva do juiz, com o Painel do Gabinete (artifact privado no claude.ai).
         // Sem credenciais e sem robô gravando no banco: o juiz copia um código daqui e cola no Painel
@@ -8097,6 +8165,10 @@
                     if (currentView === 'calendario') renderCalendario();
                     if (currentView === 'meta180') renderMeta180();
                     if (currentView === 'meta2') renderMeta2Painel();
+
+                    // integração automática com o gabinete (apenas na sessão do juiz)
+                    processarMinutasDoGabinete();
+                    agendarSnapshotPainel();
                 }, (error) => {
                     // Permissão negada = regras do Realtime Database expiradas/incorretas.
                     // Sem este aviso o sistema abre "vazio" silenciosamente.
@@ -8145,6 +8217,7 @@
                     log(`Pedidos Balcão carregados: ${Object.keys(pedidosBalcao).length}`);
 
                     if (currentView === 'balcao') renderBalcaoVirtual();
+                    agendarSnapshotPainel();
                 });
 
                 // Listener para notificações do juiz
