@@ -25,6 +25,9 @@
     <!-- Ícone padrão (SVG com fallback PNG) -->
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 
+    <!-- Tipografia do layout -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
@@ -161,15 +164,66 @@
         .week-success { background-color: #22c55e; }
         .week-warning { background-color: #f59e0b; }
         .week-danger { background-color: #ef4444; }
+
+        /* ==================== NOVO LAYOUT (trilho lateral) ==================== */
+        :root{
+            --papel:#f4f6f5; --cartao:#ffffff; --tinta:#15262e; --tinta2:#5a6e77;
+            --linha:#dde4e3; --acento:#0e7490; --acentoclaro:#e6f3f6;
+            --trilho:#102a33; --trilhotinta:#c6d8dd;
+        }
+        body{ background:var(--papel) !important; font-family:'IBM Plex Sans',system-ui,'Segoe UI',sans-serif; }
+        h1,h2{ font-family:'Lora',Georgia,serif; }
+        #main-app{ display:flex; min-height:100vh; align-items:stretch; }
+        .trilho{ width:232px; flex-shrink:0; background:var(--trilho); color:var(--trilhotinta);
+            display:flex; flex-direction:column; padding:18px 0 12px;
+            position:sticky; top:0; height:100vh; overflow-y:auto; }
+        .trilho .marca{ padding:0 18px 14px; border-bottom:1px solid rgba(255,255,255,.08); }
+        .trilho .orgao{ font:600 16px/1.2 'Lora',Georgia,serif; color:#fff; }
+        .trilho .comarca{ font-size:11.5px; margin-top:2px; }
+        .trilho .usuario{ display:flex; align-items:center; gap:10px; margin:12px 14px; padding:9px 10px; border-radius:10px; background:rgba(255,255,255,.06); }
+        .trilho .avatar{ width:34px; height:34px; border-radius:50%; background:var(--acento); color:#fff;
+            display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0; }
+        .trilho .nome{ color:#fff; font-weight:600; font-size:13px; line-height:1.2; }
+        .trilho .papel{ font-size:11px; }
+        .trilho .grupo{ margin:13px 0 2px; padding:0 18px; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.38); }
+        .trilho .item{ display:flex; align-items:center; gap:10px; margin:1px 10px; padding:8px 10px; border-radius:8px;
+            color:var(--trilhotinta); cursor:pointer; font-weight:500; border:0; background:none;
+            width:calc(100% - 20px); text-align:left; font-family:inherit; font-size:13.5px; }
+        .trilho .item svg{ flex-shrink:0; opacity:.75; }
+        .trilho .item:hover{ background:rgba(255,255,255,.07); color:#fff; }
+        .trilho .item.ativo{ background:var(--acento); color:#fff; }
+        .trilho .sair{ margin-top:auto; padding-top:10px; border-top:1px solid rgba(255,255,255,.08); }
+        .conteudo{ flex:1; min-width:0; display:flex; flex-direction:column; }
+        .topo{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 20px;
+            background:var(--cartao); border-bottom:1px solid var(--linha); position:sticky; top:0; z-index:30; }
+        .topo h1{ font-size:19px; font-weight:600; color:var(--tinta); margin:0; }
+        .topo .data-topo{ color:var(--tinta2); font-size:12.5px; }
+        .topo .direita{ margin-left:auto; display:flex; gap:10px; align-items:center; }
+        .hamb{ display:none; border:1px solid var(--linha); background:none; border-radius:8px; padding:5px 10px; color:var(--tinta); cursor:pointer; font-size:16px; }
+        .miolo{ padding:20px; max-width:1280px; width:100%; }
+        #trilho-fundo{ position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:59; display:none; }
+        .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:12px; }
+        .kpi{ background:var(--cartao); border:1px solid var(--linha); border-radius:12px; padding:13px 15px; text-align:left; }
+        .kpi.clicavel{ cursor:pointer; }
+        .kpi.clicavel:hover{ border-color:var(--acento); }
+        .kpi .rotulo{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--tinta2); font-weight:600; }
+        .kpi .valor{ font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; margin:6px 0 7px; color:var(--tinta); }
+        .kpi .valor small{ font-size:13px; color:var(--tinta2); font-weight:500; }
+        .kpi .sub{ font-size:12px; color:var(--tinta2); }
+        .kbarra{ height:6px; border-radius:99px; background:var(--linha); overflow:hidden; display:flex; margin:0 0 8px; position:relative; }
+        .kbarra i{ display:block; height:100%; }
+        .kb-ok{ background:#15803d; } .kb-min{ background:#eab308; } .kb-acento{ background:var(--acento); }
+        .kbarra .alvo-marca{ position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--acento); }
+        @media (max-width:880px){
+            .trilho{ position:fixed; left:0; top:0; bottom:0; z-index:60; transform:translateX(-100%); transition:transform .2s; width:250px; height:100%; }
+            .trilho.aberto{ transform:none; }
+            .hamb{ display:block; }
+            #trilho-fundo.mostra{ display:block; }
+        }
+        @media (prefers-reduced-motion: reduce){ .trilho{ transition:none; } }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Indicador de Conexão -->
-    <div id="connection-status" class="fixed top-4 right-4 z-50 no-print">
-        <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-            Carregando...
-        </div>
-    </div>
+<body class="min-h-screen">
 
     <!-- Tela de Login -->
     <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
@@ -207,32 +261,49 @@
     </div>
 
     <!-- Aplicação Principal -->
-    <div id="main-app" class="hidden p-4 max-w-6xl mx-auto">
-        <!-- Header -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6 no-print">
-            <div class="flex justify-between items-start mb-4">
+    <div id="main-app" class="hidden">
+        <div id="trilho-fundo" class="no-print" onclick="fecharTrilho()"></div>
+        <aside id="trilho" class="trilho no-print">
+            <div class="marca">
+                <div class="orgao">2ª Vara Cível</div>
+                <div class="comarca">Comarca de Palmeira dos Índios · TJAL</div>
+            </div>
+            <div class="usuario">
+                <div class="avatar" id="trilho-avatar">·</div>
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-800">2ª Vara Cível - Palmeira dos Índios</h1>
-                    <p id="user-info" class="text-gray-600"></p>
+                    <div class="nome" id="trilho-nome"></div>
+                    <div class="papel" id="trilho-papel"></div>
+                    <span id="user-info" style="display:none"></span>
                 </div>
-                <div class="flex items-center gap-3">
-                    <!-- Indicador de Notificações (apenas para juiz) -->
+            </div>
+            <nav id="navigation"></nav>
+            <div class="sair">
+                <button class="item" onclick="logout()">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2H2.5v11H6M10 4.5l3 3-3 3M13 7.5H6"/></svg>
+                    Sair
+                </button>
+            </div>
+        </aside>
+        <div class="conteudo">
+            <header class="topo no-print">
+                <button class="hamb" onclick="abrirTrilho()" aria-label="Abrir menu">☰</button>
+                <div>
+                    <h1 id="titulo-view">Painel do Dia</h1>
+                    <div class="data-topo" id="topo-data"></div>
+                </div>
+                <div class="direita">
                     <div id="notificacoes-container" class="hidden">
                         <button onclick="abrirModalNotificacoes()" class="relative bg-indigo-500 text-white p-2 rounded-full hover:bg-indigo-600 transition-colors" title="Notificações">
                             <i data-lucide="bell" class="h-5 w-5"></i>
                             <span id="notificacoes-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
                         </button>
                     </div>
-                    <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors flex items-center">
-                        <i data-lucide="log-out" class="h-4 w-4 mr-2"></i>
-                        Sair
-                    </button>
+                    <div id="connection-status">
+                        <div class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">Carregando...</div>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Navegação -->
-            <div id="navigation" class="flex flex-wrap gap-2"></div>
-        </div>
+            </header>
+            <main class="miolo">
 
         <!-- Dashboard -->
         <div id="dashboard-view" class="hidden space-y-6"></div>
@@ -1543,6 +1614,8 @@
                 </div>
             </div>
         </div>
+            </main>
+        </div>
     </div>
 
     <script>
@@ -2504,7 +2577,17 @@
         }
 
         function setupUserInfo() {
-            document.getElementById('user-info').textContent = `Logado como: ${currentUser.nome}`;
+            const el = document.getElementById('user-info');
+            if (el) el.textContent = `Logado como: ${currentUser.nome}`;
+            const nome = document.getElementById('trilho-nome');
+            const papel = document.getElementById('trilho-papel');
+            const avatar = document.getElementById('trilho-avatar');
+            if (nome) nome.textContent = currentUser.nome;
+            if (papel) papel.textContent = currentUser.isJuiz ? 'Juiz de Direito' : 'Assessoria';
+            if (avatar) {
+                const partes = (currentUser.nome || '?').trim().split(/\s+/);
+                avatar.textContent = (partes[0][0] + (partes[1]?.[0] || '')).toUpperCase();
+            }
         }
 
         function setupMeta10Options() {
@@ -2522,62 +2605,83 @@
             document.getElementById('edit-juiz-ato-inicial-option')?.classList.toggle('hidden', !currentUser.isJuiz);
         }
 
+        const TITULOS_VIEWS = {
+            dashboard: 'Painel do Dia',
+            registro: 'Registrar Minuta',
+            historico: 'Histórico de Minutas',
+            balcao: 'Balcão Virtual',
+            calendario: 'Calendário',
+            relatorios: 'Relatórios',
+            metas: 'Acompanhamento de Metas',
+            meta180: 'Processos Parados — 180/120/100',
+            meta2: 'Meta 2 — Julgamento de Antigos'
+        };
+
+        const ICONES_NAV = {
+            dashboard: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="8.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="8.5" width="5" height="5" rx="1"/><rect x="8.5" y="8.5" width="5" height="5" rx="1"/></svg>',
+            registro: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7.5 2v11M2 7.5h11"/></svg>',
+            historico: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7.5" cy="7.5" r="6"/><path d="M7.5 4v3.5l2.5 1.5"/></svg>',
+            meta180: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13.5V2.5h8l-2 2.5 2 2.5H3"/></svg>',
+            meta2: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13h11M4.5 13V7M7.5 13V4M10.5 13V9"/></svg>',
+            metas: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7.5" cy="7.5" r="6"/><circle cx="7.5" cy="7.5" r="2.5"/></svg>',
+            balcao: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8l2-5h8l2 5v4.5h-12z"/><path d="M1.5 8h4a2 2 0 0 0 4 0h4"/></svg>',
+            calendario: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="2.5" width="12" height="11" rx="1.5"/><path d="M1.5 6h12M5 1v3M10 1v3"/></svg>',
+            relatorios: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V8M5.75 13V2M9.5 13V5.5M13.25 13V9.5"/></svg>'
+        };
+
+        function itemNav(view, rotulo) {
+            return `
+                <button class="item" data-nav="${view}" onclick="showView('${view}')">
+                    ${ICONES_NAV[view] || ''}
+                    ${rotulo}
+                </button>`;
+        }
+
         function setupNavigation() {
             const nav = document.getElementById('navigation');
-            let buttons = '';
+            let html = '';
 
-            buttons += `
-                <button onclick="showView('dashboard')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
-                    <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2"></i>
-                    Dashboard
-                </button>
-            `;
+            html += '<div class="grupo">Produção</div>';
+            html += itemNav('dashboard', 'Painel do Dia');
+            html += itemNav('registro', 'Registrar Minuta');
+            html += itemNav('historico', 'Histórico');
 
-            buttons += `
-                <button onclick="showView('registro')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                    <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
-                    Registrar Minuta
-                </button>
-            `;
-
-            buttons += `
-                <button onclick="showView('historico')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                    <i data-lucide="clock" class="h-4 w-4 mr-2"></i>
-                    Histórico
-                </button>
-                <button onclick="showView('balcao')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                    <i data-lucide="inbox" class="h-4 w-4 mr-2"></i>
-                    Balcão Virtual
-                </button>
-                <button onclick="showView('meta180')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                    <i data-lucide="flag" class="h-4 w-4 mr-2"></i>
-                    180/120/100
-                </button>
-                <button onclick="showView('meta2')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                    <i data-lucide="gavel" class="h-4 w-4 mr-2"></i>
-                    Meta 2
-                </button>
-            `;
-
+            html += '<div class="grupo">Metas</div>';
+            html += itemNav('meta180', '180/120/100');
+            html += itemNav('meta2', 'Meta 2');
             if (currentUser.isJuiz) {
-                buttons += `
-                    <button onclick="showView('calendario')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                        <i data-lucide="calendar-days" class="h-4 w-4 mr-2"></i>
-                        Calendário
-                    </button>
-                    <button onclick="showView('relatorios')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                        <i data-lucide="bar-chart" class="h-4 w-4 mr-2"></i>
-                        Relatórios
-                    </button>
-                    <button onclick="showView('metas')" class="nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                        <i data-lucide="target" class="h-4 w-4 mr-2"></i>
-                        Metas
-                    </button>
-                `;
+                html += itemNav('metas', 'Acompanhamento');
             }
 
-            nav.innerHTML = buttons;
+            html += '<div class="grupo">Atendimento</div>';
+            html += itemNav('balcao', 'Balcão Virtual');
+
+            if (currentUser.isJuiz) {
+                html += '<div class="grupo">Análise</div>';
+                html += itemNav('calendario', 'Calendário');
+                html += itemNav('relatorios', 'Relatórios');
+            }
+
+            nav.innerHTML = html;
+
+            const dataTopo = document.getElementById('topo-data');
+            if (dataTopo) {
+                dataTopo.textContent = new Date().toLocaleDateString('pt-BR', {
+                    timeZone: 'America/Sao_Paulo',
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                });
+            }
             criarIcones();
+        }
+
+        function abrirTrilho() {
+            document.getElementById('trilho')?.classList.add('aberto');
+            document.getElementById('trilho-fundo')?.classList.add('mostra');
+        }
+
+        function fecharTrilho() {
+            document.getElementById('trilho')?.classList.remove('aberto');
+            document.getElementById('trilho-fundo')?.classList.remove('mostra');
         }
 
         function setupHistoricoFilters() {
@@ -2662,16 +2766,13 @@
                     if (el) el.classList.add('hidden');
                 });
 
-                document.querySelectorAll('.nav-btn').forEach(btn => {
-                    if (btn) {
-                        btn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
-                    }
+                document.querySelectorAll('.trilho .item[data-nav]').forEach(btn => {
+                    btn.classList.toggle('ativo', btn.dataset.nav === view);
                 });
 
-                const activeBtn = event?.target?.closest('button');
-                if (activeBtn) {
-                    activeBtn.className = 'nav-btn flex items-center px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white';
-                }
+                const tituloEl = document.getElementById('titulo-view');
+                if (tituloEl) tituloEl.textContent = TITULOS_VIEWS[view] || '2ª Vara Cível';
+                fecharTrilho();
 
                 currentView = view;
 
@@ -6759,6 +6860,51 @@
                 .transaction(v => Math.max(0, (v || 0) + delta));
         }
 
+        function renderKpiStrip(minutasParaMeta, metaTotal, minutasAlemMeta, totalMinutasHoje) {
+            const pctEquipe = metaTotal > 0 ? Math.min(Math.round((minutasParaMeta / metaTotal) * 100), 100) : 0;
+            const p1 = getProgressoTotal('assessor1');
+            const p2 = getProgressoTotal('assessor2');
+            let tiles = `
+                <div class="kpi">
+                    <div class="rotulo">Assessoria hoje</div>
+                    <div class="valor">${minutasParaMeta}<small>/${metaTotal} minutas</small></div>
+                    <div class="kbarra"><i class="kb-ok" style="width:${pctEquipe}%"></i></div>
+                    <div class="sub">${assessores.assessor1?.nome?.split(' ')[0] || 'Assessor 1'} ${p1.atual}/${p1.meta} · ${assessores.assessor2?.nome?.split(' ')[0] || 'Assessor 2'} ${p2.atual}/${p2.meta}${minutasAlemMeta > 0 ? ` · +${minutasAlemMeta} além da meta (${totalMinutasHoje} no total)` : ''}</div>
+                </div>`;
+
+            if (currentUser.isJuiz) {
+                const mj = getMetasJuizStatus();
+                const cumpridas = mj.itens.filter(i => i.cumprida).length;
+                tiles += `
+                    <div class="kpi">
+                        <div class="rotulo">Minhas metas 🔒</div>
+                        <div class="valor">${mj.totalAtual}<small>/${mj.totalMeta} itens</small></div>
+                        <div class="kbarra"><i class="kb-acento" style="width:${mj.percentual}%"></i></div>
+                        <div class="sub">${cumpridas} de ${mj.itens.length} metas cumpridas</div>
+                    </div>`;
+            }
+
+            const r180 = getResumoMeta180(getStatusMeta180());
+            tiles += `
+                <div class="kpi clicavel" onclick="showView('meta180')">
+                    <div class="rotulo">Parados 180/120/100</div>
+                    <div class="valor">${r180.cumpridos}<small>/${r180.total} cumpridos</small></div>
+                    <div class="kbarra"><i class="kb-ok" style="width:${r180.percentual}%"></i><i class="kb-min" style="width:${r180.percentualMinutados}%"></i></div>
+                    <div class="sub">${r180.pendentes} sem minuta · ${r180.minutados} aguardando assinatura</div>
+                </div>`;
+
+            const rm2 = getResumoMeta2P(getStatusMeta2P());
+            tiles += `
+                <div class="kpi clicavel" onclick="showView('meta2')">
+                    <div class="rotulo">Meta 2 · índice</div>
+                    <div class="valor">${String(rm2.indicePct).replace('.', ',')}<small>% (alvo ${rm2.alvoPct}%)</small></div>
+                    <div class="kbarra"><i class="kb-ok" style="width:${rm2.indicePct}%"></i><i class="kb-min" style="width:${rm2.pctMinutados}%"></i><span class="alvo-marca" style="left:${rm2.alvoPct}%"></span></div>
+                    <div class="sub">${rm2.faltamParaAlvo > 0 ? `faltam ${rm2.faltamParaAlvo} sentenças para o alvo` : '🎉 alvo atingido'}</div>
+                </div>`;
+
+            return `<div class="kpis">${tiles}</div>`;
+        }
+
         function renderMetasJuizCard() {
             if (!currentUser?.isJuiz) return '';
             const status = getMetasJuizStatus();
@@ -7265,35 +7411,8 @@
                 
                 const metaTotal = 24;
 
-                // Card resumo do dia
-                content += `
-                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6 mb-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h2 class="text-2xl font-bold mb-2">Produtividade do Dia</h2>
-                                <p class="text-blue-100">
-                                    ${new Date().toLocaleDateString('pt-BR', {
-                                        timeZone: 'America/Sao_Paulo',
-                                        weekday: 'long',
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
-                                    })}
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-3xl font-bold">${minutasParaMeta}/${metaTotal}</div>
-                                <div class="text-blue-100 text-sm">minutas para metas CNJ</div>
-                                ${minutasAlemMeta > 0 ? `
-                                    <div class="text-lg font-medium mt-2 text-blue-200">
-                                        +${minutasAlemMeta} além da meta
-                                    </div>
-                                    <div class="text-blue-200 text-sm">Total produzido: ${totalMinutasHoje} minutas</div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
+                // Faixa de indicadores
+                content += renderKpiStrip(minutasParaMeta, metaTotal, minutasAlemMeta, totalMinutasHoje);
 
                 // Metas pessoais do magistrado (visível apenas para o juiz)
                 if (currentUser.isJuiz) {
@@ -7307,12 +7426,6 @@
                 if (currentUser.isJuiz) {
                     content += renderMetasSemanais();
                 }
-
-                // Resumo dos processos parados 180/120/100 (visível para todos)
-                content += renderMeta180ResumoCard();
-
-                // Resumo da Meta 2 (visível para todos)
-                content += renderMeta2ResumoCard();
 
                 // Painéis de acompanhamento (visíveis para todos)
                 content += renderPaineisAcompanhamento();
