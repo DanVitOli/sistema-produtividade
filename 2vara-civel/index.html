@@ -778,6 +778,12 @@
     <!-- Módulo Painel Meta 2 -->
     <div id="meta2-view" class="hidden"></div>
 
+    <!-- Módulo Painel IA (sincronização com o Painel do Gabinete; apenas juiz) -->
+    <div id="painelia-view" class="hidden"></div>
+
+    <!-- Módulo Acervo do gabinete (teses, modelos e skills para minutar com o Claude) -->
+    <div id="acervo-view" class="hidden"></div>
+
     <!-- Modal: registro rápido de minuta (painel 180/120/100) -->
     <div id="modal-meta180-registro" class="hidden modal-overlay no-print" onclick="event.target === this && fecharModaisMeta180()">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
@@ -2614,7 +2620,9 @@
             relatorios: 'Relatórios',
             metas: 'Acompanhamento de Metas',
             meta180: 'Processos Parados — 180/120/100',
-            meta2: 'Meta 2 — Julgamento de Antigos'
+            meta2: 'Meta 2 — Julgamento de Antigos',
+            acervo: 'Acervo do Gabinete',
+            painelia: 'Painel IA'
         };
 
         const ICONES_NAV = {
@@ -2626,7 +2634,9 @@
             metas: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7.5" cy="7.5" r="6"/><circle cx="7.5" cy="7.5" r="2.5"/></svg>',
             balcao: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8l2-5h8l2 5v4.5h-12z"/><path d="M1.5 8h4a2 2 0 0 0 4 0h4"/></svg>',
             calendario: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="2.5" width="12" height="11" rx="1.5"/><path d="M1.5 6h12M5 1v3M10 1v3"/></svg>',
-            relatorios: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V8M5.75 13V2M9.5 13V5.5M13.25 13V9.5"/></svg>'
+            relatorios: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V8M5.75 13V2M9.5 13V5.5M13.25 13V9.5"/></svg>',
+            acervo: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="1.5" width="10" height="12" rx="1.5"/><path d="M5.5 1.5v12"/></svg>',
+            painelia: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12.5 4.5A5.5 5.5 0 0 0 3.2 5.2M2.5 10.5a5.5 5.5 0 0 0 9.3-.7"/><path d="M12.5 1.5v3h-3M2.5 13.5v-3h3"/></svg>'
         };
 
         function itemNav(view, rotulo) {
@@ -2655,6 +2665,12 @@
 
             html += '<div class="grupo">Atendimento</div>';
             html += itemNav('balcao', 'Balcão Virtual');
+
+            html += '<div class="grupo">Gabinete</div>';
+            html += itemNav('acervo', 'Acervo');
+            if (currentUser.isJuiz) {
+                html += itemNav('painelia', 'Painel IA');
+            }
 
             if (currentUser.isJuiz) {
                 html += '<div class="grupo">Análise</div>';
@@ -2804,6 +2820,12 @@
                     case 'meta2':
                         renderMeta2Painel();
                         break;
+                    case 'painelia':
+                        renderPainelIA();
+                        break;
+                    case 'acervo':
+                        renderAcervo();
+                        break;
                 }
 
                 log(`View ${view} carregada`);
@@ -2812,6 +2834,532 @@
                 log(`Erro ao carregar view ${view}`, error);
                 showNotification(`Erro ao carregar ${view}`, 'error');
             }
+        }
+
+        // ==================== ACERVO DO GABINETE (teses, modelos e skills para minutar com o Claude) ====================
+        // Publicado pelo juiz a partir do pacote gerado no computador do gabinete (acervo-AAAA.MM.DD.json).
+        // Lido por todos os usuários; cada assessor confirma quando atualizou o próprio Claude.
+
+        const ACERVO_PARTES = ['novidades', 'instrucoesProjeto', 'teses', 'modelos', 'skills'];
+        const ACERVO_LIMITE_LISTA = 60;
+        let acervo = { carregado: false, carregando: null, meta: null, novidades: [], instrucoesProjeto: '', teses: [], modelos: [], skills: [],
+            confirmacoes: {}, aba: 'inicio', busca: '', area: '', abertos: new Set(), publicacao: null,
+            integridade: { estado: 'pendente', detalhe: '' }, verificadoEm: 0 };
+
+        // ---------- lacre: o Firebase aceita escrita anônima, então o conteúdo é conferido contra o
+        // acervo-integridade.json publicado no GitHub junto com o site (só o juiz publica lá) ----------
+        function acervoLimpa(v) {
+            if (Array.isArray(v)) { const a = v.map(acervoLimpa).filter(x => x !== undefined); return a.length ? a : undefined; }
+            if (v && typeof v === 'object') {
+                const chaves = Object.keys(v);
+                if (chaves.length && chaves.every(k => /^\d+$/.test(k))) return acervoLimpa(chaves.sort((a, b) => a - b).map(k => v[k]));
+                const o = {};
+                chaves.sort().forEach(k => { const x = acervoLimpa(v[k]); if (x !== undefined) o[k] = x; });
+                return Object.keys(o).length ? o : undefined;
+            }
+            if (v === null || v === undefined || v === '') return undefined;
+            return v;
+        }
+
+        async function acervoSha256(valor) {
+            const texto = JSON.stringify(acervoLimpa(valor) ?? null);
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+            return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function acervoLerLacre() {
+            const r = await fetch('acervo-integridade.json', { cache: 'no-store' });
+            if (!r.ok) throw new Error('lacre não encontrado no site');
+            return r.json();
+        }
+
+        // Confere um conjunto de partes (o que veio do Firebase ou o pacote a publicar) contra o lacre.
+        async function acervoConferir(fonte, versao) {
+            let lacre;
+            try { lacre = await acervoLerLacre(); } catch (e) { return { estado: 'sem-lacre', detalhe: e.message }; }
+            if (lacre.versao !== versao) return { estado: 'versao', detalhe: `lacre da versão ${lacre.versao}; conteúdo da versão ${versao}` };
+            for (const p of ACERVO_PARTES) {
+                if (await acervoSha256(fonte[p]) !== (lacre.partes || {})[p]) return { estado: 'divergente', detalhe: `a parte "${p}" não confere com o lacre` };
+            }
+            return { estado: 'ok', detalhe: '' };
+        }
+
+        function acervoLiberado() { return acervo.integridade.estado === 'ok'; }
+
+        function acervoAvisarBloqueio() {
+            showNotification(acervo.integridade.estado === 'versao'
+                ? 'O acervo está sendo atualizado pelo juiz. Tente de novo em alguns minutos.'
+                : 'Bloqueado: o acervo do banco não confere com a versão aprovada pelo juiz. Avise o juiz.', 'warning');
+        }
+
+        function acervoIndexar() {
+            acervo.teses.forEach(t => { t._busca = acervoNormaliza(t.titulo + ' ' + (t.codigos || []).join(' ') + ' ' + t.enunciado + ' ' + t.md); });
+            acervo.modelos.forEach(m => { m._busca = acervoNormaliza(m.id + ' ' + m.codigo + ' ' + m.resultado + ' ' + (m.teses || []).join(' ') + ' ' + m.quandoUsar); });
+        }
+
+        function acervoCarregar(forcar) {
+            if (!database) return Promise.reject(new Error('sem conexão com o banco de dados'));
+            if (acervo.carregado && !forcar) return Promise.resolve();
+            if (acervo.carregando) return acervo.carregando;
+            const ler = caminho => database.ref('acervo/' + caminho).once('value').then(s => s.val());
+            acervo.carregando = Promise.all([ler('meta'), ...ACERVO_PARTES.map(ler), ler('confirmacoes')])
+                .then(async ([meta, ...resto]) => {
+                    const brutos = {};
+                    ACERVO_PARTES.forEach((p, i) => { brutos[p] = resto[i]; });
+                    acervo.integridade = meta ? await acervoConferir(brutos, meta.versao) : { estado: 'vazio', detalhe: '' };
+                    acervo.meta = meta;
+                    ACERVO_PARTES.forEach(p => {
+                        const v = brutos[p];
+                        acervo[p] = p === 'instrucoesProjeto' ? (v || '') : (Array.isArray(v) ? v : Object.values(v || {}));
+                    });
+                    acervo.confirmacoes = resto[ACERVO_PARTES.length] || {};
+                    acervoIndexar();
+                    acervo.carregado = true;
+                    acervo.verificadoEm = Date.now();
+                })
+                .finally(() => { acervo.carregando = null; });
+            return acervo.carregando;
+        }
+
+        // Ao voltar à aba, confere se o juiz publicou outra versão desde a última leitura.
+        function acervoVerificarVersao() {
+            if (!acervo.carregado || Date.now() - acervo.verificadoEm < 60000) return;
+            acervo.verificadoEm = Date.now();
+            database.ref('acervo/meta/versao').once('value').then(s => {
+                if (s.val() !== (acervo.meta?.versao ?? null)) {
+                    acervo.carregado = false;
+                    if (currentView === 'acervo') renderAcervo();
+                }
+            }).catch(() => {});
+        }
+
+        // ---------- renderização de Markdown simples (teses e modelos vêm do vault em .md) ----------
+        function acervoInline(t) {
+            return escapeHtml(t)
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?![*\w])/g, '$1<em>$2</em>')
+                .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-[0.85em]">$1</code>');
+        }
+
+        function acervoMd(md) {
+            const linhas = String(md || '').split('\n');
+            let html = '', lista = null, cit = [], par = [];
+            const fechaPar = () => { if (par.length) { html += `<p class="my-2">${acervoInline(par.join(' '))}</p>`; par = []; } };
+            const fechaLista = () => { if (lista) { html += `</${lista}>`; lista = null; } };
+            const fechaCit = () => {
+                if (!cit.length) return;
+                const primeira = cit[0].match(/^\[!(\w+)\][+-]?\s*(.*)$/);
+                let classe = 'border-gray-300 text-gray-700';
+                if (primeira) {
+                    const ok = primeira[1].toLowerCase() === 'success';
+                    classe = ok ? 'border-green-500 bg-green-50 text-gray-800' : 'border-amber-500 bg-amber-50 text-gray-800';
+                    cit[0] = `${ok ? '✅' : '⚠️'} **${primeira[2] || (ok ? 'Uniformizado' : 'Atenção')}**`;
+                }
+                html += `<blockquote class="border-l-4 ${classe} pl-3 pr-2 py-1 my-2 rounded-r">${acervoMd(cit.join('\n'))}</blockquote>`;
+                cit = [];
+            };
+            for (const l of linhas) {
+                if (/^>/.test(l)) { fechaPar(); fechaLista(); cit.push(l.replace(/^>\s?/, '')); continue; }
+                fechaCit();
+                const h = l.match(/^(#{1,6})\s+(.*)/);
+                if (h) { fechaPar(); fechaLista(); html += `<h4 class="font-semibold text-gray-800 mt-4 mb-1">${acervoInline(h[2])}</h4>`; continue; }
+                const li = l.match(/^\s*([-*+]|\d+[.)])\s+(.*)/);
+                if (li) {
+                    fechaPar();
+                    const num = /\d/.test(li[1]) ? parseInt(li[1], 10) : null;
+                    const tipo = num !== null ? 'ol' : 'ul';
+                    if (lista !== tipo) { fechaLista(); html += tipo === 'ol' ? '<ol class="list-decimal pl-6 my-2 space-y-1">' : '<ul class="list-disc pl-6 my-2 space-y-1">'; lista = tipo; }
+                    // value preserva a numeração do texto (um item "6." não pode virar "1." na minuta)
+                    html += `<li${num !== null ? ` value="${num}"` : ''}>${acervoInline(li[2])}</li>`;
+                    continue;
+                }
+                if (!l.trim() || /^-{3,}$/.test(l.trim())) { fechaPar(); fechaLista(); continue; }
+                if (lista && /^\s{2,}/.test(l)) { html = html.replace(/<\/li>$/, ' ' + acervoInline(l.trim()) + '</li>'); continue; }
+                fechaLista();
+                par.push(l.trim());
+            }
+            fechaPar(); fechaLista(); fechaCit();
+            return html;
+        }
+
+        function acervoTextoPlano(md) {
+            return String(md || '').split('\n').map(l => l.replace(/^>\s?/, '').replace(/^#{1,6}\s+/, '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/(^|[^*])\*([^*]+)\*/g, '$1$2')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+        }
+
+        // ---------- arquivos para baixar ----------
+        function acervoBaixar(nome, blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = nome;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        }
+
+        function acervoNomeArquivo(t) { return String(t).replace(/[\\/:*?"<>|]/g, '-').slice(0, 150); }
+
+        function acervoJSZip() {
+            if (window.JSZip) return Promise.resolve(window.JSZip);
+            return new Promise((ok, erro) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                s.onload = () => ok(window.JSZip);
+                s.onerror = () => erro(new Error('não foi possível carregar o compactador de arquivos'));
+                document.head.appendChild(s);
+            });
+        }
+
+        function acervoAreas(lista) {
+            return [...new Set(lista.map(x => x.area).filter(Boolean))].sort();
+        }
+
+        function acervoArquivosProjeto() {
+            const v = acervo.meta?.versao || '';
+            const cab = `Acervo do gabinete — versão ${v} (Repertório de Teses v${acervo.meta?.repertorio || ''}). Fonte: vault do gabinete, publicado pelo juiz.`;
+            const rebaixa = md => String(md || '').replace(/^(#{1,4}) /gm, (m, h) => '#'.repeat(Math.min(h.length + 2, 6)) + ' ');
+            const arquivos = [];
+            for (const area of acervoAreas(acervo.teses)) {
+                const ts = acervo.teses.filter(t => t.area === area);
+                arquivos.push({
+                    nome: `Gabinete - Teses ${area}.md`,
+                    texto: `# Teses do gabinete — ${area}\n\n${cab}\n\n` + ts.map(t =>
+                        `## Tese — ${t.titulo}\n\n` + [((t.codigos || []).length ? 'Códigos no Repertório: ' + t.codigos.join(', ') : ''), t.revisao ? 'Última revisão: ' + t.revisao : ''].filter(Boolean).join(' · ') +
+                        `\n\n${rebaixa(t.md)}\n`).join('\n')
+                });
+            }
+            for (const area of acervoAreas(acervo.modelos)) {
+                const ms = acervo.modelos.filter(m => m.area === area);
+                arquivos.push({
+                    nome: `Gabinete - Modelos ${area}.md`,
+                    texto: `# Modelos de minuta do gabinete — ${area}\n\n${cab}\n\n` + ms.map(m =>
+                        `## [${m.codigo || 's/c'}] ${m.id}\n\n` +
+                        (m.resultado ? `**Resultado:** ${m.resultado}\n\n` : '') +
+                        ((m.teses || []).length ? `**Teses vinculadas:** ${[...new Set(m.teses)].join('; ')}\n\n` : '') +
+                        (m.quandoUsar ? `### Quando usar\n\n${m.quandoUsar}\n\n` : '') +
+                        `### Minuta\n\n${rebaixa(m.minuta)}\n\n` +
+                        (m.observacoes ? `### Observações do gabinete\n\n${rebaixa(m.observacoes)}\n` : '')).join('\n')
+                });
+            }
+            const indice = `# Índice do acervo e novidades\n\n${cab}\n\n## Novidades\n\n` +
+                (acervo.novidades || []).map(n => `### ${n.data} — ${n.titulo || 'Atualização'} (versão ${n.versao})\n\n` + (n.itens || []).map(i => `- ${i}`).join('\n')).join('\n\n') +
+                `\n\n## Modelos (${acervo.modelos.length})\n\n` + acervo.modelos.map(m => `- [${m.codigo || 's/c'}] ${m.area} › ${m.id}${m.resultado ? ' — ' + m.resultado : ''}`).join('\n') +
+                `\n\n## Teses (${acervo.teses.length})\n\n` + acervo.teses.map(t => `- ${t.area} › ${t.titulo}${(t.codigos || []).length ? ' (' + t.codigos.join(', ') + ')' : ''}`).join('\n') + '\n';
+            arquivos.unshift({ nome: 'Gabinete - Índice e novidades.md', texto: indice });
+            return arquivos;
+        }
+
+        async function acervoBaixarProjeto() {
+            if (!acervoLiberado()) { acervoAvisarBloqueio(); return; }
+            try {
+                const JSZip = await acervoJSZip();
+                const zip = new JSZip();
+                acervoArquivosProjeto().forEach(a => zip.file(a.nome, a.texto));
+                const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+                acervoBaixar(`Projeto Gabinete - arquivos (versão ${acervo.meta.versao}).zip`, blob);
+                showNotification('Pacote baixado. Extraia o .zip e envie todos os arquivos ao Projeto.', 'success');
+            } catch (e) { showNotification('Erro ao gerar o pacote: ' + e.message, 'error'); }
+        }
+
+        async function acervoBaixarSkill(i) {
+            if (!acervoLiberado()) { acervoAvisarBloqueio(); return; }
+            const sk = acervo.skills[i];
+            if (!sk) return;
+            try {
+                const JSZip = await acervoJSZip();
+                const zip = new JSZip();
+                (Array.isArray(sk.arquivos) ? sk.arquivos : Object.values(sk.arquivos || {})).forEach(a => zip.file(`${sk.nome}/${a.path}`, a.conteudo || ''));
+                const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+                acervoBaixar(`${sk.nome}.zip`, blob);
+            } catch (e) { showNotification('Erro ao gerar a skill: ' + e.message, 'error'); }
+        }
+
+        function acervoCopiar(texto, aviso) {
+            navigator.clipboard.writeText(texto)
+                .then(() => showNotification(aviso || 'Copiado.', 'success'))
+                .catch(() => showNotification('Não foi possível copiar. Selecione o texto e copie manualmente.', 'warning'));
+        }
+
+        function acervoCopiarInstrucoes() { if (!acervoLiberado()) { acervoAvisarBloqueio(); return; } acervoCopiar(acervo.instrucoesProjeto, 'Instruções copiadas. Cole no campo de instruções do Projeto.'); }
+
+        function acervoCopiarMinuta(i) { if (!acervoLiberado()) { acervoAvisarBloqueio(); return; } const m = acervo.modelos[i]; if (m) acervoCopiar(acervoTextoPlano(m.minuta), 'Minuta copiada.'); }
+
+        function acervoBaixarWord(i) {
+            if (!acervoLiberado()) { acervoAvisarBloqueio(); return; }
+            const m = acervo.modelos[i];
+            if (!m) return;
+            const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">` +
+                `<style>body{font-family:'Times New Roman',serif;font-size:12pt;text-align:justify;line-height:1.5}blockquote{margin-left:4cm;font-size:11pt;border:none}h4{font-size:12pt}</style></head><body>${acervoMd(m.minuta)}</body></html>`;
+            acervoBaixar(acervoNomeArquivo(m.id) + '.doc', new Blob(['﻿', html], { type: 'application/msword' }));
+        }
+
+        function acervoConfirmarAtualizacao() {
+            if (!acervoLiberado()) { acervoAvisarBloqueio(); return; }
+            if (!acervo.meta || !currentUser) return;
+            database.ref(`acervo/confirmacoes/${currentUser.usuario}`).set({ nome: currentUser.nome, versao: acervo.meta.versao, em: new Date().toISOString() })
+                .then(() => {
+                    acervo.confirmacoes[currentUser.usuario] = { nome: currentUser.nome, versao: acervo.meta.versao, em: new Date().toISOString() };
+                    showNotification('Registrado: seu Claude está na versão ' + acervo.meta.versao + '.', 'success');
+                    renderAcervo();
+                })
+                .catch(e => showNotification('Erro ao registrar: ' + e.message, 'error'));
+        }
+
+        // ---------- publicação (juiz) ----------
+        function acervoLerPacote(input) {
+            const f = input.files && input.files[0];
+            if (!f) return;
+            const leitor = new FileReader();
+            leitor.onload = () => {
+                try {
+                    const p = JSON.parse(leitor.result);
+                    if (!p.meta?.versao || !Array.isArray(p.teses) || !Array.isArray(p.modelos) || !Array.isArray(p.skills)) throw new Error('o arquivo não é um pacote do acervo');
+                    acervo.publicacao = p;
+                    acervo.publicacaoLacre = { estado: 'pendente', detalhe: '' };
+                    acervoConferir(p, p.meta.versao).then(r => { if (acervo.publicacao === p) { acervo.publicacaoLacre = r; renderAcervo(); } });
+                } catch (e) {
+                    acervo.publicacao = null;
+                    showNotification('Pacote inválido: ' + e.message, 'error');
+                }
+                renderAcervo();
+            };
+            leitor.readAsText(f, 'utf-8');
+        }
+
+        let acervoPublicando = false;
+        async function acervoPublicar() {
+            const p = acervo.publicacao;
+            if (!currentUser?.isJuiz || !p || acervoPublicando) return;
+            if (acervo.publicacaoLacre?.estado !== 'ok') {
+                showNotification('Este pacote não confere com o lacre do site. Publique antes a versão do sistema que acompanha o pacote.', 'error');
+                return;
+            }
+            if (acervo.meta?.versao && p.meta.versao <= acervo.meta.versao &&
+                !window.confirm(`A versão ${p.meta.versao} não é mais nova que a já publicada (${acervo.meta.versao}). Publicar mesmo assim?`)) return;
+            acervoPublicando = true;
+            const status = document.getElementById('acervo-publicacao-status');
+            const botao = document.getElementById('acervo-publicar-btn');
+            if (botao) botao.disabled = true;
+            if (status) status.textContent = 'Gravando…';
+            try {
+                // gravação única (atômica): ou entra a versão inteira, ou nada muda; as confirmações dos assessores ficam intactas
+                const atualizacao = {};
+                ACERVO_PARTES.forEach(parte => { atualizacao[parte] = p[parte] ?? null; });
+                atualizacao.meta = { ...p.meta, publicadoEm: new Date().toISOString(), publicadoPor: currentUser.nome };
+                await database.ref('acervo').update(atualizacao);
+                acervo.publicacao = null;
+                await acervoCarregar(true);
+                showNotification(`Acervo ${p.meta.versao} publicado. Os assessores verão o aviso de atualização.`, 'success');
+                renderAcervo();
+            } catch (e) {
+                if (status) status.textContent = '';
+                if (botao) botao.disabled = false;
+                showNotification('Erro ao publicar: ' + e.message, 'error');
+            } finally {
+                acervoPublicando = false;
+            }
+        }
+
+        // ---------- telas ----------
+        function acervoTrocarAba(aba) { acervo.aba = aba; acervo.busca = ''; acervo.area = ''; acervo.abertos = new Set(); renderAcervo(); }
+
+        function acervoAlternar(chave) {
+            acervo.abertos.has(chave) ? acervo.abertos.delete(chave) : acervo.abertos.add(chave);
+            renderAcervoLista();
+        }
+
+        function acervoFiltrar() {
+            acervo.busca = document.getElementById('acervo-busca')?.value || '';
+            acervo.area = document.getElementById('acervo-area')?.value || '';
+            renderAcervoLista();
+        }
+
+        function acervoBuscarTese(titulo) {
+            acervo.aba = 'teses'; acervo.area = ''; acervo.busca = titulo; acervo.abertos = new Set();
+            renderAcervo();
+        }
+
+        function acervoNormaliza(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+
+        function renderAcervoLista() {
+            const alvo = document.getElementById('acervo-lista');
+            if (!alvo) return;
+            const termos = acervoNormaliza(acervo.busca).split(/\s+/).filter(Boolean);
+            const casa = texto => termos.every(t => texto.includes(t));
+            if (acervo.aba === 'teses') {
+                const lista = acervo.teses.map((t, i) => ({ t, i }))
+                    .filter(({ t }) => (!acervo.area || t.area === acervo.area) && (!termos.length || casa(t._busca || '')));
+                alvo.innerHTML = `<p class="text-xs text-gray-500 mb-2">${lista.length} tese(s)${lista.length > ACERVO_LIMITE_LISTA ? ` — mostrando as ${ACERVO_LIMITE_LISTA} primeiras; refine a busca` : ''}</p>` +
+                    lista.slice(0, ACERVO_LIMITE_LISTA).map(({ t, i }) => {
+                        const aberto = acervo.abertos.has('t' + i);
+                        return `<div class="border border-gray-200 rounded-md mb-2 bg-white">
+                            <button onclick="acervoAlternar('t${i}')" class="w-full text-left px-4 py-3 hover:bg-gray-50">
+                                <div class="font-medium text-gray-800">${escapeHtml(t.titulo)}</div>
+                                <div class="text-xs text-gray-500 mt-1">${escapeHtml(t.area)}${(t.codigos || []).length ? ' · ' + escapeHtml(t.codigos.join(', ')) : ''}${t.revisao ? ' · revisão ' + escapeHtml(t.revisao) : ''}</div>
+                                ${!aberto && t.enunciado ? `<div class="text-sm text-gray-600 mt-2 line-clamp-2">${acervoInline(acervoTextoPlano(t.enunciado).replace(/\n/g, ' ').slice(0, 260))}${t.enunciado.length > 260 ? '…' : ''}</div>` : ''}
+                            </button>
+                            ${aberto ? `<div class="px-4 pb-4 text-sm text-gray-700 border-t">${acervoMd(t.md)}</div>` : ''}
+                        </div>`;
+                    }).join('');
+            } else if (acervo.aba === 'modelos') {
+                const lista = acervo.modelos.map((m, i) => ({ m, i }))
+                    .filter(({ m }) => (!acervo.area || m.area === acervo.area) && (!termos.length || casa(m._busca || '')));
+                alvo.innerHTML = `<p class="text-xs text-gray-500 mb-2">${lista.length} modelo(s)${lista.length > ACERVO_LIMITE_LISTA ? ` — mostrando os ${ACERVO_LIMITE_LISTA} primeiros; refine a busca` : ''}</p>` +
+                    lista.slice(0, ACERVO_LIMITE_LISTA).map(({ m, i }) => {
+                        const aberto = acervo.abertos.has('m' + i);
+                        return `<div class="border border-gray-200 rounded-md mb-2 bg-white">
+                            <button onclick="acervoAlternar('m${i}')" class="w-full text-left px-4 py-3 hover:bg-gray-50">
+                                <div class="font-medium text-gray-800">${m.codigo ? `<span class="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded mr-1">${escapeHtml(m.codigo)}</span>` : ''}${escapeHtml(m.id.replace(/^Modelo - /, ''))}</div>
+                                <div class="text-xs text-gray-500 mt-1">${escapeHtml(m.area)}${m.resultado ? ' · ' + escapeHtml(m.resultado) : ''}</div>
+                            </button>
+                            ${aberto ? `<div class="px-4 pb-4 text-sm text-gray-700 border-t space-y-3">
+                                <div class="flex flex-wrap gap-2 pt-3">
+                                    <button onclick="acervoCopiarMinuta(${i})" class="bg-cyan-700 text-white text-xs px-3 py-1.5 rounded-md hover:bg-cyan-800">Copiar a minuta</button>
+                                    <button onclick="acervoBaixarWord(${i})" class="bg-gray-700 text-white text-xs px-3 py-1.5 rounded-md hover:bg-gray-800">Baixar para o Word</button>
+                                </div>
+                                ${m.quandoUsar ? `<div>${acervoMd('> ' + m.quandoUsar.split('\n').join('\n> '))}</div>` : ''}
+                                ${(m.teses || []).length ? `<div><span class="text-xs font-semibold text-gray-500 uppercase">Teses vinculadas</span><div class="flex flex-wrap gap-1 mt-1">${[...new Set(m.teses)].map(t => `<button onclick="acervoBuscarTese(${escapeHtml(JSON.stringify(t))})" class="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-100 text-left">${escapeHtml(t)}</button>`).join('')}</div></div>` : ''}
+                                <details open><summary class="cursor-pointer text-xs font-semibold text-gray-500 uppercase">Minuta</summary><div class="mt-2 bg-gray-50 border rounded p-3 font-serif">${acervoMd(m.minuta)}</div></details>
+                                ${m.observacoes ? `<details><summary class="cursor-pointer text-xs font-semibold text-gray-500 uppercase">Observações do gabinete</summary><div class="mt-2">${acervoMd(m.observacoes)}</div></details>` : ''}
+                            </div>` : ''}
+                        </div>`;
+                    }).join('');
+            }
+        }
+
+        function acervoTelaInicio(versaoMinha) {
+            const desatualizado = acervo.meta && versaoMinha !== acervo.meta.versao;
+            return `
+                ${!currentUser.isJuiz && desatualizado ? `
+                <div class="bg-amber-50 border-l-4 border-amber-500 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap">
+                    <div class="text-sm text-gray-800"><strong>Seu Claude precisa ser atualizado.</strong> O acervo está na versão ${escapeHtml(acervo.meta.versao)}${versaoMinha ? `; a última que você confirmou foi a ${escapeHtml(versaoMinha)}` : ''}.</div>
+                    <button onclick="acervoTrocarAba('claude')" class="bg-amber-600 text-white text-sm px-4 py-2 rounded-md hover:bg-amber-700 whitespace-nowrap">Atualizar meu Claude</button>
+                </div>` : ''}
+                <div class="grid sm:grid-cols-3 gap-4">
+                    <button onclick="acervoTrocarAba('teses')" class="bg-white rounded-lg shadow-md p-5 text-left hover:shadow-lg border-t-4 border-indigo-600"><div class="text-3xl font-bold text-gray-800">${acervo.teses.length}</div><div class="text-sm text-gray-600">teses do gabinete</div></button>
+                    <button onclick="acervoTrocarAba('modelos')" class="bg-white rounded-lg shadow-md p-5 text-left hover:shadow-lg border-t-4 border-cyan-600"><div class="text-3xl font-bold text-gray-800">${acervo.modelos.length}</div><div class="text-sm text-gray-600">modelos de minuta</div></button>
+                    <button onclick="acervoTrocarAba('claude')" class="bg-white rounded-lg shadow-md p-5 text-left hover:shadow-lg border-t-4 border-green-600"><div class="text-3xl font-bold text-gray-800">${acervo.skills.length}</div><div class="text-sm text-gray-600">skills para o Claude</div></button>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-5">
+                    <h3 class="font-semibold text-gray-800 mb-3">Novidades</h3>
+                    ${(acervo.novidades || []).length ? acervo.novidades.map(n => `
+                        <div class="mb-4 last:mb-0">
+                            <div class="text-sm font-semibold text-gray-700">${escapeHtml(n.data)} — ${escapeHtml(n.titulo || 'Atualização')} <span class="text-xs font-normal text-gray-500">(versão ${escapeHtml(n.versao)})</span></div>
+                            <ul class="list-disc pl-6 mt-1 text-sm text-gray-700 space-y-1">${(n.itens || []).map(i => `<li>${acervoInline(i)}</li>`).join('')}</ul>
+                        </div>`).join('') : '<p class="text-sm text-gray-500">Sem novidades registradas.</p>'}
+                </div>
+                ${currentUser.isJuiz ? `
+                <div class="bg-white rounded-lg shadow-md p-5">
+                    <h3 class="font-semibold text-gray-800 mb-3">Claude dos assessores</h3>
+                    ${Object.entries(credenciais).filter(([, c]) => c.tipo === 'assessor').map(([u, c]) => {
+                        const k = (acervo.confirmacoes || {})[u];
+                        const ok = k && k.versao === acervo.meta?.versao;
+                        return `<div class="flex items-center justify-between py-2 border-b last:border-b-0 text-sm">
+                            <span>${escapeHtml(c.nome)}</span>
+                            <span class="${ok ? 'text-green-700' : 'text-amber-700'}">${k ? `versão ${escapeHtml(k.versao)} · ${escapeHtml(new Date(k.em).toLocaleDateString('pt-BR'))}` : 'ainda não configurou'}${ok ? ' ✅' : ''}</span>
+                        </div>`;
+                    }).join('')}
+                </div>` : ''}`;
+        }
+
+        function acervoTelaClaude(versaoMinha) {
+            const passo = (n, titulo, corpo) => `
+                <div class="bg-white rounded-lg shadow-md p-5 flex gap-4">
+                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-cyan-700 text-white flex items-center justify-center font-semibold">${n}</div>
+                    <div class="flex-1 min-w-0"><h3 class="font-semibold text-gray-800 mb-1">${titulo}</h3><div class="text-sm text-gray-600 space-y-2">${corpo}</div></div>
+                </div>`;
+            return `
+                <p class="text-sm text-gray-600">Faça uma vez a configuração completa. Quando sair uma versão nova, repita os passos 3 e 4 e confirme no passo 5.</p>
+                ${passo(1, 'Crie o Projeto do gabinete no Claude', `<p>No Claude (claude.ai ou o aplicativo), abra <strong>Projetos</strong> e crie um projeto chamado <strong>Gabinete 2ª Vara Cível</strong>. Minute sempre dentro dele.</p>`)}
+                ${passo(2, 'Cole as instruções do Projeto', `<p>No campo de instruções do Projeto, cole o texto abaixo, substituindo o anterior se houver.</p>
+                    <button onclick="acervoCopiarInstrucoes()" class="bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800">Copiar instruções</button>
+                    <details><summary class="cursor-pointer text-xs text-gray-500">Ver o texto</summary><pre class="mt-2 whitespace-pre-wrap text-xs bg-gray-50 border rounded p-3">${escapeHtml(acervo.instrucoesProjeto)}</pre></details>`)}
+                ${passo(3, 'Envie os arquivos do acervo ao Projeto', `<p>Baixe o pacote, extraia o .zip e envie <strong>todos</strong> os arquivos para o conhecimento do Projeto. Na atualização, apague antes os arquivos antigos que começam com "Gabinete - ".</p>
+                    <button onclick="acervoBaixarProjeto()" class="bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800">Baixar arquivos do Projeto (versão ${escapeHtml(acervo.meta?.versao || '')})</button>`)}
+                ${passo(4, 'Instale as skills do gabinete', `<p>Baixe cada skill e envie o .zip nas configurações do Claude, na seção de <strong>Skills</strong> (em Capacidades). Se a skill já existir, substitua pela nova.</p>
+                    <div class="grid sm:grid-cols-2 gap-2">${acervo.skills.map((s, i) => `
+                        <div class="border rounded-md p-3 flex items-start justify-between gap-2">
+                            <div class="min-w-0"><div class="font-medium text-gray-800 text-sm">${escapeHtml(s.nome)}</div><div class="text-xs text-gray-500 line-clamp-2">${escapeHtml(s.descricao)}</div></div>
+                            <button onclick="acervoBaixarSkill(${i})" class="text-xs bg-gray-700 text-white px-3 py-1.5 rounded-md hover:bg-gray-800 whitespace-nowrap">Baixar</button>
+                        </div>`).join('')}</div>`)}
+                ${passo(5, 'Confirme a atualização', `<p>${versaoMinha === acervo.meta?.versao ? `✅ Você confirmou a versão ${escapeHtml(versaoMinha)}.` : 'Depois de concluir os passos acima, registre aqui. O juiz acompanha quem está atualizado.'}</p>
+                    ${versaoMinha === acervo.meta?.versao ? '' : `<button onclick="acervoConfirmarAtualizacao()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Meu Claude está na versão ${escapeHtml(acervo.meta?.versao || '')}</button>`}`)}`;
+        }
+
+        function acervoTelaPublicar() {
+            const p = acervo.publicacao;
+            return `
+                <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-indigo-600">
+                    <h3 class="font-semibold text-gray-800 mb-1">Publicar atualização do acervo</h3>
+                    <p class="text-sm text-gray-600 mb-3">Escolha o pacote gerado no computador do gabinete (pasta <code>.painel-gabinete\\acervo</code>, arquivo <code>acervo-AAAA.MM.DD.json</code>). Confira o resumo antes de publicar.</p>
+                    <input type="file" accept=".json,application/json" onchange="acervoLerPacote(this)" class="text-sm">
+                    ${p ? `
+                    <div class="mt-4 bg-gray-50 border rounded-md p-4 text-sm space-y-1">
+                        <div><strong>Versão:</strong> ${escapeHtml(p.meta.versao)} · Repertório v${escapeHtml(p.meta.repertorio || '')}</div>
+                        <div><strong>Conteúdo:</strong> ${p.teses.length} teses, ${p.modelos.length} modelos, ${p.skills.length} skills</div>
+                        <div><strong>Versão publicada agora:</strong> ${escapeHtml(acervo.meta?.versao || 'nenhuma')}</div>
+                        ${(p.novidades || [])[0] ? `<div><strong>Novidades:</strong> ${escapeHtml(p.novidades[0].titulo || '')} (${(p.novidades[0].itens || []).length} itens)</div>` : ''}
+                        <div><strong>Lacre do site:</strong> ${{ ok: '✅ confere', pendente: 'conferindo…' }[acervo.publicacaoLacre?.estado] || `❌ não confere (${escapeHtml(acervo.publicacaoLacre?.detalhe || '')}). Publique antes a versão do sistema que acompanha este pacote.`}</div>
+                    </div>
+                    <div class="mt-3 flex items-center gap-3">
+                        <button id="acervo-publicar-btn" onclick="acervoPublicar()" ${acervo.publicacaoLacre?.estado === 'ok' ? '' : 'disabled'} class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Publicar versão ${escapeHtml(p.meta.versao)}</button>
+                        <span id="acervo-publicacao-status" class="text-sm text-gray-500"></span>
+                    </div>` : ''}
+                </div>`;
+        }
+
+        function renderAcervo() {
+            const view = document.getElementById('acervo-view');
+            if (!view) return;
+            view.classList.remove('hidden');
+            const moldura = corpo => `<div class="max-w-6xl mx-auto px-4 py-6 space-y-5">${corpo}</div>`;
+            if (!acervo.carregado) {
+                view.innerHTML = moldura('<p class="text-gray-500">Carregando o acervo do gabinete…</p>');
+                acervoCarregar().then(() => { if (currentView === 'acervo') renderAcervo(); })
+                    .catch(e => { view.innerHTML = moldura(`<p class="text-red-600">Não foi possível carregar o acervo: ${escapeHtml(e.message)}</p>`); });
+                return;
+            }
+            if (!acervo.meta && !currentUser?.isJuiz) {
+                view.innerHTML = moldura('<p class="text-gray-600">O acervo do gabinete ainda não foi publicado pelo juiz.</p>');
+                return;
+            }
+            if (!acervo.meta) acervo.aba = 'publicar';
+            acervoVerificarVersao();
+            const versaoMinha = (acervo.confirmacoes || {})[currentUser.usuario]?.versao || '';
+            const integ = acervo.integridade;
+            const alertaLacre = !acervo.meta || acervoLiberado() ? '' : `
+                <div class="bg-red-50 border-l-4 border-red-600 rounded-md p-4 text-sm text-gray-800">
+                    ${integ.estado === 'versao' && !currentUser.isJuiz
+                        ? '<strong>⏳ Atualização em andamento.</strong> O juiz está publicando uma nova versão do acervo. Aguarde alguns minutos antes de baixar.'
+                        : `<strong>⛔ O acervo gravado no banco não confere com a versão aprovada pelo juiz.</strong>
+                    ${currentUser.isJuiz ? `Detalhe: ${escapeHtml(integ.detalhe || integ.estado)}. Se você acabou de publicar o sistema, publique o pacote correspondente na aba Publicar; se não, o conteúdo do banco foi alterado e é preciso publicá-lo de novo.` : 'Não baixe nem instale nada agora e avise o juiz.'}`}
+                    Downloads e cópias ficam bloqueados até a conferência voltar a bater.
+                </div>`;
+            const abas = [['inicio', 'Início'], ['teses', `Teses (${acervo.teses.length})`], ['modelos', `Modelos (${acervo.modelos.length})`], ['claude', 'Configurar meu Claude']]
+                .concat(currentUser.isJuiz ? [['publicar', 'Publicar']] : []);
+            const lista = acervo.aba === 'teses' || acervo.aba === 'modelos';
+            const fonte = acervo.aba === 'teses' ? acervo.teses : acervo.modelos;
+            view.innerHTML = moldura(`
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h2 class="text-2xl font-bold text-gray-800 flex items-center"><i data-lucide="library" class="h-6 w-6 mr-2 text-cyan-700"></i>Acervo do gabinete</h2>
+                    ${acervo.meta ? `<span class="text-xs bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full">versão ${escapeHtml(acervo.meta.versao)} · Repertório v${escapeHtml(acervo.meta.repertorio || '')}</span>` : ''}
+                </div>
+                <div class="flex flex-wrap gap-2 border-b pb-2">
+                    ${abas.map(([k, r]) => `<button onclick="acervoTrocarAba('${k}')" class="px-3 py-1.5 rounded-md text-sm font-medium ${acervo.aba === k ? 'bg-cyan-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">${r}</button>`).join('')}
+                </div>
+                ${alertaLacre}
+                ${acervo.aba === 'inicio' ? acervoTelaInicio(versaoMinha) : ''}
+                ${acervo.aba === 'claude' ? acervoTelaClaude(versaoMinha) : ''}
+                ${acervo.aba === 'publicar' && currentUser.isJuiz ? acervoTelaPublicar() : ''}
+                ${lista ? `
+                <div class="flex flex-wrap gap-2">
+                    <input id="acervo-busca" type="search" value="${escapeHtml(acervo.busca)}" oninput="acervoFiltrar()" placeholder="Buscar por palavra, tema, código (ex.: BAN-41) ou artigo" class="flex-1 min-w-[240px] border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    <select id="acervo-area" onchange="acervoFiltrar()" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">Todas as áreas</option>
+                        ${acervoAreas(fonte).map(a => `<option value="${escapeHtml(a)}" ${acervo.area === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}
+                    </select>
+                </div>
+                <div id="acervo-lista"></div>` : ''}`);
+            if (lista) renderAcervoLista();
+            criarIcones();
         }
 
         // ==================== BALCÃO VIRTUAL - FUNÇÕES ====================
@@ -6948,6 +7496,454 @@
             `;
         }
 
+        // ==================== SINCRONIZAÇÃO DAS ABAS POR MINUTA ====================
+        // Chamada sempre que uma minuta é registrada ou lançada (tela Registrar Minuta e Painel IA).
+        // Meta 2 e 180/120/100 já leem as minutas pelo número do processo; aqui se atualiza o que
+        // depende de gravação: pedidos do Balcão Virtual e processos acompanhados nas Metas.
+        // Idempotente: rodar de novo para a mesma minuta não muda nada.
+
+        function mesmoProcesso(item, numero) {
+            const d = normalizarNumeroCNJ(numero);
+            const chave = item.chave || normalizarNumeroCNJ(item.numero || item.numeroProcesso);
+            const temSufixo = item.temSufixo ?? String(item.numero || item.numeroProcesso || '').includes('/');
+            if (d.length < 20 || chave.length < 20) return false;
+            // item sem sufixo aceita a minuta do incidente (/0001); item com sufixo exige o número completo
+            return temSufixo ? d === chave : (d === chave || d.startsWith(chave));
+        }
+
+        // Categorias que a minuta deve ter pelo processo a que se refere (usado nos lançamentos do Painel)
+        function categoriasPeloProcesso(numero, tipoMinuta) {
+            const extra = [];
+            if (tipoMinuta === 'Sentença' && PROCESSOS_META2.some(p => p.grupo === 'a_julgar' && mesmoProcesso(p, numero))) extra.push('meta2');
+            if (PROCESSOS_ACOMPANHAMENTO.some(p => mesmoProcesso(p, numero))) extra.push('sem_movimento');
+            return extra;
+        }
+
+        async function sincronizarAbasPorMinuta(minuta, minutaId) {
+            if (!database || !minuta?.numeroProcesso) return [];
+            const feitos = [];
+            const hoje = getHojeString();
+            const agora = getDataHoraBrasilia().getTime();
+            const autor = minuta.assessorNome || currentUser?.nome || '';
+
+            // Balcão Virtual: pedido pendente do mesmo processo passa a "minutado"
+            for (const [id, p] of Object.entries(pedidosBalcao)) {
+                if (!p || p.status !== 'pendente' || !mesmoProcesso(p, minuta.numeroProcesso)) continue;
+                await database.ref(`pedidosBalcao/${id}`).update({
+                    status: 'minutado', dataMinutado: hoje, minutadoPor: autor, minutadoEm: agora, minutaId: minutaId || null
+                });
+                feitos.push('balcão: pedido marcado como minutado');
+            }
+
+            // Metas acompanhadas (improbidade, coletivas, +10 anos, saúde): última movimentação e, se sentença, a fase
+            for (const meta of Object.values(METAS_CONFIG)) {
+                const lista = { processosMetaImprobidade, processosMetaAcoesColetivas, processosMetaMaisDezAnos, processosMetaSaude }[meta.colecaoFirebase] || {};
+                for (const [id, p] of Object.entries(lista)) {
+                    if (!p || !mesmoProcesso(p, minuta.numeroProcesso)) continue;
+                    if (p.ultimaMinutaId === minutaId && p.ultimaMovimentacao === hoje) continue;
+                    const upd = { ultimaMovimentacao: hoje, ultimaMinutaId: minutaId || null, ultimaMinutaTipo: minuta.tipoMinuta,
+                                  editadoPor: autor, editadoEm: agora };
+                    if (minuta.tipoMinuta === 'Sentença' && meta.fases.sentenca && (meta.fases[p.fase]?.ordem || 0) < meta.fases.sentenca.ordem) upd.fase = 'sentenca';
+                    await database.ref(`${meta.colecaoFirebase}/${id}`).update(upd);
+                    feitos.push(`${meta.nome}: movimentação de hoje${upd.fase ? ' · fase Sentença' : ''}`);
+                }
+            }
+
+            // Notificações de despacho virtual do mesmo processo ficam como lidas
+            for (const [id, n] of Object.entries(notificacoesJuiz)) {
+                if (n && !n.lida && n.tipo === 'despacho_virtual' && mesmoProcesso(n, minuta.numeroProcesso)) {
+                    await database.ref(`notificacoesJuiz/${id}/lida`).set(true);
+                    feitos.push('notificação de despacho virtual lida');
+                }
+            }
+            return feitos;
+        }
+
+        // ==================== PAINEL IA (SINCRONIZAÇÃO COM O PAINEL DO GABINETE) ====================
+        // Ponte manual, exclusiva do juiz, com o Painel do Gabinete (artifact privado no claude.ai).
+        // Sem credenciais e sem robô gravando no banco: o juiz copia um código daqui e cola no Painel
+        // (produtividade, metas, balcão e situação das minutas da IA) e, no caminho inverso, cola aqui
+        // as minutas aprovadas no Painel, que são registradas com o login dele.
+
+        const PAINEL_IA_ASSESSOR_ID = 'claude_ia';
+        const PAINEL_IA_ASSESSOR_NOME = 'Claude (IA) · Painel do Gabinete';
+        let painelIAImportacao = null;
+
+        function painelIAMinutasIA() {
+            return Object.entries(minutas)
+                .filter(([, m]) => m && m.assessorId === PAINEL_IA_ASSESSOR_ID)
+                .map(([id, m]) => ({ id, ...m }));
+        }
+
+        function gerarSnapshotPainelIA() {
+            const hoje = getHojeString();
+            const mes = hoje.slice(0, 7);
+            const ativas = Object.values(minutas).filter(m => m && m.status !== 'excluida');
+            const autores = { juiz: 'Juiz', ...Object.fromEntries(Object.entries(assessores).map(([id, a]) => [id, a.nome])), [PAINEL_IA_ASSESSOR_ID]: 'Claude (IA)' };
+            const porAssessor = Object.entries(autores).map(([id, nome]) => {
+                const doAutor = ativas.filter(m => m.assessorId === id);
+                const contar = lista => ({
+                    total: lista.length,
+                    despachos: lista.filter(m => m.tipoMinuta === 'Despacho').length,
+                    decisoes: lista.filter(m => m.tipoMinuta === 'Decisão').length,
+                    sentencas: lista.filter(m => m.tipoMinuta === 'Sentença').length,
+                    assinadas: lista.filter(m => m.status === 'assinada').length
+                });
+                return { id, nome, hoje: contar(doAutor.filter(m => m.data === hoje)), mes: contar(doAutor.filter(m => (m.data || '').startsWith(mes))) };
+            });
+
+            const meta2Itens = getStatusMeta2P();
+            const meta2Resumo = getResumoMeta2P(meta2Itens);
+            const meta180Itens = getStatusMeta180();
+            const metasJuiz = getMetasJuizStatus();
+
+            return {
+                formato: 'produtividade-2vc/snapshot',
+                versao: 1,
+                geradoEm: new Date().toISOString(),
+                hoje,
+                produtividade: porAssessor,
+                assinatura: {
+                    pendentes: ativas.filter(m => m.status === 'pendente').length,
+                    correcao: ativas.filter(m => m.status === 'correcao').length
+                },
+                metasMagistrado: { atual: metasJuiz.totalAtual, meta: metasJuiz.totalMeta, percentual: metasJuiz.percentual,
+                    itens: metasJuiz.itens.map(i => ({ id: i.id, nome: i.nome, atual: i.atual, meta: i.meta })) },
+                meta2: {
+                    referencia: META2_REFERENCIA,
+                    indicePct: meta2Resumo.indicePct, alvoPct: meta2Resumo.alvoPct, acervo: meta2Resumo.acervo,
+                    julgados: meta2Resumo.julgadosTotal, minutados: meta2Resumo.minutados, faltamParaAlvo: meta2Resumo.faltamParaAlvo,
+                    aJulgar: meta2Itens.filter(p => p.status === 'pendente').map(p => ({ numero: p.numero, classe: p.classe, assunto: p.assunto }))
+                },
+                meta180: {
+                    referencia: ACOMP_REFERENCIA,
+                    total: meta180Itens.length,
+                    cumpridos: meta180Itens.filter(p => p.status === 'cumprido').length,
+                    minutados: meta180Itens.filter(p => p.status === 'minutado').length,
+                    pendentes: meta180Itens.filter(p => p.status === 'pendente').map(p => ({
+                        numero: p.numero, classe: p.classe, assunto: p.assunto, faixa: p.faixa,
+                        ultimaMov: p.ultimaMov, tipo: p.tipo, responsavel: p.responsavel || ''
+                    }))
+                },
+                balcao: Object.entries(pedidosBalcao)
+                    .filter(([, p]) => p && p.status === 'pendente')
+                    .map(([id, p]) => ({ id, numeroProcesso: p.numeroProcesso, classe: p.classe || '', categoria: p.categoria || '',
+                        dataPedido: p.dataPedido || '', resumo: String(p.resumo || '').slice(0, 300) })),
+                minutasIA: painelIAMinutasIA().map(m => ({ id: m.id, painelId: m.painelId || '', numeroProcesso: m.numeroProcesso,
+                    tipoMinuta: m.tipoMinuta, status: m.status, data: m.data || '' })),
+                // minutas lançadas pelo botão "Lançar assinadas do Painel" (confirmação de volta ao Painel)
+                assinadasPainel: Object.entries(minutas)
+                    .filter(([, m]) => m && m.painelId && m.assessorId !== PAINEL_IA_ASSESSOR_ID)
+                    .map(([id, m]) => ({ id, painelId: m.painelId, status: m.status, tipoMinuta: m.tipoMinuta }))
+            };
+        }
+
+        // Lança, em nome do juiz e já assinadas, as minutas que ele marcou como assinadas no Painel.
+        // A chave no banco deriva do painelId, então lançar de novo não duplica.
+        async function lancarAssinadasPainelIA() {
+            if (!currentUser?.isJuiz) return;
+            if (!database) { showNotification('Sem conexão com o banco de dados.', 'error'); return; }
+            const alvo = document.getElementById('painelia-lancamento');
+            let texto = '';
+            try {
+                texto = await navigator.clipboard.readText();
+            } catch (e) {
+                texto = (document.getElementById('painelia-lancar-entrada')?.value || '').trim();
+                if (!texto) {
+                    document.getElementById('painelia-lancar-entrada')?.classList.remove('hidden');
+                    showNotification('O navegador não liberou a área de transferência. Cole o código no campo que apareceu e clique de novo.', 'warning');
+                    return;
+                }
+            }
+            let dados;
+            try { dados = JSON.parse(texto); } catch (e) { dados = null; }
+            if (dados?.formato !== 'painel-gabinete/assinadas' || !Array.isArray(dados.minutas)) {
+                showNotification('A área de transferência não tem minutas assinadas do Painel. No Painel, marque como assinada (ou use "Copiar assinadas") e tente de novo.', 'warning');
+                return;
+            }
+            const hoje = getHojeString();
+            const resultados = [];
+            for (const m of dados.minutas) {
+                const painelId = String(m.painelId || '');
+                const numero = String(m.numeroProcesso || '').trim();
+                const cats = (Array.isArray(m.categorias) ? m.categorias : []).filter(c => categorias[c]);
+                let problema = '';
+                if (!/^[A-Za-z0-9_-]{1,120}$/.test(painelId)) problema = 'identificação do Painel inválida';
+                else if (!validarNumeroProcesso(numero)) problema = 'número inválido';
+                else if (!['Despacho', 'Decisão', 'Sentença'].includes(m.tipoMinuta)) problema = 'tipo inválido';
+                else if (!cats.length) problema = 'sem categoria válida';
+                else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
+                if (problema) { resultados.push({ numero, texto: problema, ok: false }); continue; }
+                // o processo também conta onde ele está listado (Meta 2 a julgar, 180/120/100)
+                const extras = categoriasPeloProcesso(numero, m.tipoMinuta).filter(c => !cats.includes(c));
+                cats.push(...extras);
+                const notaExtras = extras.length ? ' · + ' + extras.map(c => categorias[c]?.nome || c).join(', ') : '';
+                const sincronizar = async (id, base) => {
+                    const feitos = await sincronizarAbasPorMinuta({ ...base, numeroProcesso: numero, tipoMinuta: m.tipoMinuta, assessorNome: currentUser.nome }, id);
+                    return feitos.length ? ' · ' + feitos.join(' · ') : '';
+                };
+
+                // já lançada antes (pelo botão ou pelo envio manual da IA): só garante a assinatura
+                const existente = Object.entries(minutas).find(([, x]) => x && x.painelId === painelId && x.status !== 'excluida');
+                try {
+                    if (existente) {
+                        const [id, x] = existente;
+                        // relançamento corrige o tipo do ato e as categorias quando o Painel mandou outros
+                        const catsAntes = normalizarCategorias(x);
+                        const mudouTipo = x.tipoMinuta !== m.tipoMinuta;
+                        const mudouCats = catsAntes.length !== cats.length || cats.some(c => !catsAntes.includes(c));
+                        if (x.status !== 'assinada' || mudouTipo || mudouCats) {
+                            await database.ref(`minutas/${id}`).update({
+                                status: 'assinada', tipoMinuta: m.tipoMinuta, categorias: cats,
+                                atualizadaEm: getDataHoraBrasilia().getTime(), atualizadaPor: currentUser.nome
+                            });
+                            const partes = [];
+                            if (mudouTipo) partes.push(`ato corrigido: ${x.tipoMinuta} → ${m.tipoMinuta}`);
+                            if (mudouCats) partes.push('categorias atualizadas');
+                            if (x.status !== 'assinada') partes.push('marcada como assinada');
+                            resultados.push({ numero, texto: 'já estava no sistema · ' + partes.join(' · ') + notaExtras + await sincronizar(id, x), ok: true });
+                        } else {
+                            resultados.push({ numero, texto: 'já lançada antes' + await sincronizar(id, x), ok: true });
+                        }
+                        continue;
+                    }
+                    const obs = ('Minuta elaborada com o Claude (IA) no Painel do Gabinete, revisada e assinada pelo juiz. ' + String(m.observacoes || '')).trim().slice(0, 500);
+                    await database.ref(`minutas/painel-${painelId}`).set({
+                        assessorId: 'juiz',
+                        assessorNome: currentUser.nome,
+                        numeroProcesso: numero,
+                        tipoMinuta: m.tipoMinuta,
+                        categorias: cats,
+                        observacoes: obs,
+                        substituicao: false,
+                        status: 'assinada',
+                        data: hoje,
+                        timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
+                        createdAt: firebase.database.ServerValue.TIMESTAMP,
+                        atualizadaEm: getDataHoraBrasilia().getTime(),
+                        atualizadaPor: currentUser.nome,
+                        painelId,
+                        origem: 'painel-gabinete'
+                    });
+                    // mesmo efeito do "Registrar Minuta" feito pelo juiz
+                    if (cats.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
+                    if (cats.includes('juiz_ato_inicial')) ajustarMetaJuiz('ato_inicial', 1);
+                    if (cats.includes('outros')) ajustarMetaJuiz('urgentes', 1);
+                    resultados.push({ numero, texto: `${m.tipoMinuta} lançada e assinada` + notaExtras + await sincronizar(`painel-${painelId}`, {}), ok: true });
+                } catch (e) {
+                    log('Erro ao lançar assinada do Painel', e);
+                    resultados.push({ numero, texto: 'erro ao gravar; tente de novo', ok: false });
+                }
+            }
+            const okN = resultados.filter(r => r.ok).length;
+            const entrada = document.getElementById('painelia-lancar-entrada');
+            if (entrada) { entrada.value = ''; entrada.classList.add('hidden'); }
+            if (alvo) {
+                alvo.innerHTML = `<ul class="mt-3 space-y-1 text-sm">${resultados.map(r => `
+                    <li class="flex justify-between gap-3"><span class="font-mono">${escapeHtml(r.numero)}</span>
+                    <span class="${r.ok ? 'text-green-700' : 'text-red-600'}">${escapeHtml(r.texto)}</span></li>`).join('')}</ul>
+                    <p class="text-xs text-gray-500 mt-2">O Painel confirma sozinho na próxima rodada do executor. Para confirmar na hora, aperte Ctrl+V no Painel.</p>`;
+            }
+            // deixa a confirmação pronta na área de transferência: no Painel, basta Ctrl+V
+            let copiou = false;
+            try { await navigator.clipboard.writeText(JSON.stringify(gerarSnapshotPainelIA())); copiou = true; } catch (e) {}
+            showNotification(okN === resultados.length
+                ? `${okN} ${okN === 1 ? 'minuta lançada' : 'minutas lançadas'} em seu nome, já assinadas.${copiou ? ' Para atualizar o Painel agora, aperte Ctrl+V nele.' : ''}`
+                : `${okN} de ${resultados.length} lançadas. Veja os detalhes no Painel IA.`, okN === resultados.length ? 'success' : 'warning');
+        }
+
+        async function copiarSnapshotPainelIA() {
+            if (!currentUser?.isJuiz) return;
+            const texto = JSON.stringify(gerarSnapshotPainelIA());
+            const area = document.getElementById('painelia-snapshot');
+            if (area) area.value = texto;
+            try {
+                await navigator.clipboard.writeText(texto);
+                showNotification('Código copiado. Cole no Painel do Gabinete, em "Colar do sistema".', 'success');
+            } catch (e) {
+                if (area) { area.classList.remove('hidden'); area.select(); }
+                showNotification('Selecionei o código abaixo: use Ctrl+C para copiar.', 'info');
+            }
+        }
+
+        function lerImportacaoPainelIA() {
+            const texto = (document.getElementById('painelia-entrada')?.value || '').trim();
+            painelIAImportacao = null;
+            if (!texto) { renderPreviaImportacaoPainelIA('Cole aqui o código copiado no Painel do Gabinete.'); return; }
+            let dados;
+            try { dados = JSON.parse(texto); } catch (e) {
+                renderPreviaImportacaoPainelIA('O texto colado não é um código do Painel. Copie de novo pelo botão "Copiar para o sistema".'); return;
+            }
+            if (dados?.formato !== 'painel-gabinete/minutas' || !Array.isArray(dados.minutas)) {
+                renderPreviaImportacaoPainelIA('Este código não é de minutas do Painel do Gabinete.'); return;
+            }
+            const jaRegistradas = new Set(painelIAMinutasIA().filter(m => m.status !== 'excluida').map(m => m.painelId).filter(Boolean));
+            const itens = dados.minutas.map(m => {
+                const cats = (Array.isArray(m.categorias) ? m.categorias : []).filter(c => categorias[c]);
+                let problema = '';
+                if (!validarNumeroProcesso(String(m.numeroProcesso || ''))) problema = 'número inválido';
+                else if (!['Despacho', 'Decisão', 'Sentença'].includes(m.tipoMinuta)) problema = 'tipo inválido';
+                else if (!cats.length) problema = 'sem categoria válida';
+                else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
+                else if (!m.painelId) problema = 'sem identificação do Painel';
+                else if (jaRegistradas.has(m.painelId)) problema = 'já registrada';
+                return { painelId: String(m.painelId || ''), numeroProcesso: String(m.numeroProcesso || '').trim(), tipoMinuta: m.tipoMinuta,
+                    categorias: cats, observacoes: String(m.observacoes || '').slice(0, 400),
+                    pedidoBalcaoId: m.pedidoBalcaoId && pedidosBalcao[m.pedidoBalcaoId] ? m.pedidoBalcaoId : '', problema };
+            });
+            painelIAImportacao = itens;
+            renderPreviaImportacaoPainelIA();
+        }
+
+        function renderPreviaImportacaoPainelIA(mensagem) {
+            const alvo = document.getElementById('painelia-previa');
+            if (!alvo) return;
+            if (mensagem || !painelIAImportacao) {
+                alvo.innerHTML = `<p class="text-sm text-gray-500">${escapeHtml(mensagem || '')}</p>`;
+                return;
+            }
+            const validas = painelIAImportacao.filter(i => !i.problema);
+            alvo.innerHTML = `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead><tr class="text-left text-gray-500 border-b">
+                            <th class="py-2 pr-3">Processo</th><th class="py-2 pr-3">Tipo</th><th class="py-2 pr-3">Categorias</th><th class="py-2">Situação</th>
+                        </tr></thead>
+                        <tbody>${painelIAImportacao.map(i => `
+                            <tr class="border-b last:border-b-0">
+                                <td class="py-2 pr-3 font-mono">${escapeHtml(i.numeroProcesso)}</td>
+                                <td class="py-2 pr-3">${escapeHtml(i.tipoMinuta || '')}</td>
+                                <td class="py-2 pr-3">${i.categorias.map(c => escapeHtml(categorias[c]?.nome || c)).join(', ')}</td>
+                                <td class="py-2 ${i.problema ? 'text-red-600' : 'text-green-700'}">${i.problema ? escapeHtml(i.problema) : 'pronta para registrar'}${i.pedidoBalcaoId ? ' · baixa o pedido do balcão' : ''}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <button onclick="registrarImportacaoPainelIA()" ${validas.length ? '' : 'disabled'}
+                    class="mt-3 bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800 transition-colors disabled:opacity-40">
+                    Registrar ${validas.length} ${validas.length === 1 ? 'minuta' : 'minutas'} como Claude (IA)
+                </button>`;
+        }
+
+        async function registrarImportacaoPainelIA() {
+            if (!currentUser?.isJuiz || !painelIAImportacao) return;
+            if (!database) { showNotification('Sem conexão com o banco de dados.', 'error'); return; }
+            const validas = painelIAImportacao.filter(i => !i.problema);
+            let ok = 0;
+            for (const i of validas) {
+                const obs = ('Minuta elaborada pelo Claude (IA) no Painel do Gabinete e aprovada pelo juiz para revisão. ' + i.observacoes).trim().slice(0, 500);
+                try {
+                    const novaRefIA = database.ref('minutas').push({
+                        assessorId: PAINEL_IA_ASSESSOR_ID,
+                        assessorNome: PAINEL_IA_ASSESSOR_NOME,
+                        numeroProcesso: i.numeroProcesso,
+                        tipoMinuta: i.tipoMinuta,
+                        categorias: i.categorias,
+                        observacoes: obs,
+                        substituicao: false,
+                        status: 'pendente',
+                        data: getHojeString(),
+                        timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
+                        createdAt: firebase.database.ServerValue.TIMESTAMP,
+                        painelId: i.painelId,
+                        registradoPor: currentUser.nome
+                    });
+                    await novaRefIA;
+                    await sincronizarAbasPorMinuta({ numeroProcesso: i.numeroProcesso, tipoMinuta: i.tipoMinuta, assessorNome: PAINEL_IA_ASSESSOR_NOME }, novaRefIA.key);
+                    if (i.pedidoBalcaoId && pedidosBalcao[i.pedidoBalcaoId]?.status === 'pendente') {
+                        await database.ref(`pedidosBalcao/${i.pedidoBalcaoId}`).update({
+                            status: 'minutado', dataMinutado: getHojeString(),
+                            minutadoPor: PAINEL_IA_ASSESSOR_NOME, minutadoEm: getDataHoraBrasilia().getTime()
+                        });
+                    }
+                    ok++;
+                } catch (e) {
+                    log('Erro ao registrar minuta do Painel IA', e);
+                }
+            }
+            const entrada = document.getElementById('painelia-entrada');
+            if (entrada) entrada.value = '';
+            painelIAImportacao = null;
+            showNotification(ok === validas.length
+                ? `${ok} ${ok === 1 ? 'minuta registrada' : 'minutas registradas'}. Copie o código para o Painel para atualizar a situação lá.`
+                : `${ok} de ${validas.length} minutas registradas. Tente de novo as restantes.`, ok === validas.length ? 'success' : 'warning');
+            renderPainelIA();
+        }
+
+        function renderPainelIA() {
+            const view = document.getElementById('painelia-view');
+            if (!view) return;
+            view.classList.remove('hidden');
+            if (!currentUser?.isJuiz) {
+                view.innerHTML = '<div class="max-w-4xl mx-auto px-4 py-8 text-gray-600">Esta tela é exclusiva do juiz.</div>';
+                return;
+            }
+            const ia = painelIAMinutasIA().filter(m => m.status !== 'excluida')
+                .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+            const rotulo = { pendente: 'Pendente', assinada: 'Assinada', correcao: 'Precisa correção' };
+            view.innerHTML = `
+                <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <i data-lucide="refresh-cw" class="h-6 w-6 mr-2 text-cyan-700"></i>
+                            Painel IA
+                        </h2>
+                        <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">🔒 visível apenas no seu login</span>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-green-600">
+                        <div class="flex items-start justify-between gap-4 flex-wrap">
+                            <div>
+                                <h3 class="font-semibold text-gray-800 mb-1">Lançar assinadas do Painel</h3>
+                                <p class="text-sm text-gray-600">Ao marcar uma minuta como assinada no Painel, ela vai para a área de transferência. Um clique aqui lança em seu nome, já assinada. Lançar de novo não duplica.</p>
+                            </div>
+                            <button onclick="lancarAssinadasPainelIA()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">Lançar assinadas do Painel</button>
+                        </div>
+                        <textarea id="painelia-lancar-entrada" placeholder="Cole aqui o código copiado no Painel" class="hidden mt-3 w-full h-20 border border-gray-300 rounded-md p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
+                        <div id="painelia-lancamento"></div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-cyan-600">
+                            <h3 class="font-semibold text-gray-800 mb-1">1. Enviar ao Painel</h3>
+                            <p class="text-sm text-gray-600 mb-3">Copia a produtividade de hoje e do mês, as Metas do Magistrado, a Meta 2, o painel 180/120/100, os pedidos pendentes do balcão e a situação das minutas da IA.</p>
+                            <button onclick="copiarSnapshotPainelIA()" class="bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800 transition-colors">Copiar código para o Painel</button>
+                            <textarea id="painelia-snapshot" readonly class="hidden mt-3 w-full h-24 border border-gray-300 rounded-md p-2 text-xs font-mono"></textarea>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-indigo-600">
+                            <h3 class="font-semibold text-gray-800 mb-1">2. Receber do Painel</h3>
+                            <p class="text-sm text-gray-600 mb-3">Cole o código das minutas aprovadas no Painel. Elas entram como pendentes, com o autor "Claude (IA)", para você revisar e assinar aqui.</p>
+                            <textarea id="painelia-entrada" oninput="lerImportacaoPainelIA()" placeholder="Cole aqui o código copiado no Painel" class="w-full h-24 border border-gray-300 rounded-md p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                            <div id="painelia-previa" class="mt-3"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-5">
+                        <h3 class="font-semibold text-gray-800 mb-3">Minutas da IA no sistema (${ia.length})</h3>
+                        ${ia.length ? `
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead><tr class="text-left text-gray-500 border-b">
+                                    <th class="py-2 pr-3">Data</th><th class="py-2 pr-3">Processo</th><th class="py-2 pr-3">Tipo</th><th class="py-2">Situação</th>
+                                </tr></thead>
+                                <tbody>${ia.map(m => `
+                                    <tr class="border-b last:border-b-0">
+                                        <td class="py-2 pr-3">${escapeHtml(m.data || '')}</td>
+                                        <td class="py-2 pr-3 font-mono">${escapeHtml(m.numeroProcesso)}</td>
+                                        <td class="py-2 pr-3">${escapeHtml(m.tipoMinuta)}</td>
+                                        <td class="py-2">${escapeHtml(rotulo[m.status] || m.status)}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Assine ou peça correção pelo Histórico, como nas demais minutas.</p>` :
+                        '<p class="text-sm text-gray-500">Nenhuma minuta da IA registrada ainda. Elas aparecem aqui depois do passo 2.</p>'}
+                    </div>
+                </div>`;
+            renderPreviaImportacaoPainelIA(painelIAImportacao ? undefined : 'Cole aqui o código copiado no Painel do Gabinete.');
+            criarIcones();
+        }
+
         // ==================== FIREBASE ====================
 
         function setupFirebaseListeners() {
@@ -7272,10 +8268,15 @@
 
             try {
                 if (database) {
-                    database.ref('minutas').push({
+                    const novaRef = database.ref('minutas').push({
                         ...novaMinuta,
                         createdAt: firebase.database.ServerValue.TIMESTAMP
-                    }).then(() => {
+                    });
+                    novaRef.then(() => {
+                        // balcão, metas e notificações do mesmo processo acompanham o registro
+                        sincronizarAbasPorMinuta(novaMinuta, novaRef.key)
+                            .then(feitos => { if (feitos.length) showNotification('Abas atualizadas: ' + feitos.join('; '), 'info'); })
+                            .catch(e => log('Erro ao sincronizar abas da minuta', e));
                         limparFormularioRegistro();
                         
                         let mensagem = 'Minuta registrada com sucesso!';
