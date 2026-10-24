@@ -74,9 +74,9 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
   Meta 1, 4 sem movimentação 60+ dias e 4 pedidos/atos), metas semanais
   (Meta 2 e Impulso Processos Antigos) e painéis de acompanhamento quinzenal.
 - **Metas do Magistrado**: quadro diário pessoal do juiz (visível apenas no
-  login dele): 5 revisões de minutas, 5 da fila de distribuição automática,
-  5 da fila de ato inicial e 3 urgentes/pedidos (contadores manuais +/-);
-  5 sem movimentação 60+ dias (automática pelas minutas próprias do dia).
+  login dele): 5 da fila de distribuição automática, 5 da fila de atos
+  iniciais e 5 urgentes/pedidos (contadores manuais +/-); 5 sem movimentação
+  60+ dias (automática pelas minutas próprias do dia). Total: 20 itens/dia.
 - **Registrar Minuta**: registro com múltiplas categorias/metas por minuta,
   disponível para assessores e também para o juiz (produção própria). No
   login do juiz, o formulário exibe o grupo "Metas do Magistrado" (filas de
