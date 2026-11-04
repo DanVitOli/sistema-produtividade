@@ -3753,6 +3753,8 @@
                 }
             }
 
+            const respSeq = responsavelPorSequencial(parseInt(pedido.sequencial));
+            const respSeqTxt = respSeq ? ` · responsável pela divisão: ${META180_RESPONSAVEIS[respSeq].nome} (seq ${pedido.sequencial})` : '';
             return `
                 <div class="border ${prazo.vencido && pedido.status === 'pendente' ? 'border-red-300 bg-red-50' : 'border-gray-200'} rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex items-start justify-between">
@@ -3766,7 +3768,7 @@
                             </div>
                             <div class="text-sm text-gray-600 mb-2">
                                 <div><strong>Processo:</strong> ${escapeHtml(pedido.numeroProcesso)}</div>
-                                <div><strong>Assessor:</strong> ${escapeHtml(assessorNome)}</div>
+                                <div><strong>Assessor:</strong> ${escapeHtml(assessorNome)}${respSeqTxt}</div>
                                 <div><strong>Solicitante:</strong> ${escapeHtml(pedido.nomeSolicitante || '-')} (${pedido.tipoSolicitante === 'advogado' ? 'Advogado' : 'Parte'})</div>
                                 <div><strong>Resumo:</strong> ${escapeHtml(pedido.resumo)}</div>
                                 ${pedido.dataMinutado ? `<div class="text-green-600"><strong>Minutado em:</strong> ${formatarDataBrasilia(pedido.dataMinutado)}</div>` : ''}
@@ -6083,12 +6085,12 @@
         // organizados por faixa de dias parados e cruzados com as minutas em tempo
         // real: o processo é CUMPRIDO quando a minuta correspondente é ASSINADA.
 
-        // Divisão de cotas por sequencial: Danilo (1-3), Gilbert (4-6), Laíse (7-9).
-        // Sequencial 0: sem responsável definido.
+        // Divisão de trabalho do gabinete por sequencial, válida para todos os
+        // processos (instituída em 11/2026): Juiz (0-1), Laíse (2-5), Gilbert (6-9).
         const META180_RESPONSAVEIS = {
-            'danilo': { nome: 'Danilo (Juiz)', seqs: [1, 2, 3], cor: 'indigo' },
-            'gilbert': { nome: 'Gilbert', seqs: [4, 5, 6], cor: 'blue' },
-            'laise': { nome: 'Laíse', seqs: [7, 8, 9], cor: 'pink' }
+            'danilo': { nome: 'Danilo (Juiz)', seqs: [0, 1], cor: 'indigo' },
+            'laise': { nome: 'Laíse', seqs: [2, 3, 4, 5], cor: 'pink' },
+            'gilbert': { nome: 'Gilbert', seqs: [6, 7, 8, 9], cor: 'blue' }
         };
 
         function responsavelPorSequencial(seq) {
@@ -6622,10 +6624,9 @@
                             </select>
                             <select onchange="atualizarFiltroMeta180('responsavel', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
                                 <option value="">Todos os responsáveis</option>
-                                <option value="danilo">Danilo (Seq 1-3)</option>
-                                <option value="gilbert">Gilbert (Seq 4-6)</option>
-                                <option value="laise">Laíse (Seq 7-9)</option>
-                                <option value="sem">Sem responsável (Seq 0)</option>
+                                <option value="danilo">Juiz (Seq 0-1)</option>
+                                <option value="laise">Laíse (Seq 2-5)</option>
+                                <option value="gilbert">Gilbert (Seq 6-9)</option>
                             </select>
                             <select onchange="atualizarFiltroMeta180('classe', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 max-w-72">
                                 <option value="">Todas as classes</option>
