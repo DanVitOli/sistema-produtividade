@@ -6086,11 +6086,11 @@
         // real: o processo é CUMPRIDO quando a minuta correspondente é ASSINADA.
 
         // Divisão de trabalho do gabinete por sequencial, válida para todos os
-        // processos (instituída em 11/2026): Juiz (0-1), Laíse (2-5), Gilbert (6-9).
+        // processos (instituída em 11/2026): Juiz (0-1), Gilbert (2-5), Laíse (6-9).
         const META180_RESPONSAVEIS = {
             'danilo': { nome: 'Danilo (Juiz)', seqs: [0, 1], cor: 'indigo' },
-            'laise': { nome: 'Laíse', seqs: [2, 3, 4, 5], cor: 'pink' },
-            'gilbert': { nome: 'Gilbert', seqs: [6, 7, 8, 9], cor: 'blue' }
+            'gilbert': { nome: 'Gilbert', seqs: [2, 3, 4, 5], cor: 'blue' },
+            'laise': { nome: 'Laíse', seqs: [6, 7, 8, 9], cor: 'pink' }
         };
 
         function responsavelPorSequencial(seq) {
@@ -6625,8 +6625,8 @@
                             <select onchange="atualizarFiltroMeta180('responsavel', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
                                 <option value="">Todos os responsáveis</option>
                                 <option value="danilo">Juiz (Seq 0-1)</option>
-                                <option value="laise">Laíse (Seq 2-5)</option>
-                                <option value="gilbert">Gilbert (Seq 6-9)</option>
+                                <option value="gilbert">Gilbert (Seq 2-5)</option>
+                                <option value="laise">Laíse (Seq 6-9)</option>
                             </select>
                             <select onchange="atualizarFiltroMeta180('classe', this.value)" class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 max-w-72">
                                 <option value="">Todas as classes</option>

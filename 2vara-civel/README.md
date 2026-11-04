@@ -90,7 +90,7 @@ Os caminhos são relativos, então a pasta funciona em qualquer endereço:
   julgados" e registro rápido de sentença (Meta 1 + Meta 2).
 - **180/120/100**: painel dos processos sem movimentação (lista da
   Corregedoria) organizados por faixa de dias parados, com cotas por
-  sequencial — divisão do gabinete: Juiz 0-1, Laíse 2-5, Gilbert 6-9 — e
+  sequencial — divisão do gabinete: Juiz 0-1, Gilbert 2-5, Laíse 6-9 — e
   cumprimento automático em
   tempo real quando a minuta do processo é assinada.
 - **Calendário e Relatórios**: histórico diário, semanal e mensal.
