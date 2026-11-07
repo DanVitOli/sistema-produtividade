@@ -2042,9 +2042,22 @@
         }
 
         // ===== FUNÇÃO PARA ESCAPAR IDs PARA USO EM ATRIBUTOS =====
+        // Para valores dentro de handlers inline (onclick="fn('${escapeAttr(x)}')"):
+        // primeiro escapa como literal de string JS, depois como atributo HTML,
+        // porque o navegador decodifica as entidades do atributo antes de rodar o JS.
         function escapeAttr(str) {
             if (str === null || str === undefined) return '';
-            return String(str).replace(/['"\\]/g, '\\$&');
+            const js = String(str)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '\\"')
+                .replace(/\r/g, '\\r')
+                .replace(/\n/g, '\\n')
+                .replace(/\u2028/g, '\\u2028')
+                .replace(/\u2029/g, '\\u2029')
+                .replace(/</g, '\\x3C')
+                .replace(/>/g, '\\x3E');
+            return escapeHtml(js);
         }
 
         // ===== FUNÇÃO PARA CRIAR ÍCONES COM FALLBACK =====
@@ -3798,9 +3811,9 @@
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
-                                <span class="font-bold text-gray-800">#${pedido.sequencial || '-'}</span>
-                                <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor} text-white">${categoria.nome}</span>
-                                <span class="px-2 py-1 rounded-full text-xs font-medium ${statusInfo.cor} text-white">${statusInfo.nome}</span>
+                                <span class="font-bold text-gray-800">#${escapeHtml(pedido.sequencial || '-')}</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor} text-white">${escapeHtml(categoria.nome)}</span>
+                                <span class="px-2 py-1 rounded-full text-xs font-medium ${statusInfo.cor} text-white">${escapeHtml(statusInfo.nome)}</span>
                                 <span class="px-2 py-1 rounded text-xs ${pedido.classe === 'fazenda' ? 'bg-sky-700 text-white' : 'bg-blue-100 text-blue-800'}">${pedido.classe === 'fazenda' ? 'Fazenda Pública' : 'Cível'}</span>
                                 ${pedido.despachoVirtual ? '<span class="px-2 py-1 rounded text-xs bg-blue-500 text-white">📹 Despacho Virtual</span>' : ''}
                             </div>
@@ -4638,7 +4651,7 @@
 
             // Gerar opções HTML
             const opcoesHtml = fasesOrdenadas.map(([key, fase]) =>
-                `<option value="${key}">${fase.nome}</option>`
+                `<option value="${escapeHtml(key)}">${escapeHtml(fase.nome)}</option>`
             ).join('');
 
             // Atualizar filtro de fases
@@ -4805,8 +4818,8 @@
                 <div class="bg-gradient-to-r ${corGradiente} text-white rounded-lg p-6 mb-4">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-2xl font-bold mb-2">${meta.nome}</h2>
-                            <p class="${corTexto}">${meta.descricao}</p>
+                            <h2 class="text-2xl font-bold mb-2">${escapeHtml(meta.nome)}</h2>
+                            <p class="${corTexto}">${escapeHtml(meta.descricao)}</p>
                         </div>
                         <div class="text-right">
                             <div class="text-4xl font-bold">${percentualConcluido}%</div>
@@ -4887,8 +4900,8 @@
                             ${parados15dias.length > 0 ? `
                                 <div class="max-h-32 overflow-y-auto space-y-1">
                                     ${parados15dias.slice(0, 5).map(p => `
-                                        <div class="text-xs text-yellow-700 truncate" title="${p.numeroProcesso}">
-                                            • ${p.numeroProcesso?.substring(0, 20)}...
+                                        <div class="text-xs text-yellow-700 truncate" title="${escapeHtml(p.numeroProcesso)}">
+                                            • ${escapeHtml(p.numeroProcesso?.substring(0, 20))}...
                                         </div>
                                     `).join('')}
                                     ${parados15dias.length > 5 ? `<div class="text-xs text-yellow-600 font-medium">+ ${parados15dias.length - 5} outros</div>` : ''}
@@ -4908,8 +4921,8 @@
                             ${parados30dias.length > 0 ? `
                                 <div class="max-h-32 overflow-y-auto space-y-1">
                                     ${parados30dias.slice(0, 5).map(p => `
-                                        <div class="text-xs text-orange-700 truncate" title="${p.numeroProcesso}">
-                                            • ${p.numeroProcesso?.substring(0, 20)}...
+                                        <div class="text-xs text-orange-700 truncate" title="${escapeHtml(p.numeroProcesso)}">
+                                            • ${escapeHtml(p.numeroProcesso?.substring(0, 20))}...
                                         </div>
                                     `).join('')}
                                     ${parados30dias.length > 5 ? `<div class="text-xs text-orange-600 font-medium">+ ${parados30dias.length - 5} outros</div>` : ''}
@@ -4929,8 +4942,8 @@
                             ${parados45dias.length > 0 ? `
                                 <div class="max-h-32 overflow-y-auto space-y-1">
                                     ${parados45dias.slice(0, 5).map(p => `
-                                        <div class="text-xs text-red-700 truncate" title="${p.numeroProcesso}">
-                                            • ${p.numeroProcesso?.substring(0, 20)}...
+                                        <div class="text-xs text-red-700 truncate" title="${escapeHtml(p.numeroProcesso)}">
+                                            • ${escapeHtml(p.numeroProcesso?.substring(0, 20))}...
                                         </div>
                                     `).join('')}
                                     ${parados45dias.length > 5 ? `<div class="text-xs text-red-600 font-medium">+ ${parados45dias.length - 5} outros</div>` : ''}
@@ -5185,7 +5198,7 @@
             const fasesOrdenadas = Object.entries(fases).sort((a, b) => a[1].ordem - b[1].ordem);
             const selectFase = document.getElementById('edicao-meta-processo-fase');
             selectFase.innerHTML = '<option value="">Selecione a fase</option>' +
-                fasesOrdenadas.map(([key, fase]) => `<option value="${key}">${fase.nome}</option>`).join('');
+                fasesOrdenadas.map(([key, fase]) => `<option value="${escapeHtml(key)}">${escapeHtml(fase.nome)}</option>`).join('');
 
             document.getElementById('edicao-meta-processo-id').value = id;
             document.getElementById('edicao-meta-processo-numero-display').textContent = `Processo: ${processo.numeroProcesso}`;
@@ -5761,7 +5774,7 @@
                     <div class="flex items-center gap-2 bg-white p-2 rounded border">
                         <span class="flex-1 text-sm font-medium text-gray-700">"${escapeHtml(situacao)}"</span>
                         <i data-lucide="arrow-right" class="h-4 w-4 text-gray-400"></i>
-                        <select class="mapeamento-situacao-select border border-gray-300 rounded px-2 py-1 text-sm" data-situacao="${escapeAttr(situacao)}">
+                        <select class="mapeamento-situacao-select border border-gray-300 rounded px-2 py-1 text-sm" data-situacao="${escapeHtml(situacao)}">
                             <option value="em_andamento" ${statusSugerido === 'em_andamento' ? 'selected' : ''}>Em Andamento</option>
                             <option value="baixado" ${statusSugerido === 'baixado' ? 'selected' : ''}>Baixado</option>
                             <option value="suspenso" ${statusSugerido === 'suspenso' ? 'selected' : ''}>Suspenso</option>
@@ -6869,7 +6882,7 @@
                         <div class="flex items-start justify-between flex-wrap gap-2">
                             <div>
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="font-mono font-semibold text-gray-800">${item.numero}</span>
+                                    <span class="font-mono font-semibold text-gray-800">${escapeHtml(item.numero)}</span>
                                     ${badgeStatus[item.status]}
                                     <span class="px-2 py-1 rounded text-xs font-medium ${ACOMP_FAIXA_CORES[item.faixa]?.chip || 'bg-gray-100 text-gray-700'}">${item.faixa}</span>
                                     ${badgeTipo[item.tipo] || ''}
@@ -6878,7 +6891,7 @@
                                     ${item.responsavel ? `<span class="px-2 py-1 rounded text-xs bg-${META180_RESPONSAVEIS[item.responsavel].cor}-100 text-${META180_RESPONSAVEIS[item.responsavel].cor}-800 font-medium">${META180_RESPONSAVEIS[item.responsavel].nome} · Seq ${item.sequencial}</span>`
                                                        : `<span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600">Seq ${item.sequencial}</span>`}
                                 </div>
-                                <div class="text-sm text-gray-600 mt-1">${item.classe}${item.assunto ? ' — ' + item.assunto : ''}</div>
+                                <div class="text-sm text-gray-600 mt-1">${escapeHtml(item.classe)}${item.assunto ? ' — ' + escapeHtml(item.assunto) : ''}</div>
                                 ${minutaInfo}
                                 ${obsInfo}
                             </div>
@@ -6887,11 +6900,11 @@
                                 <div class="${dias > 300 ? 'text-red-600 font-semibold' : ''}">${dias} dias parado</div>
                                 <div class="flex gap-1 mt-1 no-print">
                                     ${item.status === 'pendente' ? `
-                                        <button onclick="abrirRegistroRapidoMeta180('${item.chave}')"
+                                        <button onclick="abrirRegistroRapidoMeta180('${escapeAttr(item.chave)}')"
                                                 class="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700 transition-colors">
                                             ✍️ Minutei
                                         </button>` : ''}
-                                    <button onclick="abrirObsMeta180('${item.chave}')"
+                                    <button onclick="abrirObsMeta180('${escapeAttr(item.chave)}')"
                                             class="${obs && obs.texto ? 'bg-cyan-100 text-cyan-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-xs hover:bg-cyan-200 transition-colors">
                                         💬 ${obs && obs.texto ? 'Editar obs' : 'Obs'}
                                     </button>
@@ -7447,11 +7460,11 @@
                         <div class="flex items-start justify-between flex-wrap gap-2">
                             <div>
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="font-mono font-semibold text-gray-800">${item.numero}</span>
+                                    <span class="font-mono font-semibold text-gray-800">${escapeHtml(item.numero)}</span>
                                     ${badgeStatus[item.status]}
                                     ${FAIXA_PARADOS_POR_CHAVE[item.chave] ? `<span class="px-2 py-1 rounded text-xs font-medium ${(ACOMP_FAIXA_CORES[FAIXA_PARADOS_POR_CHAVE[item.chave]] || {}).chip || 'bg-gray-100 text-gray-700'}">⏱ Parado ${FAIXA_PARADOS_POR_CHAVE[item.chave]}</span>` : ''}
                                 </div>
-                                <div class="text-sm text-gray-600 mt-1">${item.classe}${item.assunto ? ' — ' + item.assunto : ''}</div>
+                                <div class="text-sm text-gray-600 mt-1">${escapeHtml(item.classe)}${item.assunto ? ' — ' + escapeHtml(item.assunto) : ''}</div>
                                 ${minutaInfo}
                                 ${outraInfo}
                                 ${obsInfo}
@@ -7459,11 +7472,11 @@
                             ${item.grupo === 'a_julgar' ? `
                                 <div class="flex gap-1 no-print">
                                     ${item.status === 'pendente' ? `
-                                        <button onclick="abrirRegistroRapidoMeta2('${item.chave}')"
+                                        <button onclick="abrirRegistroRapidoMeta2('${escapeAttr(item.chave)}')"
                                                 class="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition-colors">
                                             ✍️ Sentença minutada
                                         </button>` : ''}
-                                    <button onclick="abrirObsMeta180('${item.chave}')"
+                                    <button onclick="abrirObsMeta180('${escapeAttr(item.chave)}')"
                                             class="${obs && obs.texto ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-xs hover:bg-purple-200 transition-colors">
                                         💬 ${obs && obs.texto ? 'Editar obs' : 'Obs'}
                                     </button>
@@ -7595,7 +7608,7 @@
                     <div class="flex items-center gap-3 py-2 border-b border-indigo-100 last:border-b-0">
                         <div class="flex-1 min-w-0">
                             <div class="flex justify-between text-sm">
-                                <span class="text-gray-700" title="${item.dica}">${item.nome}</span>
+                                <span class="text-gray-700" title="${escapeHtml(item.dica)}">${escapeHtml(item.nome)}</span>
                                 <span class="font-bold ${item.cumprida ? 'text-green-600' : 'text-gray-800'}">${item.atual}/${item.meta} ${item.cumprida ? '✅' : ''}</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
@@ -7604,8 +7617,8 @@
                         </div>
                         ${item.tipo === 'manual' ? `
                             <div class="flex gap-1 no-print">
-                                <button onclick="ajustarMetaJuiz('${item.id}', -1)" class="bg-gray-200 text-gray-700 w-7 h-7 rounded hover:bg-gray-300 font-bold">−</button>
-                                <button onclick="ajustarMetaJuiz('${item.id}', 1)" class="bg-indigo-600 text-white w-7 h-7 rounded hover:bg-indigo-700 font-bold">+</button>
+                                <button onclick="ajustarMetaJuiz('${escapeAttr(item.id)}', -1)" class="bg-gray-200 text-gray-700 w-7 h-7 rounded hover:bg-gray-300 font-bold">−</button>
+                                <button onclick="ajustarMetaJuiz('${escapeAttr(item.id)}', 1)" class="bg-indigo-600 text-white w-7 h-7 rounded hover:bg-indigo-700 font-bold">+</button>
                             </div>` : `
                             <span class="text-xs text-gray-400 no-print" title="${item.dica}">auto</span>`}
                     </div>
@@ -8039,7 +8052,7 @@
             alvo.innerHTML = `<ul class="mt-3 space-y-1 text-sm">${resultados.map(r => `
                 <li class="flex justify-between items-start gap-3"><span class="font-mono">${escapeHtml(r.numero)}</span>
                 <span class="text-right ${r.ok ? 'text-green-700' : r.aguardando ? 'text-amber-700' : 'text-red-600'}">${r.aguardando ? '⚠️ ' : ''}${escapeHtml(r.texto)}${r.aguardando ? `
-                    <button onclick="confirmarDuplicadaPainelIA('${escapeHtml(r.painelId)}')" class="ml-2 bg-amber-600 text-white px-2 py-0.5 rounded text-xs hover:bg-amber-700 whitespace-nowrap">Lançar mesmo assim</button>` : ''}</span></li>`).join('')}</ul>
+                    <button onclick="confirmarDuplicadaPainelIA('${escapeAttr(r.painelId)}')" class="ml-2 bg-amber-600 text-white px-2 py-0.5 rounded text-xs hover:bg-amber-700 whitespace-nowrap">Lançar mesmo assim</button>` : ''}</span></li>`).join('')}</ul>
                 ${resultados.some(r => r.aguardando) ? '<p class="text-xs text-amber-700 mt-2">Antes de lançar, confira se o ato já registrado não é o mesmo: a produtividade contaria duas vezes.</p>' : ''}
                 <p class="text-xs text-gray-500 mt-2">O Painel confirma sozinho na próxima rodada do executor. Para confirmar na hora, aperte Ctrl+V no Painel.</p>`;
         }
@@ -9022,7 +9035,7 @@
                 
             } catch (error) {
                 log(`Erro ao renderizar card ${assessorId}:`, error);
-                return `<div class="bg-red-50 p-4 rounded-lg text-red-800">Erro ao carregar dados de ${assessorId}: ${error.message}</div>`;
+                return `<div class="bg-red-50 p-4 rounded-lg text-red-800">Erro ao carregar dados de ${assessorId}: ${escapeHtml(error.message)}</div>`;
             }
         }
 
@@ -9216,7 +9229,7 @@
                         <div class="text-center text-red-500 py-12">
                             <i data-lucide="alert-triangle" class="mx-auto h-12 w-12 mb-4"></i>
                             <p>Erro ao carregar histórico</p>
-                            <p class="text-sm mt-2">${error.message}</p>
+                            <p class="text-sm mt-2">${escapeHtml(error.message)}</p>
                             <button onclick="renderHistorico()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded text-sm">Tentar Novamente</button>
                         </div>
                     `;
@@ -9250,11 +9263,11 @@
                         categoriasHtml = categoriasMinuta.map(catId => {
                             const categoria = categorias[catId];
                             if (!categoria) return '';
-                            return `<span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor || 'bg-gray-500'} text-white">${categoria.nome || catId}</span>`;
+                            return `<span class="px-2 py-1 rounded-full text-xs font-medium ${categoria.cor || 'bg-gray-500'} text-white">${escapeHtml(categoria.nome || catId)}</span>`;
                         }).filter(html => html).join(' ');
                         
                         if (categoriasMinuta.length > 1) {
-                            categoriasTexto = `<div class="text-xs text-blue-600 mt-1"><strong>Múltiplas categorias:</strong> ${categoriasMinuta.map(id => categorias[id]?.nome || id).join(', ')}</div>`;
+                            categoriasTexto = `<div class="text-xs text-blue-600 mt-1"><strong>Múltiplas categorias:</strong> ${escapeHtml(categoriasMinuta.map(id => categorias[id]?.nome || id).join(', '))}</div>`;
                         }
                     }
                 } catch (error) {
@@ -9351,7 +9364,7 @@
                 return `
                     <div class="border border-red-200 bg-red-50 rounded-lg p-4">
                         <div class="text-red-800 text-sm">
-                            Erro ao carregar minuta: ${error.message}
+                            Erro ao carregar minuta: ${escapeHtml(error.message)}
                         </div>
                     </div>
                 `;
@@ -9394,7 +9407,7 @@
                     }
 
                     return `
-                        <div class="${classes}" onclick="selecionarDia('${dia.data}')">
+                        <div class="${classes}" onclick="selecionarDia('${escapeAttr(dia.data)}')">
                             <div class="day-number">${dia.numero}</div>
                             ${minutasDoDia.length > 0 ? `<div class="day-count">${minutasDoDia.length}</div>` : ''}
                             ${indicadores}
@@ -9526,13 +9539,13 @@
                                 return `
                                     <div class="border border-gray-200 rounded p-3 text-sm">
                                         <div class="flex justify-between items-start mb-2">
-                                            <div class="font-medium text-gray-800">${minuta.numeroProcesso}</div>
-                                            <span class="status-badge ${status.cor} text-xs">${status.nome}</span>
+                                            <div class="font-medium text-gray-800">${escapeHtml(minuta.numeroProcesso)}</div>
+                                            <span class="status-badge ${status ? status.cor : ''} text-xs">${escapeHtml(status ? status.nome : minuta.status)}</span>
                                         </div>
                                         <div class="text-gray-600">
-                                            <div><strong>Assessor:</strong> ${minuta.assessorNome}</div>
-                                            <div><strong>Tipo:</strong> ${minuta.tipoMinuta}</div>
-                                            ${cats.length > 0 ? `<div><strong>Categorias:</strong> ${cats.map(c => categorias[c]?.nome || c).join(', ')}</div>` : ''}
+                                            <div><strong>Assessor:</strong> ${escapeHtml(minuta.assessorNome)}</div>
+                                            <div><strong>Tipo:</strong> ${escapeHtml(minuta.tipoMinuta)}</div>
+                                            ${cats.length > 0 ? `<div><strong>Categorias:</strong> ${escapeHtml(cats.map(c => categorias[c]?.nome || c).join(', '))}</div>` : ''}
                                         </div>
                                     </div>
                                 `;
@@ -10250,7 +10263,7 @@
                     setTimeout(() => criarIcones(), 100);
                 }
                 
-                showNotification(`Erro ao gerar relatório ${tipo}: ${error.message}`, 'error');
+                showNotification(`Erro ao gerar relatório ${tipo}: ${escapeHtml(error.message)}`, 'error');
             }
         }
 
@@ -10397,7 +10410,7 @@
                         <h4 class="text-lg font-semibold text-red-800 mb-3">📈 Performance Semanal</h4>
                         <div class="text-red-700 text-center py-4">
                             <i data-lucide="alert-triangle" class="mx-auto h-8 w-8 mb-2"></i>
-                            <div>Erro ao gerar gráfico: ${error.message}</div>
+                            <div>Erro ao gerar gráfico: ${escapeHtml(error.message)}</div>
                             <div class="text-sm mt-2">Os dados do relatório estão completos, apenas o gráfico não pôde ser exibido.</div>
                         </div>
                     </div>
