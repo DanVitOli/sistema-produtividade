@@ -375,6 +375,9 @@
                     <i data-lucide="log-in" class="h-5 w-5 mr-2 inline"></i>
                     Entrar
                 </button>
+                <button type="button" onclick="esqueciSenha()" class="w-full text-sm text-blue-600 hover:underline">
+                    Esqueci a senha
+                </button>
             </div>
         </div>
     </div>
@@ -1780,9 +1783,10 @@
 
         // Credenciais seguras
         const credenciais = {
-            'juiz': { senha: 'Juiz2VC@2026!', nome: 'Danilo Vital de Oliveira', tipo: 'juiz' },
-            'gilbert': { senha: 'Gilbert2VC@2026!', nome: 'Gilbert Juliano de Sena Lúcio', tipo: 'assessor', assessorId: 'assessor1' },
-            'laise': { senha: 'Laise2VC@2026!', nome: 'Laíse Vital da Silva Nunes', tipo: 'assessor', assessorId: 'assessor2' }
+            // As senhas ficam no Firebase Authentication (e-mail/senha), não no código.
+            'juiz': { email: 'vital.danilo5@gmail.com', nome: 'Danilo Vital de Oliveira', tipo: 'juiz' },
+            'gilbert': { email: 'gilbert.sena@gmail.com', nome: 'Gilbert Juliano de Sena Lúcio', tipo: 'assessor', assessorId: 'assessor1' },
+            'laise': { email: 'laise_vital@hotmail.com', nome: 'Laíse Vital da Silva Nunes', tipo: 'assessor', assessorId: 'assessor2' }
         };
 
         const categorias = {
@@ -2629,7 +2633,29 @@
 
         // ==================== AUTENTICAÇÃO ====================
         
-        function fazerLogin() {
+        // Inicializa o Firebase uma única vez (login e banco usam a mesma instância)
+        function garantirFirebase() {
+            firebase = window.firebase;
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            return firebase;
+        }
+
+        function usuarioPorEmail(email) {
+            const alvo = (email || '').toLowerCase();
+            return Object.keys(credenciais).find(u => credenciais[u].email.toLowerCase() === alvo) || null;
+        }
+
+        const MSG_ERRO_LOGIN = {
+            'auth/wrong-password': 'Senha incorreta.',
+            'auth/invalid-credential': 'Usuário ou senha incorretos.',
+            'auth/invalid-login-credentials': 'Usuário ou senha incorretos.',
+            'auth/user-not-found': 'Conta não encontrada no sistema.',
+            'auth/user-disabled': 'Esta conta está desativada. Fale com o juiz.',
+            'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos ou redefina a senha.',
+            'auth/network-request-failed': 'Sem conexão com a internet.'
+        };
+
+        async function fazerLogin() {
             const usuario = document.getElementById('login-usuario').value;
             const senha = document.getElementById('login-senha').value;
 
@@ -2639,11 +2665,40 @@
             }
 
             const cred = credenciais[usuario];
-            if (!cred || cred.senha !== senha) {
+            if (!cred) {
                 showNotification('Usuário ou senha incorretos.', 'error');
                 return;
             }
 
+            try {
+                await garantirFirebase().auth().signInWithEmailAndPassword(cred.email, senha);
+            } catch (error) {
+                showNotification(MSG_ERRO_LOGIN[error.code] || 'Não foi possível entrar: ' + (error.message || error.code), 'error');
+                return;
+            }
+            document.getElementById('login-senha').value = '';
+            entrarComo(usuario);
+        }
+
+        async function esqueciSenha() {
+            const usuario = document.getElementById('login-usuario').value;
+            const cred = credenciais[usuario];
+            if (!cred) {
+                showNotification('Selecione o seu usuário primeiro.', 'warning');
+                return;
+            }
+            try {
+                await garantirFirebase().auth().sendPasswordResetEmail(cred.email);
+                showNotification('Enviamos um link para redefinir a senha ao e-mail cadastrado.', 'success');
+            } catch (error) {
+                showNotification(MSG_ERRO_LOGIN[error.code] || 'Não foi possível enviar o e-mail: ' + (error.message || error.code), 'error');
+            }
+        }
+
+        // Abre o sistema para o usuário já autenticado no Firebase
+        function entrarComo(usuario) {
+            if (currentUser) return;
+            const cred = credenciais[usuario];
             currentUser = {
                 usuario: usuario,
                 nome: cred.nome,
@@ -2666,6 +2721,8 @@
 
         function logout() {
             log('Logout realizado', currentUser?.nome);
+            // Encerra a sessão do Firebase e recarrega para desligar os listeners do banco
+            garantirFirebase().auth().signOut().finally(() => window.location.reload());
             currentUser = null;
             document.getElementById('main-app').classList.add('hidden');
             document.getElementById('login-screen').classList.remove('hidden');
@@ -2676,37 +2733,18 @@
         function initializeApp() {
             try {
                 try {
-                    firebase = window.firebase;
-                    firebase.initializeApp(firebaseConfig);
-                    database = firebase.database();
-                    
-                    firebase.auth().signInAnonymously()
-                        .then(() => {
-                            console.log('✅ Firebase autenticado com sucesso');
-                            
-                            setupUserInfo();
-                            setupNavigation();
-                            setupMeta10Options();
-                            if (database) setupFirebaseListeners();
-                            showView('dashboard');
-                            
-                            log('Aplicação inicializada com sucesso');
-                        })
-                        .catch((error) => {
-                            // 02/09/2026: o projeto Firebase está sem o login anônimo habilitado
-                            // (auth/configuration-not-found) e este caminho NÃO ligava os listeners
-                            // do banco — dashboard ficava vazio ("Erro ao carregar dashboard").
-                            // As regras do Realtime Database permitem leitura/escrita sem auth,
-                            // então os listeners funcionam normalmente aqui também.
-                            console.error('❌ Erro na autenticação (seguindo sem auth):', error);
-                            setupUserInfo();
-                            setupNavigation();
-                            setupMeta10Options();
-                            if (database) setupFirebaseListeners();
-                            showView('dashboard');
-                            log('Aplicação inicializada sem autenticação Firebase (dados via listeners mesmo assim)');
-                        });
-                        
+                    // 06/11/2026: o login agora é feito no Firebase Authentication (e-mail/senha)
+                    // antes de chegar aqui, e as regras do banco exigem usuário autenticado.
+                    database = garantirFirebase().database();
+                    console.log('✅ Firebase autenticado como', firebase.auth().currentUser?.email);
+
+                    setupUserInfo();
+                    setupNavigation();
+                    setupMeta10Options();
+                    if (database) setupFirebaseListeners();
+                    showView('dashboard');
+
+                    log('Aplicação inicializada com sucesso');
                 } catch (error) {
                     log('Firebase não disponível - modo offline', error);
                     database = null;
@@ -10573,6 +10611,23 @@
         document.addEventListener('DOMContentLoaded', function() {
             try {
                 log('🚀 Sistema da 2ª Vara Cível de Palmeira dos Índios iniciando...');
+
+                // Retoma a sessão do Firebase: quem já entrou neste navegador não digita a senha de novo
+                try {
+                    garantirFirebase().auth().onAuthStateChanged((user) => {
+                        if (!user || currentUser) return;
+                        const usuario = usuarioPorEmail(user.email);
+                        if (usuario) {
+                            entrarComo(usuario);
+                        } else {
+                            // Conta sem perfil no sistema (ex.: a do robô): não abre o painel
+                            firebase.auth().signOut();
+                            showNotification('Esta conta não tem acesso ao sistema.', 'error');
+                        }
+                    });
+                } catch (e) {
+                    log('⚠️ Não foi possível retomar a sessão do Firebase', e);
+                }
 
                 // Registrar Service Worker para PWA
                 if ('serviceWorker' in navigator) {

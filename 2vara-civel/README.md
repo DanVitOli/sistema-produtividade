@@ -43,20 +43,26 @@ execução penal nem de execuções fiscais**.
    placeholders no `index.html` desta pasta (procure por
    `CONFIGURAÇÃO OBRIGATÓRIA`).
 
-### 2. Personalizar usuários e senhas
+### 2. Usuários e senhas (Firebase Authentication)
 
-No `index.html`, localize `const credenciais` e ajuste nomes, logins e senhas
-da equipe. As senhas padrão de fábrica são:
+O login usa o **Firebase Authentication por e-mail/senha**; nenhuma senha fica
+no código. Cada usuário da tela de login corresponde a uma conta criada no
+console do Firebase (Authentication > Usuários), ligada pelo e-mail em
+`const credenciais` no `index.html`. Para incluir alguém: crie a conta no
+console, acrescente o perfil em `const credenciais` (e em `const assessores`,
+se for assessor) e a opção na tela de login, e inclua o UID da conta nas regras
+do banco (`database.rules.json`).
 
-| Usuário   | Nome                          | Senha             |
-|-----------|-------------------------------|-------------------|
-| `juiz`    | Danilo Vital de Oliveira      | `Juiz2VC@2026!`   |
-| `gilbert` | Gilbert Juliano de Sena Lúcio | `Gilbert2VC@2026!`|
-| `laise`   | Laíse Vital da Silva Nunes    | `Laise2VC@2026!`  |
+A senha é definida pelo próprio usuário pelo link **Esqueci a senha** da tela
+de login. A sessão fica guardada no navegador: a pessoa só digita a senha de
+novo depois de clicar em Sair.
 
-**Troque essas senhas antes de colocar em produção.** Se alterar os nomes de
-exibição, ajuste também `const assessores` (logo abaixo no mesmo arquivo) e as
-opções da tela de login.
+### 3. Regras do banco
+
+As regras em `database.rules.json` só deixam ler e gravar as contas
+autenticadas cuja UID está na lista. Cole-as em Realtime Database > Regras e
+publique **depois** de colocar no ar esta versão do sistema e de ajustar o
+executor do gabinete para mandar o token (`INTEGRACAO-GABINETE.md`).
 
 ## Hospedagem em endereço próprio
 

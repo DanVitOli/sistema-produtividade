@@ -8,6 +8,23 @@ Painel em `snapshotPainel/`. **Nenhum copiar/colar é necessário.**
 
 Base: `https://produtividade-2vara-civel-default-rtdb.firebaseio.com`
 
+## 0. Autenticação (obrigatória)
+
+O banco só aceita contas autenticadas da lista de `database.rules.json`. O
+executor usa a conta **gabinete-auto** (danilooliveira@tjal.jus.br), com as
+credenciais em `firebase-credencial.json` na máquina do executor (nunca no
+repositório):
+
+1. `POST https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<apiKey>`
+   com `{"email", "password", "returnSecureToken": true}` → `idToken`
+   (vale 1 hora) e `refreshToken`.
+2. Toda chamada ao banco leva `?auth=<idToken>` no fim da URL.
+3. Para renovar: `POST https://securetoken.googleapis.com/v1/token?key=<apiKey>`
+   com `grant_type=refresh_token&refresh_token=<refreshToken>` → novo
+   `id_token`. Renove alguns minutos antes de vencer ou ao receber HTTP 401.
+
+O módulo `firebase_auth.py` faz os três passos.
+
 ## 1. Registrar minuta da IA (pendente de revisão/assinatura)
 
 `PUT /minutas/painel-ia-<painelId>.json` — a chave determinística torna o
@@ -91,7 +108,7 @@ campo extra `publicadoEm`.
 
 ```bash
 curl -sS -X PUT \
-  "https://produtividade-2vara-civel-default-rtdb.firebaseio.com/minutas/painel-ia-ABC123.json" \
+  "https://produtividade-2vara-civel-default-rtdb.firebaseio.com/minutas/painel-ia-ABC123.json?auth=$ID_TOKEN" \
   -H 'Content-Type: application/json' \
   -d @minuta.json
 ```
