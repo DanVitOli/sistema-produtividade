@@ -7699,22 +7699,50 @@
         // lógica daqui — categorias dos painéis (Meta 2, 180/120/100), sincronização
         // das abas, baixa no Balcão e contadores das metas do magistrado — e publica
         // o snapshot do Painel em snapshotPainel/ para o executor ler, sem copiar
-        // e colar. A trava efeitosAplicados (transação) impede efeito duplicado
-        // quando houver mais de uma aba aberta.
+        // e colar.
+        // 06/11/2026: a trava de efeitos fica em efeitosGabinete/<id>, FORA da minuta.
+        // Antes ela era o campo efeitosAplicados da própria minuta, e um PUT do
+        // executor (reenvio, ou envio depois do lançamento pelo botão) apagava a
+        // trava e os efeitos eram aplicados de novo (metas e Balcão em dobro).
+        // A trava externa (transação) também impede efeito duplicado entre abas.
 
         let processandoGabinete = false;
+        let efeitosGabinete = {};
+        let efeitosGabineteCarregados = false;
+
+        function marcaEfeitos() {
+            return `${currentUser.nome} em ${getHojeString()}`;
+        }
 
         async function processarMinutasDoGabinete() {
             if (!currentUser?.isJuiz || !database || processandoGabinete) return;
-            const novas = Object.entries(minutas).filter(([, m]) =>
-                m && m.origem === 'gabinete-auto' && !m.efeitosAplicados && m.status !== 'excluida');
+            // migração única: minutas já processadas no modelo antigo (trava dentro da minuta)
+            // ganham a trava externa, para que um PUT futuro do executor não as reprocesse
+            if (efeitosGabineteCarregados) {
+                const legado = {};
+                for (const [id, m] of Object.entries(minutas)) {
+                    if (!m || efeitosGabinete[id]) continue;
+                    // lançadas pelo botão do Painel já tiveram os efeitos aplicados no próprio lançamento
+                    if (m.origem === 'painel-gabinete') legado[id] = `lançamento pelo Painel (${m.data || ''})`;
+                    else if (m.origem === 'gabinete-auto' && m.efeitosAplicados) legado[id] = m.efeitosAplicados;
+                }
+                if (Object.keys(legado).length) {
+                    Object.assign(efeitosGabinete, legado);
+                    database.ref('efeitosGabinete').update(legado).catch(e => log('migração das travas falhou', e));
+                }
+            }
+            const novas = Object.entries(minutas).filter(([id, m]) =>
+                m && m.origem === 'gabinete-auto' && !m.efeitosAplicados && !efeitosGabinete[id] && m.status !== 'excluida');
             if (!novas.length) return;
             processandoGabinete = true;
             try {
                 for (const [id, m] of novas) {
-                    const trava = await database.ref(`minutas/${id}/efeitosAplicados`)
-                        .transaction(v => (v ? undefined : `${currentUser.nome} em ${getHojeString()}`));
+                    const trava = await database.ref(`efeitosGabinete/${id}`)
+                        .transaction(v => (v ? undefined : marcaEfeitos()));
+                    efeitosGabinete[id] = trava.snapshot?.val() || true;
                     if (!trava.committed) continue;
+                    // mantém o campo antigo para leitura (compatibilidade); a trava que vale é a externa
+                    database.ref(`minutas/${id}/efeitosAplicados`).set(efeitosGabinete[id]).catch(e => log('marca efeitosAplicados falhou', e));
 
                     const cats = normalizarCategorias(m);
                     // o processo também conta onde está listado (Meta 2 a julgar, 180/120/100)
@@ -7974,6 +8002,10 @@
                 };
                 if (forcar) registro.duplicidadeConfirmada = true;
                 await database.ref(`minutas/painel-${painelId}`).set(registro);
+                // os efeitos deste lançamento são aplicados aqui mesmo: grava a trava externa para que
+                // um envio posterior do executor na mesma chave não os aplique de novo
+                efeitosGabinete[`painel-${painelId}`] = marcaEfeitos();
+                await database.ref(`efeitosGabinete/painel-${painelId}`).set(efeitosGabinete[`painel-${painelId}`]);
                 lancadasAgora.push(registro);
                 // mesmo efeito do "Registrar Minuta" feito pelo juiz
                 if (cats.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
@@ -8286,6 +8318,15 @@
                     if (currentView === 'dashboard' && currentUser?.isJuiz) renderDashboard();
                 });
 
+                // Travas dos efeitos das minutas do gabinete (ver processarMinutasDoGabinete)
+                if (currentUser?.isJuiz) {
+                    database.ref('efeitosGabinete').on('value', (snapshot) => {
+                        efeitosGabinete = snapshot.val() || {};
+                        efeitosGabineteCarregados = true;
+                        processarMinutasDoGabinete();
+                    }, (error) => log('Erro ao ler efeitosGabinete', error));
+                }
+
                 // Listener das observações do painel 180/120/100
                 database.ref('obsAcompanhamento').on('value', (snapshot) => {
                     obsAcompanhamento = snapshot.val() || {};
@@ -8417,100 +8458,18 @@
         }
 
         // Função para carregar dados do localStorage
+        // 06/11/2026: sem banco não há dados. Antes, carregava uma cópia antiga do navegador ou
+        // inventava minutas de demonstração com nomes reais, que entravam nos relatórios.
         function carregarDadosLocais() {
-            try {
-                const dadosSalvos = localStorage.getItem('minutas_backup');
-                if (dadosSalvos) {
-                    const dados = JSON.parse(dadosSalvos);
-                    if (dados && Object.keys(dados).length > 0) {
-                        minutas = dados;
-                        log('Dados carregados do localStorage:', Object.keys(dados).length + ' minutas');
-                        showNotification('Dados locais restaurados', 'info');
-                        return;
-                    }
-                }
-            } catch (error) {
-                log('Erro ao carregar dados do localStorage:', error);
-            }
-
-            // Somente inicializa demo data se não houver dados salvos
-            inicializarDadosDemo();
+            showNotification('Sem conexão com o banco de dados: nada foi carregado. Verifique a internet e entre de novo no sistema.', 'error');
         }
 
         // Função para salvar dados no localStorage (backup)
         function salvarDadosLocalmente() {
-            try {
-                localStorage.setItem('minutas_backup', JSON.stringify(minutas));
-                log('Dados salvos no localStorage');
-            } catch (error) {
-                log('Erro ao salvar no localStorage:', error);
-            }
+            // cópia local desativada; apaga a cópia antiga que versões anteriores deixavam no navegador
+            try { localStorage.removeItem('minutas_backup'); } catch (e) {}
         }
 
-        // Função para inicializar dados de demonstração
-        function inicializarDadosDemo() {
-            const hoje = getHojeString();
-            const ontem = new Date();
-            ontem.setDate(ontem.getDate() - 1);
-            const ontemStr = ontem.toISOString().split('T')[0];
-
-            // Dados de exemplo para demonstração
-            minutas = {
-                'demo_1': {
-                    assessorId: 'assessor1',
-                    assessorNome: 'Gilbert Juliano',
-                    numeroProcesso: '1234567-89.2024.8.02.3456',
-                    tipoMinuta: 'Decisão',
-                    categorias: ['meta1'],
-                    observacoes: 'Minuta de exemplo - Gilbert Juliano',
-                    status: 'pendente',
-                    data: hoje,
-                    timestamp: '09:30:00',
-                    createdAt: Date.now() - 1000
-                },
-                'demo_2': {
-                    assessorId: 'assessor2',
-                    assessorNome: 'Laíse Vital',
-                    numeroProcesso: '7654321-10.2024.8.02.7890',
-                    tipoMinuta: 'Despacho',
-                    categorias: ['meta1', 'sem_movimento'],
-                    observacoes: 'Minuta de exemplo - Laíse Vital',
-                    status: 'assinada',
-                    data: hoje,
-                    timestamp: '10:15:00',
-                    createdAt: Date.now() - 500
-                },
-                'demo_3': {
-                    assessorId: 'assessor1',
-                    assessorNome: 'Gilbert Juliano',
-                    numeroProcesso: '9876543-21.2024.8.02.1357',
-                    tipoMinuta: 'Sentença',
-                    categorias: ['meta2'],
-                    observacoes: 'Sentença da Meta 2 CNJ',
-                    status: 'pendente',
-                    data: ontemStr,
-                    timestamp: '14:20:00',
-                    createdAt: Date.now() - 2000
-                },
-                'demo_4': {
-                    assessorId: 'assessor2',
-                    assessorNome: 'Laíse Vital',
-                    numeroProcesso: '1111111-11.2024.8.02.1111',
-                    tipoMinuta: 'Sentença',
-                    categorias: ['meta2'],
-                    observacoes: 'Sentença da Meta 2 CNJ - Laíse Vital',
-                    status: 'assinada',
-                    data: ontemStr,
-                    timestamp: '16:30:00',
-                    createdAt: Date.now() - 1500
-                }
-            };
-            
-            log('Dados de demonstração inicializados');
-            
-            // Atualizar views após carregar dados demo
-            if (currentView === 'dashboard') renderDashboard();
-        }
 
         // ==================== REGISTRO DE MINUTAS ====================
         
@@ -8630,18 +8589,12 @@
             }
         }
 
+        // 06/11/2026: não há mais "registro local". Uma minuta guardada só no navegador nunca
+        // chegava ao banco e sumia da produtividade. Agora a falha é avisada e o formulário
+        // continua preenchido para uma nova tentativa.
         function salvarMinutaLocal(minuta) {
-            const id = 'local_' + getDataHoraBrasilia().getTime();
-            minuta.id = id;
-            minutas[id] = minuta;
-
-            // Salvar backup no localStorage
-            salvarDadosLocalmente();
-
-            limparFormularioRegistro();
-            showNotification('Minuta registrada localmente!', 'warning');
-            showView('dashboard');
-            log('Minuta salva localmente', minuta.numeroProcesso);
+            showNotification('A minuta NÃO foi registrada: não foi possível gravar no banco. O formulário continua preenchido; verifique a conexão ou entre de novo e tente outra vez.', 'error');
+            log('Falha ao registrar minuta (não salva)', minuta?.numeroProcesso);
         }
 
         function limparFormularioRegistro() {
@@ -9596,6 +9549,16 @@
 
         // ==================== FUNÇÕES DE AÇÃO (IMPLEMENTADAS) ====================
         
+        // Grava só os campos que mudaram (06/11/2026): regravar o objeto inteiro a partir do
+        // cache local desfazia gravações simultâneas do executor ou de outra aba.
+        function camposAlterados(antes, depois) {
+            const campos = {};
+            for (const [k, v] of Object.entries(depois)) {
+                if (JSON.stringify(v) !== JSON.stringify(antes?.[k])) campos[k] = v === undefined ? null : v;
+            }
+            return campos;
+        }
+
         function editarMinuta(id) {
             try {
                 const minuta = minutas[id];
@@ -9649,19 +9612,17 @@
                 }
 
                 if (database) {
-                    database.ref(`minutas/${id}`).update(minutaAtualizada)
+                    database.ref(`minutas/${id}`).update(camposAlterados(minuta, minutaAtualizada))
                         .then(() => {
                             showNotification('Minuta excluída com sucesso', 'success');
                             log(`Minuta ${id} excluída`);
                         })
                         .catch((error) => {
-                            minutas[id] = minutaAtualizada;
-                            showNotification('Minuta excluída localmente', 'warning');
+                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                             renderHistorico();
                         });
                 } else {
-                    minutas[id] = minutaAtualizada;
-                    showNotification('Minuta excluída localmente', 'warning');
+                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                     renderHistorico();
                 }
                 
@@ -9714,23 +9675,17 @@
                 }
 
                 if (database) {
-                    database.ref(`minutas/${id}`).update(minutaAtualizada)
+                    database.ref(`minutas/${id}`).update(camposAlterados(minuta, minutaAtualizada))
                         .then(() => {
                             showNotification('Minuta excluída com sucesso', 'success');
                             log(`Minuta ${id} excluída pelo assessor ${currentUser.nome}`);
                         })
                         .catch((error) => {
                             log('Erro ao excluir no Firebase:', error);
-                            minutas[id] = minutaAtualizada;
-                            salvarDadosLocalmente();
-                            showNotification('Minuta excluída localmente', 'warning');
-                            renderHistorico();
+                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                         });
                 } else {
-                    minutas[id] = minutaAtualizada;
-                    salvarDadosLocalmente();
-                    showNotification('Minuta excluída localmente', 'warning');
-                    renderHistorico();
+                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                 }
 
             } catch (error) {
@@ -9761,20 +9716,18 @@
                 }
 
                 if (database) {
-                    database.ref(`minutas/${id}`).update(minutaAtualizada)
+                    database.ref(`minutas/${id}`).update(camposAlterados(minuta, minutaAtualizada))
                         .then(() => {
                             const statusMsg = status === 'assinada' ? 'assinada' : 'atualizada';
                             showNotification(`Minuta ${statusMsg} com sucesso`, 'success');
                             log(`Status da minuta ${id} atualizado para ${status}`);
                         })
                         .catch((error) => {
-                            minutas[id] = minutaAtualizada;
-                            showNotification('Status atualizado localmente', 'warning');
+                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                             renderHistorico();
                         });
                 } else {
-                    minutas[id] = minutaAtualizada;
-                    showNotification('Status atualizado localmente', 'warning');
+                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                     renderHistorico();
                 }
                 
@@ -9880,7 +9833,7 @@
                 };
 
                 if (database) {
-                    database.ref(`minutas/${id}`).update(minutaAtualizada)
+                    database.ref(`minutas/${id}`).update(camposAlterados(minuta, minutaAtualizada))
                         .then(() => {
                             showNotification('Minuta marcada como corrigida', 'success');
                             log(`Minuta ${id} marcada como corrigida pelo assessor ${currentUser.nome}`);
@@ -9888,18 +9841,10 @@
                         })
                         .catch((error) => {
                             log('Erro ao salvar correção no Firebase:', error);
-                            minutas[id] = minutaAtualizada;
-                            salvarDadosLocalmente();
-                            showNotification('Correção aplicada localmente', 'warning');
-                            renderHistorico();
-                            fecharModalComentarioCorrecao();
+                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                         });
                 } else {
-                    minutas[id] = minutaAtualizada;
-                    salvarDadosLocalmente();
-                    showNotification('Correção aplicada localmente', 'warning');
-                    renderHistorico();
-                    fecharModalComentarioCorrecao();
+                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                 }
 
             } catch (error) {
@@ -10491,11 +10436,15 @@
                 }
 
                 const minuta = minutas[minutaEditando];
+                // o formulário edita só a categoria principal: as demais (Meta 2, painéis, extras) são preservadas
+                const categoriasAntes = normalizarCategorias(minuta);
+                let novasCategorias = [categoria, ...categoriasAntes.slice(1).filter(c => c !== categoria)];
+                if (tipoMinuta !== 'Sentença') novasCategorias = novasCategorias.filter(c => c !== 'meta2' || c === categoria);
                 const minutaAtualizada = {
                     ...minuta,
                     numeroProcesso,
                     tipoMinuta,
-                    categorias: [categoria], // Atualiza para array
+                    categorias: novasCategorias,
                     observacoes,
                     substituicao,
                     editadaEm: getDataHoraBrasilia().getTime(),
@@ -10503,22 +10452,18 @@
                 };
 
                 if (database) {
-                    database.ref(`minutas/${minutaEditando}`).update(minutaAtualizada)
+                    database.ref(`minutas/${minutaEditando}`).update(camposAlterados(minuta, minutaAtualizada))
                         .then(() => {
                             showNotification('Minuta editada com sucesso', 'success');
                             fecharModalEdicao();
                             log(`Minuta ${minutaEditando} editada`);
                         })
                         .catch((error) => {
-                            minutas[minutaEditando] = minutaAtualizada;
-                            showNotification('Minuta editada localmente', 'warning');
-                            fecharModalEdicao();
+                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                             renderHistorico();
                         });
                 } else {
-                    minutas[minutaEditando] = minutaAtualizada;
-                    showNotification('Minuta editada localmente', 'warning');
-                    fecharModalEdicao();
+                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                     renderHistorico();
                 }
                 
@@ -10551,22 +10496,18 @@
                 };
 
                 if (database) {
-                    database.ref(`minutas/${minutaCorrecao}`).update(minutaAtualizada)
+                    database.ref(`minutas/${minutaCorrecao}`).update(camposAlterados(minuta, minutaAtualizada))
                         .then(() => {
                             showNotification('Correção solicitada com sucesso', 'success');
                             fecharModalCorrecao();
                             log(`Correção solicitada para minuta ${minutaCorrecao}`);
                         })
                         .catch((error) => {
-                            minutas[minutaCorrecao] = minutaAtualizada;
-                            showNotification('Correção solicitada localmente', 'warning');
-                            fecharModalCorrecao();
+                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                             renderHistorico();
                         });
                 } else {
-                    minutas[minutaCorrecao] = minutaAtualizada;
-                    showNotification('Correção solicitada localmente', 'warning');
-                    fecharModalCorrecao();
+                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
                     renderHistorico();
                 }
                 
@@ -10847,33 +10788,10 @@
             }
         }
 
-        // Função para limpar dados (apenas para desenvolvimento)
-        function limparDados() {
-            if (confirm('⚠️ ATENÇÃO: Isso irá limpar todos os dados! Confirma?')) {
-                minutas = {};
-                if (database) {
-                    database.ref('minutas').remove()
-                        .then(() => {
-                            showNotification('Dados limpos com sucesso', 'success');
-                            if (currentView === 'dashboard') renderDashboard();
-                        })
-                        .catch(() => {
-                            showNotification('Dados limpos localmente', 'warning');
-                            if (currentView === 'dashboard') renderDashboard();
-                        });
-                } else {
-                    showNotification('Dados limpos localmente', 'warning');
-                    if (currentView === 'dashboard') renderDashboard();
-                }
-                log('🗑️ Dados do sistema limpos');
-            }
-        }
-
         // Tornar funções de debug disponíveis globalmente (apenas em desenvolvimento)
         if (typeof window !== 'undefined') {
             window.debugSystem = debugSystem;
             window.debugRelatorios = debugRelatorios;
-            window.limparDados = limparDados;
             
             // Função de teste para relatórios
             window.testarRelatorio = function(tipo = 'mensal') {
@@ -10884,12 +10802,7 @@
                     gerarRelatorio(tipo);
                 } else {
                     console.log('❌ Sem dados suficientes para o relatório');
-                    console.log('💡 Executando inicializarDadosDemo()...');
-                    inicializarDadosDemo();
-                    setTimeout(() => {
-                        console.log('🔄 Tentando novamente...');
-                        gerarRelatorio(tipo);
-                    }, 1000);
+
                 }
             };
         }
@@ -10903,7 +10816,6 @@
             console.log('   • debugSystem() - Estado geral do sistema');
             console.log('   • debugRelatorios(tipo) - Debug específico de relatórios');
             console.log('   • testarRelatorio(tipo) - Testar geração de relatórios');
-            console.log('   • limparDados() - Limpar todos os dados');
             console.log('   🆕 setupHistoricoFilters agora está no local correto!');
         }
     </script>

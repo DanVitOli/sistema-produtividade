@@ -27,8 +27,12 @@ O módulo `firebase_auth.py` faz os três passos.
 
 ## 1. Registrar minuta da IA (pendente de revisão/assinatura)
 
-`PUT /minutas/painel-ia-<painelId>.json` — a chave determinística torna o
-envio idempotente (reenviar não duplica).
+`PUT /minutas/painel-ia-<painelId>.json` **condicional**: primeiro
+`GET` com o cabeçalho `X-Firebase-ETag: true`; só se o nó vier vazio, `PUT`
+com `if-match: <ETag>` (resposta 412 = alguém criou antes; não regrave).
+**Nunca** regrave um registro existente com `PUT`: isso apagava a trava de
+efeitos e o sistema reaplicava metas e baixas. Registro existente só recebe
+`PATCH` de campos pontuais (ver item 2).
 
 ```json
 {
@@ -52,8 +56,9 @@ envio idempotente (reenviar não duplica).
 
 Quando o juiz marca a minuta como assinada no Painel:
 
-`PUT /minutas/painel-<painelId>.json` — mesma chave usada pelo botão manual
-"Lançar assinadas", então os dois caminhos nunca duplicam.
+`PUT /minutas/painel-<painelId>.json`, também **condicional** (como no item 1)
+— é a mesma chave usada pelo botão manual "Lançar assinadas"; se o juiz já
+lançou pelo botão, o nó existe e o executor não grava nada.
 
 ```json
 {
@@ -101,8 +106,9 @@ campo extra `publicadoEm`.
 - **Balcão**: se a minuta atende um pedido do Balcão, inclua
   `"pedidoBalcaoId": "<id>"` (os ids dos pendentes vêm no snapshot) — o
   sistema dá baixa sozinho.
-- **Efeitos**: o campo `efeitosAplicados` é preenchido pelo sistema; nunca o
-  envie. Os contadores das metas do magistrado só são incrementados para
+- **Efeitos**: a trava de efeitos fica em `efeitosGabinete/<id da minuta>`,
+  gravada só pelo sistema (o campo `efeitosAplicados` na minuta é mantido
+  apenas para leitura). Nunca envie nenhum dos dois. Os contadores das metas do magistrado só são incrementados para
   minutas com `assessorId: "juiz"`.
 - Exemplo com curl:
 
