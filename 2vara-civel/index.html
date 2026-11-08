@@ -3480,12 +3480,33 @@
             }
         }
 
+        // 08/11/2026: "o que mudou" para o assessor — as entradas do registro de novidades do pacote
+        // com versão posterior à última que ele confirmou ficam destacadas (só leitura: o pacote e o
+        // lacre não mudam). Versões no formato AAAA.MM.DD com letra opcional (2026.11.06c).
+        function acervoCompararVersao(a, b) {
+            const p = v => {
+                const m = /^(\d+)\.(\d+)\.(\d+)([a-z]*)$/i.exec(String(v || '').trim());
+                return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4].toLowerCase()] : null;
+            };
+            const x = p(a), y = p(b);
+            if (!x || !y) return String(a || '').localeCompare(String(b || ''), 'pt-BR', { numeric: true });
+            for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] - y[i];
+            return x[3] === y[3] ? 0 : (x[3] < y[3] ? -1 : 1);
+        }
+
+        // novidades posteriores à versão confirmada (sem versão confirmada, todas são novas)
+        function acervoNovidadesDesde(versaoMinha) {
+            return (acervo.novidades || []).filter(n => !versaoMinha || acervoCompararVersao(n.versao, versaoMinha) > 0);
+        }
+
         function acervoTelaInicio(versaoMinha) {
             const desatualizado = acervo.meta && versaoMinha !== acervo.meta.versao;
+            const destacar = !currentUser.isJuiz;
+            const novas = destacar ? acervoNovidadesDesde(versaoMinha) : [];
             return `
                 ${!currentUser.isJuiz && desatualizado ? `
                 <div class="bg-amber-50 border-l-4 border-amber-500 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap">
-                    <div class="text-sm text-gray-800"><strong>Seu Claude precisa ser atualizado.</strong> O acervo está na versão ${escapeHtml(acervo.meta.versao)}${versaoMinha ? `; a última que você confirmou foi a ${escapeHtml(versaoMinha)}` : ''}.</div>
+                    <div class="text-sm text-gray-800"><strong>Seu Claude precisa ser atualizado.</strong> O acervo está na versão ${escapeHtml(acervo.meta.versao)}${versaoMinha ? `; a última que você confirmou foi a ${escapeHtml(versaoMinha)}` : ''}.${novas.length ? ` <button type="button" onclick="document.getElementById('acervo-o-que-mudou')?.scrollIntoView({ behavior: 'smooth' })" class="underline">${novas.length === 1 ? '1 atualização' : `${novas.length} atualizações`} desde então</button>.` : ''}</div>
                     <button onclick="acervoTrocarAba('claude')" class="bg-amber-600 text-white text-sm px-4 py-2 rounded-md hover:bg-amber-700 whitespace-nowrap">Atualizar meu Claude</button>
                 </div>` : ''}
                 <div class="grid sm:grid-cols-3 gap-4">
@@ -3493,13 +3514,19 @@
                     <button onclick="acervoTrocarAba('modelos')" class="bg-white rounded-lg shadow-md p-5 text-left hover:shadow-lg border-t-4 border-cyan-600"><div class="text-3xl font-bold text-gray-800">${acervo.modelos.length}</div><div class="text-sm text-gray-600">modelos de minuta</div></button>
                     <button onclick="acervoTrocarAba('claude')" class="bg-white rounded-lg shadow-md p-5 text-left hover:shadow-lg border-t-4 border-green-600"><div class="text-3xl font-bold text-gray-800">${acervo.skills.length}</div><div class="text-sm text-gray-600">skills para o Claude</div></button>
                 </div>
-                <div class="bg-white rounded-lg shadow-md p-5">
-                    <h3 class="font-semibold text-gray-800 mb-3">Novidades</h3>
-                    ${(acervo.novidades || []).length ? acervo.novidades.map(n => `
-                        <div class="mb-4 last:mb-0">
-                            <div class="text-sm font-semibold text-gray-700">${escapeHtml(n.data)} — ${escapeHtml(n.titulo || 'Atualização')} <span class="text-xs font-normal text-gray-500">(versão ${escapeHtml(n.versao)})</span></div>
+                <div class="bg-white rounded-lg shadow-md p-5" id="acervo-o-que-mudou">
+                    <h3 class="font-semibold text-gray-800 mb-1">Novidades</h3>
+                    ${destacar ? `<p class="text-xs text-gray-500 mb-3">${novas.length
+                        ? `${novas.length === 1 ? '1 atualização nova' : `${novas.length} atualizações novas`} ${versaoMinha ? `desde a versão ${escapeHtml(versaoMinha)}, a última que você confirmou` : 'para você (você ainda não confirmou nenhuma versão)'} — destacadas abaixo.`
+                        : 'Nada mudou desde a versão que você confirmou.'}</p>` : '<div class="mb-3"></div>'}
+                    ${(acervo.novidades || []).length ? acervo.novidades.map(n => {
+                        const nova = novas.includes(n);
+                        return `
+                        <div class="mb-4 last:mb-0 ${nova ? 'border-l-4 border-amber-500 bg-amber-50 rounded-r-md pl-3 py-2' : ''}">
+                            <div class="text-sm font-semibold text-gray-700">${nova ? '<span class="text-xs font-semibold bg-amber-500 text-white px-1.5 py-0.5 rounded mr-1">novo para você</span>' : ''}${escapeHtml(n.data)} — ${escapeHtml(n.titulo || 'Atualização')} <span class="text-xs font-normal text-gray-500">(versão ${escapeHtml(n.versao)})</span></div>
                             <ul class="list-disc pl-6 mt-1 text-sm text-gray-700 space-y-1">${(n.itens || []).map(i => `<li>${acervoInline(i)}</li>`).join('')}</ul>
-                        </div>`).join('') : '<p class="text-sm text-gray-500">Sem novidades registradas.</p>'}
+                        </div>`;
+                    }).join('') : '<p class="text-sm text-gray-500">Sem novidades registradas.</p>'}
                 </div>
                 ${currentUser.isJuiz ? `
                 <div class="bg-white rounded-lg shadow-md p-5">
