@@ -8229,9 +8229,9 @@
                         if (mudouTipo) partes.push(`ato corrigido: ${x.tipoMinuta} → ${m.tipoMinuta}`);
                         if (mudouCats) partes.push('categorias atualizadas');
                         if (x.status !== 'assinada') partes.push('marcada como assinada');
-                        return { numero, painelId, texto: 'já estava no sistema · ' + partes.join(' · ') + notaExtras + await sincronizar(id, x), ok: true };
+                        return { numero, painelId, minutaId: id, texto: 'já estava no sistema · ' + partes.join(' · ') + notaExtras + await sincronizar(id, x), ok: true };
                     }
-                    return { numero, painelId, texto: 'já lançada antes' + await sincronizar(id, x), ok: true };
+                    return { numero, painelId, minutaId: id, texto: 'já lançada antes' + await sincronizar(id, x), ok: true };
                 }
                 if (!forcar) {
                     const dup = duplicidadesPainelIA(numero, { painelId, extras: lancadasAgora });
@@ -8256,7 +8256,16 @@
                     origem: 'painel-gabinete'
                 };
                 if (forcar) registro.duplicidadeConfirmada = true;
-                await database.ref(`minutas/painel-${painelId}`).set(registro);
+                // gravação condicional (08/11/2026, contrato INTEGRACAO-GABINETE.md): só cria se a
+                // chave estiver vazia. Antes era set(), e um registro criado pelo executor (ou por
+                // outra aba) entre a leitura e a gravação era sobrescrito.
+                // createdAt com o relógio local: placeholder do servidor dentro de transação não
+                // é garantido no SDK compat.
+                const criacao = await database.ref(`minutas/painel-${painelId}`)
+                    .transaction(v => (v ? undefined : { ...registro, createdAt: Date.now() }));
+                if (!criacao.committed) {
+                    return { numero, painelId, minutaId: `painel-${painelId}`, texto: 'já estava no sistema (gravada por outra sessão ou pelo executor); nada foi sobrescrito', ok: true };
+                }
                 // os efeitos deste lançamento são aplicados aqui mesmo: grava a trava externa para que
                 // um envio posterior do executor na mesma chave não os aplique de novo
                 efeitosGabinete[`painel-${painelId}`] = marcaEfeitos();
@@ -8266,7 +8275,7 @@
                 if (cats.includes('juiz_distribuicao')) ajustarMetaJuiz('distribuicao', 1);
                 if (cats.includes('juiz_ato_inicial')) ajustarMetaJuiz('ato_inicial', 1);
                 if (cats.includes('outros')) ajustarMetaJuiz('urgentes', 1);
-                return { numero, painelId, texto: `${m.tipoMinuta} lançada e assinada${forcar ? ' (duplicidade confirmada)' : ''}` + notaExtras + await sincronizar(`painel-${painelId}`, {}), ok: true };
+                return { numero, painelId, minutaId: `painel-${painelId}`, texto: `${m.tipoMinuta} lançada e assinada${forcar ? ' (duplicidade confirmada)' : ''}` + notaExtras + await sincronizar(`painel-${painelId}`, {}), ok: true };
             } catch (e) {
                 log('Erro ao lançar assinada do Painel', e);
                 return { numero, painelId, texto: 'erro ao gravar; tente de novo', ok: false };
