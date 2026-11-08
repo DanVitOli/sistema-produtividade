@@ -64,6 +64,16 @@ autenticadas cuja UID está na lista. Cole-as em Realtime Database > Regras e
 publique **depois** de colocar no ar esta versão do sistema e de ajustar o
 executor do gabinete para mandar o token (`INTEGRACAO-GABINETE.md`).
 
+Desde 08/11/2026 o nó `gabinete/` (esteira da aba Gabinete) só abre para o juiz
+e para a conta do gabinete (gabinete-auto). No Realtime Database uma permissão
+dada num nó vale para tudo abaixo dele, por isso a liberação geral deixou de
+ficar na raiz e passou para `$outro` (todos os outros nós, com as mesmas quatro
+contas de antes). O juiz e a conta do gabinete são reconhecidos pelo e-mail da
+conta (`auth.token.email`), além da lista de UIDs; quem preferir pode trocar o
+teste do e-mail pelas duas UIDs correspondentes. O repositório não tem
+`firebase.json`: as regras são publicadas à mão, colando o arquivo inteiro em
+Realtime Database > Regras e clicando em Publicar.
+
 ## Hospedagem em endereço próprio
 
 Os caminhos são relativos, então a pasta funciona em qualquer endereço:
