@@ -1137,7 +1137,7 @@
                 <div id="meta-selecao-coluna" class="hidden">
                     <label class="block text-sm font-medium text-gray-700 mb-2">2. Mapeie as colunas do arquivo</label>
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
-                        <div class="grid md:grid-cols-3 gap-4">
+                        <div class="grid md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-xs text-gray-600 mb-1">Coluna: Número do Processo *</label>
                                 <select id="meta-coluna-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="atualizarPreviewImportacao()">
@@ -1154,6 +1154,12 @@
                                 <label class="block text-xs text-gray-600 mb-1">Coluna: Situação</label>
                                 <select id="meta-coluna-situacao" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="atualizarPreviewImportacao()">
                                     <option value="">Não importar</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Coluna: Última Movimentação</label>
+                                <select id="meta-coluna-movimentacao" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="atualizarPreviewImportacao()">
+                                    <option value="">Não importar (fica em branco)</option>
                                 </select>
                             </div>
                         </div>
@@ -5480,6 +5486,9 @@
         // ==================== METAS - IMPORTAÇÃO DE XLSX ====================
 
         let dadosXLSXImportacao = null;
+        let dadosXLSXBrutos = null;          // mesmas linhas, valores brutos (datas em número de série)
+        let linhaCabecalhoXLSX = 1;          // linha do cabeçalho no Excel, para citar as rejeitadas
+        let linhasRejeitadasImportacao = []; // { linha, valor, motivo }
         let processosParaImportar = [];
         let valoresSituacaoUnicos = [];
         let mapeamentoSituacao = {};
@@ -5520,16 +5529,18 @@
             reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    // 08/11/2026: o número do processo é lido como TEXTO (raw:false). Lido como número,
+                    // um NPU de 20 dígitos perdia precisão e o zero à esquerda e era gravado errado.
+                    const workbook = XLSX.read(data, { type: 'array', cellText: true });
 
                     // Pegar a primeira planilha
                     const primeiraPlanilha = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[primeiraPlanilha];
 
-                    // Converter para JSON
-                    dadosXLSXImportacao = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                    console.log('Dados brutos do XLSX:', dadosXLSXImportacao);
+                    // Converter para JSON: texto formatado (números de processo, classe, situação) e valor
+                    // bruto (datas: número de série do Excel), linha a linha
+                    dadosXLSXImportacao = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '', blankrows: true });
+                    dadosXLSXBrutos = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true, defval: '', blankrows: true });
 
                     if (dadosXLSXImportacao.length === 0) {
                         showNotification('Arquivo vazio ou formato inválido', 'error');
@@ -5552,21 +5563,25 @@
                     // Remover linhas vazias antes do cabeçalho para processamento posterior
                     if (indiceCabecalho > 0) {
                         dadosXLSXImportacao = dadosXLSXImportacao.slice(indiceCabecalho);
+                        dadosXLSXBrutos = dadosXLSXBrutos.slice(indiceCabecalho);
                     }
+                    linhaCabecalhoXLSX = indiceCabecalho + 1; // número da linha no Excel (1-based)
 
                     // Preencher os 3 dropdowns de colunas
                     const selectProcesso = document.getElementById('meta-coluna-processo');
                     const selectClasse = document.getElementById('meta-coluna-classe');
                     const selectSituacao = document.getElementById('meta-coluna-situacao');
+                    const selectMovimentacao = document.getElementById('meta-coluna-movimentacao');
 
                     selectProcesso.innerHTML = '<option value="">Selecione...</option>';
                     selectClasse.innerHTML = '<option value="">Não importar</option>';
                     selectSituacao.innerHTML = '<option value="">Não importar</option>';
+                    selectMovimentacao.innerHTML = '<option value="">Não importar (fica em branco)</option>';
 
                     primeiraLinha.forEach((coluna, index) => {
                         const nomeColuna = coluna ? String(coluna).trim() : `Coluna ${index + 1}`;
 
-                        [selectProcesso, selectClasse, selectSituacao].forEach(select => {
+                        [selectProcesso, selectClasse, selectSituacao, selectMovimentacao].forEach(select => {
                             const option = document.createElement('option');
                             option.value = String(index);
                             option.textContent = nomeColuna;
@@ -5579,7 +5594,8 @@
 
                     document.getElementById('meta-selecao-coluna').classList.remove('hidden');
 
-                    showNotification(`Arquivo carregado: ${dadosXLSXImportacao.length - 1} processos encontrados`, 'success');
+                    const linhasComDados = dadosXLSXImportacao.slice(1).filter(l => l && l.some(c => String(c ?? '').trim() !== '')).length;
+                    showNotification(`Arquivo carregado: ${linhasComDados} linha(s) com dados`, 'success');
 
                 } catch (error) {
                     log('Erro ao ler arquivo XLSX:', error);
@@ -5607,6 +5623,7 @@
             const selectProcesso = document.getElementById('meta-coluna-processo');
             const selectClasse = document.getElementById('meta-coluna-classe');
             const selectSituacao = document.getElementById('meta-coluna-situacao');
+            const selectMovimentacao = document.getElementById('meta-coluna-movimentacao');
 
             // Termos normalizados (sem acentos)
             const termosProcesso = ['processo', 'numero', 'n°', 'proc', 'npu'];
@@ -5616,6 +5633,7 @@
             let indiceProcesso = -1;
             let indiceClasse = -1;
             let indiceSituacao = -1;
+            let indiceMovimentacao = -1;
 
             // Log para debug
             console.log('Colunas detectadas no arquivo:', linha);
@@ -5635,6 +5653,10 @@
                     indiceClasse = i;
                     console.log(`  -> Detectado como CLASSE`);
                 }
+                if (indiceMovimentacao === -1 && valor.includes('movimenta')) {
+                    indiceMovimentacao = i;
+                    continue; // "última movimentação" não é processo, classe nem situação
+                }
                 if (indiceSituacao === -1 && termosSituacao.some(termo => valor.includes(termo))) {
                     indiceSituacao = i;
                     console.log(`  -> Detectado como SITUAÇÃO`);
@@ -5651,6 +5673,9 @@
             if (indiceClasse >= 0) {
                 selectClasse.selectedIndex = indiceClasse + 1;
                 console.log(`Select Classe: selectedIndex = ${indiceClasse + 1}`);
+            }
+            if (indiceMovimentacao >= 0) {
+                selectMovimentacao.selectedIndex = indiceMovimentacao + 1;
             }
             if (indiceSituacao >= 0) {
                 selectSituacao.selectedIndex = indiceSituacao + 1;
@@ -5679,23 +5704,47 @@
             const indexProcesso = parseInt(colunaProcesso);
             const indexClasse = colunaClasse !== '' ? parseInt(colunaClasse) : -1;
             const indexSituacao = colunaSituacao !== '' ? parseInt(colunaSituacao) : -1;
+            const colunaMov = document.getElementById('meta-coluna-movimentacao')?.value ?? '';
+            const indexMov = colunaMov !== '' ? parseInt(colunaMov) : -1;
 
             processosParaImportar = [];
+            linhasRejeitadasImportacao = [];
             valoresSituacaoUnicos = [];
             const situacoesEncontradas = new Set();
+            // números já cadastrados na meta, comparados só pelos dígitos (com ou sem máscara)
+            const numerosJaCadastrados = new Set(Object.values(getProcessosMetaAtual()).filter(p => p?.numeroProcesso)
+                .map(p => normalizarNumeroCNJ(p.numeroProcesso)));
+            const vistosNaPlanilha = new Map(); // dígitos -> linha do Excel
 
             // Extrair processos (pular primeira linha = cabeçalho)
             for (let i = 1; i < dadosXLSXImportacao.length; i++) {
-                const linha = dadosXLSXImportacao[i];
-                const valorProcesso = String(linha[indexProcesso] || '').trim();
+                const linha = dadosXLSXImportacao[i] || [];
+                const linhaExcel = linhaCabecalhoXLSX + i;
+                const valorProcesso = String(linha[indexProcesso] ?? '').trim();
+                const temDados = linha.some(c => String(c ?? '').trim() !== '');
 
-                if (valorProcesso) {
-                    const processoNormalizado = normalizarNumeroProcesso(valorProcesso);
-                    if (processoNormalizado && validarNumeroProcesso(processoNormalizado)) {
-                        const processosAtuais = getProcessosMetaAtual();
-                        const jaExiste = Object.values(processosAtuais).some(p =>
-                            p && p.numeroProcesso === processoNormalizado
-                        );
+                if (!valorProcesso) {
+                    if (temDados) linhasRejeitadasImportacao.push({ linha: linhaExcel, valor: '', motivo: 'sem número do processo' });
+                    continue;
+                }
+                {
+                    const cnj = validarCNJ(valorProcesso);
+                    if (!cnj.ok) {
+                        linhasRejeitadasImportacao.push({ linha: linhaExcel, valor: valorProcesso, motivo: cnj.motivo });
+                        continue;
+                    }
+                    const processoNormalizado = cnj.formatado;
+                    const chave = normalizarNumeroCNJ(processoNormalizado);
+                    if (vistosNaPlanilha.has(chave)) {
+                        linhasRejeitadasImportacao.push({ linha: linhaExcel, valor: valorProcesso, motivo: `repetido na planilha (já na linha ${vistosNaPlanilha.get(chave)})` });
+                        continue;
+                    }
+                    vistosNaPlanilha.set(chave, linhaExcel);
+                    {
+                        const jaExiste = numerosJaCadastrados.has(chave);
+                        const ultimaMovimentacao = indexMov >= 0
+                            ? lerDataPlanilha(dadosXLSXBrutos?.[i]?.[indexMov], linha[indexMov])
+                            : '';
 
                         const classe = indexClasse >= 0 ? String(linha[indexClasse] || '').trim() : '';
                         const situacao = indexSituacao >= 0 ? String(linha[indexSituacao] || '').trim() : '';
@@ -5710,6 +5759,7 @@
                             original: valorProcesso,
                             classe: classe,
                             situacao: situacao,
+                            ultimaMovimentacao,
                             jaExiste: jaExiste
                         });
                     }
@@ -5729,9 +5779,11 @@
             const novos = processosParaImportar.filter(p => !p.jaExiste);
             const existentes = processosParaImportar.filter(p => p.jaExiste);
 
+            const rejeitadasHtml = renderLinhasRejeitadasImportacao();
+
             if (processosParaImportar.length === 0) {
                 listaPreview.innerHTML = '<div class="text-gray-500">Nenhum número de processo válido encontrado.</div>';
-                document.getElementById('meta-preview-stats').innerHTML = '';
+                document.getElementById('meta-preview-stats').innerHTML = rejeitadasHtml;
                 document.getElementById('meta-opcoes-importacao').classList.add('hidden');
                 document.getElementById('meta-botao-importar').classList.add('hidden');
             } else {
@@ -5745,6 +5797,7 @@
                                 <th class="text-left p-1">Processo</th>
                                 ${indexClasse >= 0 ? '<th class="text-left p-1">Classe</th>' : ''}
                                 ${indexSituacao >= 0 ? '<th class="text-left p-1">Situação</th>' : ''}
+                                ${indexMov >= 0 ? '<th class="text-left p-1">Últ. mov.</th>' : ''}
                                 <th class="text-right p-1">Status</th>
                             </tr>
                         </thead>
@@ -5754,6 +5807,7 @@
                                     <td class="p-1 ${p.jaExiste ? 'line-through' : ''}">${escapeHtml(p.numero)}</td>
                                     ${indexClasse >= 0 ? `<td class="p-1">${escapeHtml(p.classe)}</td>` : ''}
                                     ${indexSituacao >= 0 ? `<td class="p-1">${escapeHtml(p.situacao)}</td>` : ''}
+                                    ${indexMov >= 0 ? `<td class="p-1">${p.ultimaMovimentacao ? escapeHtml(formatarDataBrasilia(p.ultimaMovimentacao)) : '—'}</td>` : ''}
                                     <td class="p-1 text-right">
                                         ${p.jaExiste
                                             ? '<span class="bg-yellow-100 text-yellow-700 px-1 rounded">Existente</span>'
@@ -5773,6 +5827,7 @@
                     <span class="text-green-600 font-medium">${novos.length} novos</span> •
                     <span class="text-yellow-600">${existentes.length} já cadastrados</span> •
                     <span class="text-gray-600">${processosParaImportar.length} total</span>
+                    ${rejeitadasHtml}
                 `;
 
                 if (novos.length > 0) {
@@ -5820,6 +5875,77 @@
                 mapeamento[situacao.toLowerCase()] = select.value;
             });
             return mapeamento;
+        }
+
+        // ===== VALIDAÇÃO DO NÚMERO CNJ (08/11/2026) =====
+        // NNNNNNN-DD.AAAA.J.TR.OOOO (Res. CNJ 65/2008): DD = 98 - (NNNNNNN AAAA J TR OOOO 00 mod 97).
+        // Aceita com ou sem máscara e um sufixo de incidente (/0001). Devolve o número formatado.
+        function digitoVerificadorCNJ(n7, ano, j, tr, orgao) {
+            const s = `${n7}${ano}${j}${tr}${orgao}00`;
+            let resto = 0;
+            for (const ch of s) resto = (resto * 10 + Number(ch)) % 97;
+            return String(98 - resto).padStart(2, '0');
+        }
+
+        function validarCNJ(valor) {
+            const texto = String(valor ?? '').trim();
+            if (!texto) return { ok: false, motivo: 'vazio' };
+            if (/e\+?\d+$/i.test(texto)) return { ok: false, motivo: 'célula numérica em notação científica (formate a coluna como Texto no Excel)' };
+            const [base, sufixo, ...resto] = texto.replace(/\s+/g, '').split('/');
+            if (resto.length) return { ok: false, motivo: 'formato inválido' };
+            if (sufixo !== undefined && !/^\d{1,4}$/.test(sufixo)) return { ok: false, motivo: 'sufixo inválido' };
+            if (!/^[\d.\-]+$/.test(base)) return { ok: false, motivo: 'contém caracteres que não são do número CNJ' };
+            const d = base.replace(/\D/g, '');
+            if (d.length !== 20) {
+                return { ok: false, motivo: d.length === 19
+                    ? '19 dígitos: falta o zero à esquerda (célula numérica? formate a coluna como Texto)'
+                    : `${d.length} dígitos (o número CNJ tem 20)` };
+            }
+            const n7 = d.slice(0, 7), dv = d.slice(7, 9), ano = d.slice(9, 13), j = d.slice(13, 14), tr = d.slice(14, 16), orgao = d.slice(16, 20);
+            if (digitoVerificadorCNJ(n7, ano, j, tr, orgao) !== dv) return { ok: false, motivo: 'dígito verificador não confere (número digitado ou convertido errado)' };
+            const formatado = `${n7}-${dv}.${ano}.${j}.${tr}.${orgao}` + (sufixo !== undefined ? `/${sufixo.padStart(4, '0')}` : '');
+            return { ok: true, formatado };
+        }
+
+        // Data da última movimentação vinda da planilha: número de série do Excel, 'DD/MM/AAAA'
+        // ou 'AAAA-MM-DD'. Devolve 'AAAA-MM-DD' ou '' (sem data, o campo fica em branco).
+        function lerDataPlanilha(bruto, texto) {
+            if (typeof bruto === 'number' && bruto > 0 && typeof XLSX !== 'undefined') {
+                const c = XLSX.SSF.parse_date_code(bruto);
+                if (c && c.y > 1900) return `${c.y}-${String(c.m).padStart(2, '0')}-${String(c.d).padStart(2, '0')}`;
+            }
+            const t = String(texto ?? bruto ?? '').trim();
+            let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
+            if (m) return parseDataLocal(t) ? `${m[1]}-${m[2]}-${m[3]}` : '';
+            m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(t);
+            if (m) {
+                const ano = m[3].length === 2 ? `20${m[3]}` : m[3];
+                const iso = `${ano}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+                const d = parseDataLocal(iso);
+                return d && dataLocalISO(d) === iso ? iso : '';
+            }
+            return '';
+        }
+
+        function renderLinhasRejeitadasImportacao() {
+            const rej = linhasRejeitadasImportacao;
+            if (!rej.length) return '';
+            const porMotivo = {};
+            rej.forEach(r => { const k = r.motivo.replace(/ \(já na linha \d+\)/, ''); porMotivo[k] = (porMotivo[k] || 0) + 1; });
+            return `
+                <div class="mt-2 bg-red-50 border border-red-200 rounded p-2 text-red-700">
+                    <div class="font-medium">${rej.length} linha(s) rejeitada(s) — não serão importadas</div>
+                    <ul class="list-disc ml-5 text-xs">
+                        ${Object.entries(porMotivo).map(([motivo, n]) => `<li>${n} × ${escapeHtml(motivo)}</li>`).join('')}
+                    </ul>
+                    <details class="text-xs mt-1">
+                        <summary class="cursor-pointer">Ver as linhas</summary>
+                        <ul class="ml-4 mt-1 max-h-40 overflow-y-auto">
+                            ${rej.slice(0, 200).map(r => `<li>Linha ${r.linha}: ${escapeHtml(r.valor || '(vazio)')} — ${escapeHtml(r.motivo)}</li>`).join('')}
+                            ${rej.length > 200 ? `<li>... e mais ${rej.length - 200}</li>` : ''}
+                        </ul>
+                    </details>
+                </div>`;
         }
 
         function normalizarNumeroProcesso(valor) {
@@ -5878,7 +6004,9 @@
                     situacaoOriginal: processo.situacao || '',
                     status: statusProcesso,
                     fase: faseInicial,
-                    ultimaMovimentacao: dataHoje,
+                    // 08/11/2026: a data vem da planilha; sem ela fica em branco (antes era "hoje" e o
+                    // lote inteiro aparecia como recém-movimentado, zerando os alertas de parado)
+                    ultimaMovimentacao: processo.ultimaMovimentacao || '',
                     observacoes: `Importado em lote${processo.classe ? ' | Classe: ' + processo.classe : ''}${processo.situacao ? ' | Situação: ' + processo.situacao : ''}`,
                     dataCadastro: dataHoje,
                     criadoPor: currentUser.nome,
