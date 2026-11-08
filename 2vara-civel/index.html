@@ -893,7 +893,6 @@
                 </div>
             </div>
         </div>
-    </div>
 
     <!-- Módulo Meta 180 Dias -->
     <div id="meta180-view" class="hidden"></div>
@@ -1749,6 +1748,7 @@
                 </div>
             </div>
         </div>
+    </div>
             </main>
         </div>
     </div>
@@ -2199,6 +2199,26 @@
             const d = new Date(data);
             const inicio = new Date(d.getFullYear(), 0, 1);
             return Math.ceil(((d - inicio) / 86400000 + inicio.getDay() + 1) / 7);
+        }
+
+        // ===== FALHAS DE GRAVAÇÃO (08/11/2026) =====
+        // Falha de gravação no banco é sempre avisada como falha, com o motivo real. Não existe
+        // mais "salvo localmente": a cópia na memória era sobrescrita no próximo snapshot e a
+        // alteração sumia sem aviso.
+        function descreverErroGravacao(error) {
+            const code = String(error?.code || '').toUpperCase();
+            const msg = String(error?.message || error || '');
+            if (code.includes('PERMISSION_DENIED') || /permission[_ ]denied/i.test(msg)) {
+                return 'o banco recusou a gravação (permissão negada). Entre de novo no sistema; se continuar, avise o juiz.';
+            }
+            if (!error) return 'sem conexão com o banco de dados.';
+            if (/network|offline|disconnect|timeout/i.test(msg)) return `sem conexão com o banco (${msg}).`;
+            return msg || 'erro desconhecido.';
+        }
+
+        function avisarFalhaGravacao(error, oQue = 'Não foi possível salvar no banco') {
+            log(oQue, error);
+            showNotification(`${oQue}: nada foi gravado — ${descreverErroGravacao(error)}`, 'error');
         }
 
         function log(message, data = null) {
@@ -3735,7 +3755,9 @@
             if (!lista) return;
 
             // Obter filtros
-            const filtroStatus = document.getElementById('filtro-balcao-status')?.value || 'pendente';
+            // 08/11/2026: "Todos os status" (value="") mostra todos; antes o || 'pendente' o transformava em "Pendentes"
+            const selectStatus = document.getElementById('filtro-balcao-status');
+            const filtroStatus = selectStatus ? selectStatus.value : 'pendente';
             const filtroCategoria = document.getElementById('filtro-balcao-categoria')?.value;
             const filtroAssessor = document.getElementById('filtro-balcao-assessor')?.value;
             const filtroPrazo = document.getElementById('filtro-balcao-prazo')?.value;
@@ -3759,9 +3781,11 @@
                 pedidosArray = pedidosArray.filter(p => p.assessorId === filtroAssessor);
             }
 
-            // Filtro por prazo
-            if (filtroPrazo && filtroStatus === 'pendente') {
+            // Filtro por prazo: só pedidos pendentes têm prazo correndo (antes o filtro era
+            // ignorado em silêncio quando o status não era "Pendentes")
+            if (filtroPrazo) {
                 pedidosArray = pedidosArray.filter(p => {
+                    if (p.status !== 'pendente') return false;
                     const prazo = calcularPrazoBalcao(p);
                     return prazo.status === filtroPrazo;
                 });
@@ -3944,14 +3968,10 @@
                         })
                         .catch((error) => {
                             log('Erro ao salvar pedido no Firebase:', error);
-                            showNotification('Erro ao cadastrar pedido', 'error');
+                            avisarFalhaGravacao(error, 'Erro ao cadastrar pedido');
                         });
                 } else {
-                    const id = 'local_balcao_' + getDataHoraBrasilia().getTime();
-                    pedidosBalcao[id] = novoPedido;
-                    limparFormularioBalcao();
-                    showNotification('Pedido cadastrado localmente', 'warning');
-                    renderBalcaoVirtual();
+                    avisarFalhaGravacao(null, 'Pedido NÃO cadastrado');
                 }
             } catch (error) {
                 log('Erro ao cadastrar pedido:', error);
@@ -4003,12 +4023,10 @@
                     })
                     .catch((error) => {
                         log('Erro ao atualizar pedido:', error);
-                        showNotification('Erro ao atualizar pedido', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao atualizar pedido');
                     });
             } else {
-                pedidosBalcao[id] = pedidoAtualizado;
-                showNotification('Pedido atualizado localmente', 'warning');
-                renderBalcaoVirtual();
+                avisarFalhaGravacao(null, 'Pedido NÃO atualizado');
             }
         }
 
@@ -4035,12 +4053,10 @@
                     })
                     .catch((error) => {
                         log('Erro ao cancelar pedido:', error);
-                        showNotification('Erro ao cancelar pedido', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao cancelar pedido');
                     });
             } else {
-                pedidosBalcao[id] = pedidoAtualizado;
-                showNotification('Pedido cancelado localmente', 'warning');
-                renderBalcaoVirtual();
+                avisarFalhaGravacao(null, 'Pedido NÃO cancelado');
             }
         }
 
@@ -4158,13 +4174,10 @@
                     })
                     .catch((error) => {
                         log('Erro ao atualizar pedido:', error);
-                        showNotification('Erro ao atualizar pedido', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao atualizar pedido');
                     });
             } else {
-                pedidosBalcao[id] = pedidoAtualizado;
-                fecharModalEdicaoPedidoBalcao();
-                showNotification('Pedido atualizado localmente', 'warning');
-                renderBalcaoVirtual();
+                avisarFalhaGravacao(null, 'Pedido NÃO atualizado');
             }
         }
 
@@ -4193,12 +4206,10 @@
                     })
                     .catch((error) => {
                         log('Erro ao excluir pedido:', error);
-                        showNotification('Erro ao excluir pedido', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao excluir pedido');
                     });
             } else {
-                delete pedidosBalcao[id];
-                showNotification('Pedido excluído localmente', 'warning');
-                renderBalcaoVirtual();
+                avisarFalhaGravacao(null, 'Pedido NÃO excluído');
             }
         }
 
@@ -5183,22 +5194,10 @@
                     })
                     .catch((error) => {
                         log('Erro ao cadastrar processo na meta:', error);
-                        showNotification('Erro ao cadastrar processo', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao cadastrar processo');
                     });
             } else {
-                const id = 'local_' + Date.now();
-                if (metaAtual === 'improbidade') {
-                    processosMetaImprobidade[id] = novoProcesso;
-                } else if (metaAtual === 'acoes_coletivas') {
-                    processosMetaAcoesColetivas[id] = novoProcesso;
-                } else if (metaAtual === 'mais_dez_anos') {
-                    processosMetaMaisDezAnos[id] = novoProcesso;
-                } else if (metaAtual === 'saude') {
-                    processosMetaSaude[id] = novoProcesso;
-                }
-                limparFormularioMeta();
-                showNotification('Processo cadastrado localmente', 'warning');
-                renderMetasProcessos();
+                avisarFalhaGravacao(null, 'Processo NÃO cadastrado');
             }
         }
 
@@ -5287,21 +5286,10 @@
                     })
                     .catch((error) => {
                         log('Erro ao atualizar processo:', error);
-                        showNotification('Erro ao atualizar processo', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao atualizar processo');
                     });
             } else {
-                if (metaAtual === 'improbidade') {
-                    processosMetaImprobidade[id] = processoAtualizado;
-                } else if (metaAtual === 'acoes_coletivas') {
-                    processosMetaAcoesColetivas[id] = processoAtualizado;
-                } else if (metaAtual === 'mais_dez_anos') {
-                    processosMetaMaisDezAnos[id] = processoAtualizado;
-                } else if (metaAtual === 'saude') {
-                    processosMetaSaude[id] = processoAtualizado;
-                }
-                fecharModalEdicaoProcessoMeta();
-                showNotification('Processo atualizado localmente', 'warning');
-                renderMetasProcessos();
+                avisarFalhaGravacao(null, 'Processo NÃO atualizado');
             }
         }
 
@@ -5325,20 +5313,10 @@
                     })
                     .catch((error) => {
                         log('Erro ao excluir processo:', error);
-                        showNotification('Erro ao excluir processo', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao excluir processo');
                     });
             } else {
-                if (metaAtual === 'improbidade') {
-                    delete processosMetaImprobidade[id];
-                } else if (metaAtual === 'acoes_coletivas') {
-                    delete processosMetaAcoesColetivas[id];
-                } else if (metaAtual === 'mais_dez_anos') {
-                    delete processosMetaMaisDezAnos[id];
-                } else if (metaAtual === 'saude') {
-                    delete processosMetaSaude[id];
-                }
-                showNotification('Processo removido localmente', 'warning');
-                renderMetasProcessos();
+                avisarFalhaGravacao(null, 'Processo NÃO removido');
             }
         }
 
@@ -6019,16 +5997,7 @@
                     if (database) {
                         await database.ref(meta.colecaoFirebase).push(novoProcesso);
                     } else {
-                        const id = 'local_' + Date.now() + '_' + i;
-                        if (metaAtual === 'improbidade') {
-                            processosMetaImprobidade[id] = novoProcesso;
-                        } else if (metaAtual === 'acoes_coletivas') {
-                            processosMetaAcoesColetivas[id] = novoProcesso;
-                        } else if (metaAtual === 'mais_dez_anos') {
-                            processosMetaMaisDezAnos[id] = novoProcesso;
-                        } else if (metaAtual === 'saude') {
-                            processosMetaSaude[id] = novoProcesso;
-                        }
+                        throw new Error('sem conexão com o banco de dados');
                     }
                     importados++;
                 } catch (error) {
@@ -6250,7 +6219,7 @@
                     })
                     .catch((error) => {
                         log('Erro ao marcar todas como lidas:', error);
-                        showNotification('Erro ao marcar notificações', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao marcar notificações');
                     });
             } else {
                 naoLidas.forEach(([key, n]) => {
@@ -6273,7 +6242,7 @@
                     })
                     .catch((error) => {
                         log('Erro ao excluir notificação:', error);
-                        showNotification('Erro ao excluir notificação', 'error');
+                        avisarFalhaGravacao(error, 'Erro ao excluir notificação');
                     });
             } else {
                 delete notificacoesJuiz[id];
@@ -8754,8 +8723,8 @@
                         showView('dashboard');
                         log('Minuta registrada no Firebase', numeroProcesso + ' - Categorias: ' + categoriasSelecionadas.join(', '));
                     }).catch((error) => {
-                        log('Erro ao salvar no Firebase, salvando localmente:', error);
-                        salvarMinutaLocal(novaMinuta);
+                        log('Erro ao salvar no Firebase:', error);
+                        salvarMinutaLocal(novaMinuta, error);
                     });
                 } else {
                     salvarMinutaLocal(novaMinuta);
@@ -8770,8 +8739,8 @@
         // 06/11/2026: não há mais "registro local". Uma minuta guardada só no navegador nunca
         // chegava ao banco e sumia da produtividade. Agora a falha é avisada e o formulário
         // continua preenchido para uma nova tentativa.
-        function salvarMinutaLocal(minuta) {
-            showNotification('A minuta NÃO foi registrada: não foi possível gravar no banco. O formulário continua preenchido; verifique a conexão ou entre de novo e tente outra vez.', 'error');
+        function salvarMinutaLocal(minuta, error = null) {
+            showNotification(`A minuta NÃO foi registrada — ${descreverErroGravacao(error)} O formulário continua preenchido para tentar outra vez.`, 'error');
             log('Falha ao registrar minuta (não salva)', minuta?.numeroProcesso);
         }
 
@@ -9796,11 +9765,11 @@
                             log(`Minuta ${id} excluída`);
                         })
                         .catch((error) => {
-                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                            avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                             renderHistorico();
                         });
                 } else {
-                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                    avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                     renderHistorico();
                 }
                 
@@ -9860,10 +9829,10 @@
                         })
                         .catch((error) => {
                             log('Erro ao excluir no Firebase:', error);
-                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                            avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                         });
                 } else {
-                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                    avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                 }
 
             } catch (error) {
@@ -9901,11 +9870,11 @@
                             log(`Status da minuta ${id} atualizado para ${status}`);
                         })
                         .catch((error) => {
-                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                            avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                             renderHistorico();
                         });
                 } else {
-                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                    avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                     renderHistorico();
                 }
                 
@@ -10019,10 +9988,10 @@
                         })
                         .catch((error) => {
                             log('Erro ao salvar correção no Firebase:', error);
-                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                            avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                         });
                 } else {
-                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                    avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                 }
 
             } catch (error) {
@@ -10637,11 +10606,11 @@
                             log(`Minuta ${minutaEditando} editada`);
                         })
                         .catch((error) => {
-                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                            avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                             renderHistorico();
                         });
                 } else {
-                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                    avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                     renderHistorico();
                 }
                 
@@ -10681,11 +10650,11 @@
                             log(`Correção solicitada para minuta ${minutaCorrecao}`);
                         })
                         .catch((error) => {
-                            showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                            avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                             renderHistorico();
                         });
                 } else {
-                    showNotification('Não foi possível salvar no banco: nada foi alterado. Verifique a conexão ou entre de novo no sistema.', 'error');
+                    avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                     renderHistorico();
                 }
                 
@@ -10894,108 +10863,9 @@
 
         // ==================== FUNÇÕES UTILITÁRIAS FINAIS ====================
         
-        // Função para debug - mostrar estado atual do sistema
-        function debugSystem() {
-            if (typeof console !== 'undefined') {
-                console.group('🔍 Debug do Sistema');
-                console.log('👤 Usuário atual:', currentUser);
-                console.log('📄 Total de minutas:', Object.keys(minutas).length);
-                console.log('👥 Assessores:', assessores);
-                console.log('🎯 View atual:', currentView);
-                console.log('🔥 Firebase ativo:', !!database);
-                console.log('📅 Data atual:', getHojeString());
-                console.log('🕐 Data/hora Brasília:', getDataHoraBrasilia());
-                console.groupEnd();
-            }
-        }
-
-        // Função específica para debug de relatórios
-        function debugRelatorios(tipo) {
-            try {
-                console.group(`📊 Debug Relatório ${tipo}`);
-                
-                const hoje = getDataHoraBrasilia();
-                console.log('Data atual:', hoje);
-                
-                let inicio, fim;
-                if (tipo === 'semanal') {
-                    inicio = getInicioSemana(hoje);
-                    fim = getFimSemana(hoje);
-                } else if (tipo === 'mensal') {
-                    inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-                    fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-                }
-                
-                console.log('Período:', {
-                    inicio: inicio?.toISOString(),
-                    fim: fim?.toISOString()
-                });
-                
-                const minutasNoSistema = Object.values(minutas);
-                console.log('Minutas no sistema:', minutasNoSistema.length);
-                
-                if (minutasNoSistema.length > 0) {
-                    console.log('Primeira minuta:', minutasNoSistema[0]);
-                    console.log('Última minuta:', minutasNoSistema[minutasNoSistema.length - 1]);
-                }
-                
-                const inicioStr = dataLocalISO(inicio);
-                const fimStr = dataLocalISO(fim);
-                
-                const minutasFiltradas = minutasNoSistema.filter(m => {
-                    if (!m || !m.data) return false;
-                    const dentroPeríodo = m.data >= inicioStr && m.data <= fimStr;
-                    const naoExcluida = m.status !== 'excluida';
-                    return dentroPeríodo && naoExcluida;
-                });
-                
-                console.log('Minutas no período:', minutasFiltradas.length);
-                console.log('Minutas filtradas:', minutasFiltradas);
-                
-                console.groupEnd();
-                
-                return {
-                    totalMinutas: minutasNoSistema.length,
-                    minutasPeríodo: minutasFiltradas.length,
-                    período: { inicio, fim }
-                };
-                
-            } catch (error) {
-                console.error('Erro no debug de relatórios:', error);
-                return null;
-            }
-        }
-
-        // Tornar funções de debug disponíveis globalmente (apenas em desenvolvimento)
-        if (typeof window !== 'undefined') {
-            window.debugSystem = debugSystem;
-            window.debugRelatorios = debugRelatorios;
-            
-            // Função de teste para relatórios
-            window.testarRelatorio = function(tipo = 'mensal') {
-                console.log(`🧪 Testando relatório ${tipo}...`);
-                const debug = debugRelatorios(tipo);
-                if (debug && debug.totalMinutas > 0) {
-                    console.log('✅ Dados disponíveis, gerando relatório...');
-                    gerarRelatorio(tipo);
-                } else {
-                    console.log('❌ Sem dados suficientes para o relatório');
-
-                }
-            };
-        }
-
-        // Log final
-        log('📋 2ª Vara Cível de Palmeira dos Índios - Sistema de Produtividade v1.0');
-        
-        // Aviso sobre funções de debug disponíveis
-        if (typeof console !== 'undefined') {
-            console.log('🛠️  Funções de debug disponíveis:');
-            console.log('   • debugSystem() - Estado geral do sistema');
-            console.log('   • debugRelatorios(tipo) - Debug específico de relatórios');
-            console.log('   • testarRelatorio(tipo) - Testar geração de relatórios');
-            console.log('   🆕 setupHistoricoFilters agora está no local correto!');
-        }
+        // 08/11/2026: removidas as funções de debug que ficavam no escopo global (debugSystem,
+        // debugRelatorios, testarRelatorio; limparDados já tinha saído em 06/11).
+        log('📋 2ª Vara Cível de Palmeira dos Índios - Sistema de Produtividade');
     </script>
 </body>
 </html>
