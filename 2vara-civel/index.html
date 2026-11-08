@@ -915,6 +915,9 @@
     <!-- Módulo Painel IA (sincronização com o Painel do Gabinete; apenas juiz) -->
     <div id="painelia-view" class="hidden"></div>
 
+    <!-- Módulo Gabinete (esteira do Painel do Gabinete; apenas juiz) -->
+    <div id="gabinete-view" class="hidden"></div>
+
     <!-- Módulo Acervo do gabinete (teses, modelos e skills para minutar com o Claude) -->
     <div id="acervo-view" class="hidden"></div>
 
@@ -2941,7 +2944,8 @@
             meta180: 'Processos Parados — 180/120/100',
             meta2: 'Meta 2 — Julgamento de Antigos',
             acervo: 'Acervo do Gabinete',
-            painelia: 'Painel IA'
+            painelia: 'Painel IA',
+            gabinete: 'Gabinete'
         };
 
         const ICONES_NAV = {
@@ -2955,6 +2959,7 @@
             calendario: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="2.5" width="12" height="11" rx="1.5"/><path d="M1.5 6h12M5 1v3M10 1v3"/></svg>',
             relatorios: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V8M5.75 13V2M9.5 13V5.5M13.25 13V9.5"/></svg>',
             acervo: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="1.5" width="10" height="12" rx="1.5"/><path d="M5.5 1.5v12"/></svg>',
+            gabinete: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="2.5" width="3" height="10" rx="1"/><rect x="6" y="2.5" width="3" height="7" rx="1"/><rect x="10.5" y="2.5" width="3" height="4.5" rx="1"/></svg>',
             painelia: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12.5 4.5A5.5 5.5 0 0 0 3.2 5.2M2.5 10.5a5.5 5.5 0 0 0 9.3-.7"/><path d="M12.5 1.5v3h-3M2.5 13.5v-3h3"/></svg>'
         };
 
@@ -2988,6 +2993,7 @@
             html += '<div class="grupo">Gabinete</div>';
             html += itemNav('acervo', 'Acervo');
             if (currentUser.isJuiz) {
+                html += itemNav('gabinete', 'Gabinete');
                 html += itemNav('painelia', 'Painel IA');
             }
 
@@ -3141,6 +3147,9 @@
                         break;
                     case 'painelia':
                         renderPainelIA();
+                        break;
+                    case 'gabinete':
+                        renderGabinete();
                         break;
                     case 'acervo':
                         renderAcervo();
@@ -8556,6 +8565,1429 @@
             criarIcones();
         }
 
+        // ==================== GABINETE (esteira do Painel do Gabinete; exclusiva do juiz) ====================
+        // 08/11/2026: o Painel do Gabinete (artifact do claude.ai) passou para dentro do sistema.
+        // Os processos ficam em gabinete/processos/<id> (mesmos campos e ids do Painel) e os sinais
+        // do executor em gabinete/sistema/{executor,gatilho,trava,varredura}. Contrato: seção
+        // "Esteira do gabinete no sistema" do INTEGRACAO-GABINETE.md. Regras do banco: só o juiz e a
+        // conta gabinete-auto leem e gravam gabinete/.
+        // Diferenças em relação ao Painel: "Assinar e lançar" e "Aprovar para revisão" gravam a minuta
+        // aqui mesmo, pela mesma função do botão "Lançar assinadas do Painel" (sem esperar o executor),
+        // e a situação no sistema vem das minutas vivas. Por isso não há Sincronizar, Confirmar
+        // lançamentos, snapshot nem ponte de copiar/colar. A Visão geral e a Produtividade do Painel
+        // não foram trazidas: o sistema já tem esses painéis (links no topo da aba).
+        // Regra do juiz: o executor só roda quando ele aperta "Ativar o executor"; nada rearma sozinho.
+
+        const GAB_ETAPAS = [
+            { id: 'fila', nome: 'A executar' },
+            { id: 'minuta', nome: 'Minuta pronta' },
+            { id: 'revisada', nome: 'Revisada' },
+            { id: 'assinada', nome: 'Assinada' }
+        ];
+        const GAB_COLUNAS = [
+            { id: 'fila', nome: 'Na fila', vazio: 'Nada esperando. Cadastre em “Novo processo” ou “Lote de processos”.' },
+            { id: 'execucao', nome: 'Em execução', vazio: 'O executor está parado.' },
+            { id: 'minuta', nome: 'Minuta pronta', vazio: 'Nenhuma minuta para revisar.' },
+            { id: 'assinar', nome: 'Assinada · falta lançar', vazio: 'Nada para lançar no sistema.' },
+            { id: 'lancada', nome: 'Lançada no sistema', vazio: 'Nenhuma lançada nas últimas 24 horas. As mais antigas estão no Arquivo.' }
+        ];
+        // o executor lê estes textos no comando: não alterar
+        const GAB_MATERIAS = { civel: 'cível', consumidor: 'direito do consumidor', familia: 'família', sucessoes: 'sucessões', execucao: 'execução e cumprimento de sentença', fazenda: 'Fazenda Pública', contratos: 'contratos e obrigações', possessorias: 'possessórias e direitos reais' };
+        const GAB_MATERIAS_CURTO = { civel: 'Cível', consumidor: 'Consumidor', familia: 'Família', sucessoes: 'Sucessões', execucao: 'Execução', fazenda: 'Fazenda', contratos: 'Contratos', possessorias: 'Possessórias' };
+        const GAB_MATERIAS_ROTULO = { civel: 'Cível geral', consumidor: 'Consumidor', familia: 'Família', sucessoes: 'Sucessões', execucao: 'Execução e cumprimento', fazenda: 'Fazenda Pública', contratos: 'Contratos e obrigações', possessorias: 'Possessórias e reais' };
+        const GAB_ESPECIES = {
+            auto: { curto: 'Ato pelos autos', rotulo: 'O Claude decide pelos autos', ato: 'o ato adequado ao estado do processo (despacho, decisão ou sentença, conforme os autos; diga qual escolheu e por quê)' },
+            despacho: { curto: 'Despacho', rotulo: 'Despacho', ato: 'um despacho' },
+            decisao: { curto: 'Decisão', rotulo: 'Decisão interlocutória', ato: 'uma decisão interlocutória' },
+            liminar: { curto: 'Liminar', rotulo: 'Decisão liminar / tutela', ato: 'uma decisão sobre o pedido de tutela' },
+            sentenca: { curto: 'Sentença', rotulo: 'Sentença', ato: 'uma sentença' },
+            embargos: { curto: 'ED', rotulo: 'Sentença em embargos de declaração', ato: 'a sentença nos embargos de declaração' },
+            'inv-saneadora': { curto: 'Inv. saneadora', rotulo: 'Inventário · decisão saneadora', ato: 'a decisão saneadora do inventário' },
+            'inv-homologa': { curto: 'Inv. homologação', rotulo: 'Inventário · sentença de homologação', ato: 'a sentença de homologação da partilha' }
+        };
+        const GAB_EXEC = {
+            fila: { nome: 'Na fila', cls: 'warn' },
+            executando: { nome: 'Executando', cls: 'run' },
+            concluido: { nome: 'Executado', cls: 'ok' },
+            erro: { nome: 'Erro na execução', cls: 'crit' }
+        };
+        const GAB_CATS = ['meta1', 'meta2', 'meta10', 'sem_movimento', 'outros', 'alem_meta', 'juiz_distribuicao', 'juiz_ato_inicial',
+            'conhecimento_10anos', 'fazenda_publica', 'acoes_saude', 'acoes_ambientais'];
+        // arquivo e atrasos: nada é apagado; "arquivado" true/false no processo sobrepõe a regra automática
+        const GAB_DIAS_ARQUIVO = 1, GAB_DIAS_PARADA = 30, GAB_POR_COLUNA = 15, GAB_POR_TABELA = 150;
+        const GAB_LIMITE_RODADA = 6; // processos por ativação do executor (o restante espera a próxima)
+        const GAB_CAMPOS = ['numero', 'classe', 'concluso', 'materia', 'especie', 'meta2', 'etapa', 'modo', 'rigor', 'esforco', 'biblio', 'juris', 'notas'];
+        const GAB_RE_CNJ_TEXTO = /\b(\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4})(?:\s*\/\s*(\d{1,4}))?/g;
+
+        let gabProcessos = {};
+        let gabSistema = {};
+        let gabCarregado = false;
+        let gabErroLeitura = '';
+        let gabListenersLigados = false;
+        const gab = {
+            aba: 'esteira', vista: 'kanban', f: gabFiltrosVazios(), busca: '', buscaArq: '',
+            sel: new Set(), modoLote: false, mais: {}, ordem: { k: 'padrao', dir: 1 }, tabelaTudo: false,
+            aberto: null, dtab: 'dados', form: null, prodForm: null, armado: false,
+            loteArmado: false, excArmado: '', retidas: {}, lote: null, loteItens: []
+        };
+        try {
+            const v = localStorage.getItem('gab-vista');
+            if (v === 'kanban' || v === 'lista') gab.vista = v;
+            const s = JSON.parse(localStorage.getItem('gab-filtros') || '{}');
+            for (const k of ['meta', 'atraso', 'erro', 'lancar']) gab.f[k] = !!s[k];
+            gab.f.materia = typeof s.materia === 'string' ? s.materia : '';
+        } catch (e) { /* sem armazenamento local: usa o padrão */ }
+
+        function gabFiltrosVazios() { return { meta: false, atraso: false, erro: false, lancar: false, materia: '', col: '' }; }
+        function gabSalvaPreferencias() {
+            try {
+                const { col, ...resto } = gab.f;
+                localStorage.setItem('gab-filtros', JSON.stringify(resto));
+                localStorage.setItem('gab-vista', gab.vista);
+            } catch (e) { /* ignorado */ }
+        }
+        function gabVazio() {
+            return { numero: '', classe: '', concluso: hojeLocal(), materia: 'civel', especie: 'sentenca', meta2: false, etapa: 'fila',
+                modo: 'minuta', rigor: 'rigoroso', esforco: 3, biblio: true, juris: true, notas: '' };
+        }
+
+        // ---------- dados ----------
+        function gabIniciarListeners() {
+            if (!currentUser?.isJuiz || !database || gabListenersLigados) return;
+            gabListenersLigados = true;
+            database.ref('gabinete/processos').on('value', (snapshot) => {
+                gabProcessos = snapshot.val() || {};
+                gabCarregado = true;
+                gabErroLeitura = '';
+                for (const id of [...gab.sel]) if (!gabProcessos[id]) gab.sel.delete(id);
+                gabAtualizar();
+                gabAgendarConciliacao();
+            }, (error) => {
+                gabErroLeitura = descreverErroGravacao(error);
+                log('Erro ao ler gabinete/processos', error);
+                gabAtualizar();
+            });
+            database.ref('gabinete/sistema').on('value', (snapshot) => {
+                gabSistema = snapshot.val() || {};
+                gabAtualizar();
+            }, (error) => log('Erro ao ler gabinete/sistema', error));
+            setInterval(() => { if (currentView === 'gabinete') gabRenderTopo(); }, 60000);
+        }
+
+        function gabAtualizar() {
+            if (currentView !== 'gabinete' || !currentUser?.isJuiz) return;
+            gabRenderTopo();
+            gabRenderCorpo();
+            if (gab.aberto && gab.aberto !== 'novo' && gab.aberto !== 'lote') {
+                if (!gabProcessos[gab.aberto]) { gabFechar(); return; }
+                const g = document.getElementById('gab-gaveta');
+                const foco = document.activeElement;
+                // não redesenha a gaveta enquanto o juiz digita nela
+                if (!(g && g.contains(foco) && /^(INPUT|TEXTAREA|SELECT)$/.test(foco.tagName))) gabRenderGaveta();
+            }
+        }
+
+        function gabDocs() {
+            return Object.entries(gabProcessos).filter(([, p]) => p && typeof p === 'object').map(([id, p]) => ({ id, ...p }));
+        }
+        function gabDoc(id) { const p = gabProcessos[id]; return p && typeof p === 'object' ? { id, ...p } : null; }
+        function gabRef(id) { return database.ref(`gabinete/processos/${id}`); }
+
+        function gabColunaDe(p) {
+            const prod = p.prod?.status;
+            if (prod === 'lancada' || prod === 'assinada') return 'lancada';
+            if (p.etapa === 'assinada' || prod === 'lancar') return 'assinar';
+            if (p.execStatus === 'executando') return 'execucao';
+            if (p.execStatus === 'concluido' || p.exec?.arquivo || p.etapa === 'minuta' || p.etapa === 'revisada') return 'minuta';
+            return 'fila';
+        }
+        function gabDiasISO(iso) { if (!iso) return null; const ms = Date.parse(iso); return isNaN(ms) ? null : Math.floor((Date.now() - ms) / 86400000); }
+        function gabDiasDesde(data) { const d = diasEntreDatas(String(data || '').slice(0, 10), hojeLocal()); return d === null ? null : Math.max(0, d); }
+        // minuta da pasta que já entrou lançada no sistema (importador do executor): vai direto ao Arquivo
+        function gabLancadaFora(p) {
+            return p.origem?.tipo === 'pasta' && !!p.prod?.lancadoPor && ['lancada', 'assinada'].includes(p.prod?.status);
+        }
+        function gabArquivado(p) {
+            if (p.arquivado === true) return true;
+            if (p.arquivado === false) return false;
+            if (gabLancadaFora(p)) return true;
+            // orientação do juiz (25/10/2026): a lançada vai para o Arquivo 1 dia depois do lançamento
+            return gabColunaDe(p) === 'lancada' && (gabDiasISO(p.prod?.lancadaEm || p.atualizadoEm) ?? 0) >= GAB_DIAS_ARQUIVO;
+        }
+        function gabDiasParada(p) {
+            if (gabColunaDe(p) !== 'minuta' || p.etapa === 'revisada') return null;
+            const d = gabDiasISO(p.exec?.concluidoEm || p.atualizadoEm);
+            return d !== null && d > GAB_DIAS_PARADA ? d : null;
+        }
+        const gabNaEsteira = () => gabDocs().filter(p => !gabArquivado(p));
+        const gabEmAtraso = (p) => ((gabDiasDesde(p.concluso) ?? 0) > 60 && p.etapa !== 'assinada') || !!gabDiasParada(p);
+        const gabComErro = (p) => p.execStatus === 'erro' || !!p.prod?.erro;
+        const gabTemMinuta = (p) => !!p && (p.execStatus === 'concluido' || !!p.exec?.arquivo);
+        function gabPassa(p) {
+            const f = gab.f;
+            if (f.meta && !p.meta2) return false;
+            if (f.atraso && !gabEmAtraso(p)) return false;
+            if (f.erro && !gabComErro(p)) return false;
+            if (f.lancar && gabColunaDe(p) !== 'assinar') return false;
+            if (f.materia && p.materia !== f.materia) return false;
+            if (f.col && gabColunaDe(p) !== f.col) return false;
+            const q = gab.busca.trim().toLowerCase();
+            if (q && !`${p.numero} ${p.classe} ${p.notas} ${GAB_MATERIAS[p.materia] || ''}`.toLowerCase().includes(q)) return false;
+            return true;
+        }
+        const gabOrdemPadrao = (a, b) => (Number(!!b.meta2) - Number(!!a.meta2)) || ((gabDiasDesde(b.concluso) ?? 0) - (gabDiasDesde(a.concluso) ?? 0));
+
+        // ---------- comandos (o executor executa este texto: não alterar) ----------
+        function gabComando(p) {
+            const n = p.numero || '[número do processo]';
+            const avancado = ['baixado', 'firac', 'minuta', 'revisada'].includes(p.etapa);
+            const linhas = [];
+            if (p.especie === 'inv-saneadora' || p.especie === 'inv-homologa') {
+                linhas.push(`${avancado ? 'Usando os autos já baixados do' : 'Baixa o'} processo ${n}, audita o inventário pelo Roteiro de Sucessões do TJAL e minuta ${GAB_ESPECIES[p.especie].ato}.`);
+            } else if (p.especie === 'embargos') {
+                linhas.push(`${avancado ? 'Usando os autos já baixados do' : 'Baixa o'} processo ${n} e minuta ${GAB_ESPECIES.embargos.ato} (tempestividade, art. 1.022 do CPC, vício apontado e dispositivo).`);
+            } else {
+                linhas.push(`${avancado ? 'Usando os autos já baixados do' : 'Baixa o'} processo ${n}, faz a ficha FIRAC+ e minuta ${GAB_ESPECIES[p.especie]?.ato || 'o ato'}.`);
+            }
+            if (p.etapa === 'minuta' || p.etapa === 'revisada') linhas.push('A minuta já existe: revisa a minuta atual em vez de começar do zero.');
+            const barra = [`modo ${p.modo}`, `esforço ${p.esforco}`];
+            if (p.biblio) barra.push(`ativa bibliotecário de ${GAB_MATERIAS[p.materia] || p.materia}`);
+            barra.push(`modo ${p.rigor}`);
+            linhas.push(barra.join(', ') + '.');
+            if (p.juris) linhas.push('Consulte a jurisprudência do TJAL.');
+            if (p.meta2) linhas.push('Processo da Meta 2: priorize.');
+            if (p.notas && p.notas.trim()) linhas.push('', 'Orientações:', p.notas.trim());
+            return linhas.join('\n');
+        }
+        function gabComandoLote(lista) {
+            const l = ['Processa em lote estes processos (download sequencial, um agente por processo, revisor independente e painel do lote):', ''];
+            for (const p of lista) {
+                const extra = [GAB_ESPECIES[p.especie]?.ato || 'ato', `esforço ${p.esforco}`, p.biblio ? `bibliotecário de ${GAB_MATERIAS[p.materia]}` : '', p.meta2 ? 'Meta 2' : ''].filter(Boolean).join('; ');
+                l.push(`- ${p.numero} → ${extra}${p.notas && p.notas.trim() ? ` · ${p.notas.trim().replace(/\s+/g, ' ')}` : ''}`);
+            }
+            l.push('', 'Modo minuta, consulte a jurisprudência do TJAL e entregue as minutas em .docx.');
+            return l.join('\n');
+        }
+        function gabPedidoExec(p, loteId) {
+            return { execStatus: 'fila', exec: { pedidoEm: new Date().toISOString(), comando: gabComando(p), loteId: loteId || '', iniciadoEm: '', concluidoEm: '', resumo: '', arquivo: '', erro: '' } };
+        }
+
+        // ---------- tipo do ato, categorias e situação no sistema ----------
+        function gabTipoPadrao(especie) {
+            if (especie === 'auto') return '';
+            if (['sentenca', 'embargos', 'inv-homologa'].includes(especie)) return 'Sentença';
+            if (especie === 'despacho') return 'Despacho';
+            return 'Decisão';
+        }
+        // o ato que vale é o que a minuta realmente é (gravado pelo executor); o pedido é só a intenção
+        function gabTipoDe(p) { return p.atoGerado || gabTipoPadrao(p.especie); }
+        function gabAtoDivergente(p) { const pedido = gabTipoPadrao(p.especie); return !!(p.atoGerado && pedido && pedido !== p.atoGerado); }
+        function gabLancadaComOutroAto(p) { return ['lancada', 'assinada'].includes(p.prod?.status) && p.atoGerado && p.prod?.tipo && p.prod.tipo !== p.atoGerado; }
+        function gabCatsPadrao(p) {
+            const tipo = gabTipoDe(p) || 'Decisão';
+            if (p.origem?.tipo === 'meta2' || (p.meta2 && tipo === 'Sentença')) return tipo === 'Sentença' ? ['meta2', 'meta1'] : ['outros'];
+            if (p.origem?.tipo === 'meta180') return ['sem_movimento'];
+            if (p.origem?.tipo === 'balcao') return ['outros'];
+            return tipo === 'Sentença' ? ['meta1'] : ['outros'];
+        }
+
+        // índice das minutas vivas por painelId (refeito quando o listener troca o objeto minutas)
+        let gabIndice = { fonte: null, mapa: new Map() };
+        function gabMinutaNoSistema(p) {
+            if (gabIndice.fonte !== minutas) {
+                const mapa = new Map();
+                for (const [id, m] of Object.entries(minutas)) {
+                    if (!m || !m.painelId || m.status === 'excluida') continue;
+                    const atual = mapa.get(m.painelId);
+                    // o registro em nome do juiz prevalece sobre o do Claude (IA)
+                    if (!atual || (atual.m.assessorId === PAINEL_IA_ASSESSOR_ID && m.assessorId !== PAINEL_IA_ASSESSOR_ID)) mapa.set(m.painelId, { id, m });
+                }
+                gabIndice = { fonte: minutas, mapa };
+            }
+            return gabIndice.mapa.get(p.id) || null;
+        }
+
+        function gabSituacao(p) {
+            const st = p.prod?.status || '', no = gabMinutaNoSistema(p), ms = no?.m?.status;
+            if (st === 'lancada' || st === 'assinada') return { k: 'lancada', txt: 'Lançada (assinada no sistema)', cls: 'ok', em: p.prod.lancadaEm, ordem: 6 };
+            if (ms === 'assinada') return { k: 'lancada', txt: 'Assinada no sistema', cls: 'ok', em: '', ordem: 6, dica: 'O registro já está assinado no sistema; a esteira confirma sozinha em instantes.' };
+            if (p.lancarStatus === 'duplicidade') return { k: 'dup', txt: 'Retida por duplicidade', cls: 'crit', em: p.prod?.solicitadoEm, ordem: 1, dica: 'Há outra minuta do mesmo processo no sistema nos últimos 7 dias. Confira e, se não for o mesmo ato, use “Lançar mesmo assim” na aba Sistema.' };
+            if (ms === 'correcao') return { k: 'correcao', txt: 'Correção pedida no sistema', cls: 'crit', em: p.prod?.enviadaEm, ordem: 1 };
+            if (ms === 'pendente') return { k: 'pendente', txt: no.m.assessorId === PAINEL_IA_ASSESSOR_ID ? 'No sistema · a assinar (Claude IA)' : 'No sistema · a assinar', cls: 'warn', em: p.prod?.enviadaEm, ordem: 4 };
+            if (st === 'lancar') return { k: 'lancar', txt: 'Falta lançar', cls: 'warn', em: p.prod.solicitadoEm, ordem: 2, dica: 'Marcada como assinada, mas ainda sem registro no sistema. Use “Assinar e lançar” na aba Sistema.' };
+            if (st === 'aprovada') return { k: 'aprovada', txt: 'Aprovada · falta registrar', cls: 'meta', em: p.prod.solicitadoEm, ordem: 2, dica: 'Use “Aprovar para revisão” na aba Sistema para registrar agora.' };
+            if (st === 'enviada' || st === 'pendente') return { k: 'enviada', txt: 'Enviada para revisão', cls: 'meta', em: p.prod.enviadaEm, ordem: 4 };
+            if (st === 'correcao') return { k: 'correcao', txt: 'Correção pedida no sistema', cls: 'crit', em: p.prod.enviadaEm, ordem: 1 };
+            return null;
+        }
+        function gabEmNomeDe(p) {
+            const nomeDe = id => id === 'juiz' ? 'Juiz' : id === PAINEL_IA_ASSESSOR_ID ? 'Claude (IA)' : (assessores[id]?.nome || id);
+            if (gabLancadaFora(p)) return nomeDe(p.prod.lancadoPor);
+            const no = gabMinutaNoSistema(p);
+            if (no) return no.m.assessorNome || nomeDe(no.m.assessorId);
+            const st = p.prod?.status;
+            if (['lancar', 'lancada', 'assinada'].includes(st)) return 'Juiz';
+            if (['aprovada', 'enviada', 'pendente', 'correcao'].includes(st)) return 'Claude (IA)';
+            return '';
+        }
+
+        // Conciliação (substitui o "Confirmar lançamentos" do Painel): a sessão do juiz confere as
+        // minutas vivas e grava no processo o que já está no sistema (lançada pelo Histórico, pelo
+        // executor ou em outra aba). Grava só o que mudou; nunca substitui prod (só os campos).
+        let gabConcTimer = null;
+        const gabConcEmCurso = new Set();
+        function gabAgendarConciliacao() {
+            if (!currentUser?.isJuiz || !database || !gabCarregado) return;
+            clearTimeout(gabConcTimer);
+            gabConcTimer = setTimeout(gabConciliar, 1500);
+        }
+        async function gabConciliar() {
+            if (!currentUser?.isJuiz || !database) return;
+            for (const p of gabDocs()) {
+                const no = gabMinutaNoSistema(p);
+                if (!no) continue;
+                const st = p.prod?.status || '', m = no.m, ia = m.assessorId === PAINEL_IA_ASSESSOR_ID;
+                let upd = null;
+                if (m.status === 'assinada') {
+                    if (st === 'lancada' || st === 'assinada') continue;
+                    // correção de ato só se confirma quando o sistema já mostra o ato novo
+                    if (m.tipoMinuta && p.prod?.tipo && m.tipoMinuta !== p.prod.tipo) continue;
+                    upd = { etapa: 'assinada', lancarStatus: 'ok', 'prod/status': ia ? 'assinada' : 'lancada', 'prod/minutaId': no.id,
+                        'prod/lancadaEm': new Date().toISOString(), 'prod/erro': '' };
+                    if (!p.prod?.tipo && m.tipoMinuta) upd['prod/tipo'] = m.tipoMinuta;
+                } else if (ia && (m.status === 'pendente' || m.status === 'correcao')) {
+                    if (['lancada', 'assinada', 'lancar', m.status].includes(st)) continue;
+                    upd = { 'prod/status': m.status, 'prod/minutaId': no.id };
+                }
+                if (!upd) continue;
+                const chave = `${p.id}:${upd['prod/status']}`;
+                if (gabConcEmCurso.has(chave)) continue;
+                gabConcEmCurso.add(chave);
+                try {
+                    await gabRef(p.id).update(upd);
+                    log(`Esteira do gabinete: ${p.numero} conferido no sistema (${upd['prod/status']})`);
+                } catch (e) {
+                    log('Conciliação da esteira falhou', e);
+                } finally {
+                    setTimeout(() => gabConcEmCurso.delete(chave), 10000);
+                }
+            }
+        }
+
+        // ---------- executor ----------
+        function gabGatilhoAtivo() {
+            const g = gabSistema.gatilho;
+            return g && (g.status === 'pendente' || g.status === 'disparado') ? g : null;
+        }
+        // grava o pedido só se não houver outro pendente ou em curso (transação: dois cliques ou duas
+        // abas não geram dois pedidos). O executor muda o status para "disparado" e depois "atendido".
+        async function gabPedirExecutor() {
+            const novo = { status: 'pendente', modo: 'completo', pedidoEm: new Date().toISOString(), pedidoPor: currentUser.nome };
+            const r = await database.ref('gabinete/sistema/gatilho')
+                .transaction(v => (v && (v.status === 'pendente' || v.status === 'disparado')) ? undefined : novo);
+            return !!r.committed;
+        }
+        async function gabAtivarExecutor() {
+            if (!currentUser?.isJuiz || !database) return;
+            if (!iniciarGravacao('gab-gatilho')) return;
+            try {
+                const ok = await gabPedirExecutor();
+                showNotification(ok ? 'Executor ativado: começa em até 5 minutos (ele confere das 6h às 23h).' : 'Já há um pedido ao executor pendente ou em curso.', ok ? 'success' : 'info');
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível ativar o executor');
+            } finally {
+                encerrarGravacao('gab-gatilho');
+            }
+        }
+
+        // ---------- utilidades de tela ----------
+        const GAB_PILL = {
+            ok: 'bg-green-100 text-green-800', warn: 'bg-amber-100 text-amber-800', crit: 'bg-red-100 text-red-700',
+            run: 'bg-blue-100 text-blue-800', meta: 'bg-purple-100 text-purple-800', ato: 'bg-cyan-100 text-cyan-800', '': 'bg-gray-100 text-gray-700'
+        };
+        function gabPill(texto, cls = '', titulo = '') {
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${GAB_PILL[cls] || GAB_PILL['']}"${titulo ? ` title="${escapeHtml(titulo)}"` : ''}>${escapeHtml(texto)}</span>`;
+        }
+        function gabPillDias(n, etapa) {
+            if (n == null || etapa === 'assinada') return '';
+            return gabPill(`${n} ${n === 1 ? 'dia' : 'dias'}`, n > 100 ? 'crit' : n > 60 ? 'warn' : 'ok', 'Dias desde a conclusão');
+        }
+        function gabDataHora(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return isNaN(d) ? '' : d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+        function gabHaQuanto(iso) {
+            const min = Math.round((Date.now() - Date.parse(iso)) / 60000);
+            if (!(min >= 0)) return '';
+            if (min < 1) return 'agora';
+            if (min < 60) return `há ${min} min`;
+            const h = Math.round(min / 60);
+            return h < 24 ? `há ${h} h` : `em ${gabDataHora(iso)}`;
+        }
+        const gabPlural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+        function gabSisHTML(p) {
+            const s = gabSituacao(p);
+            const erro = p.prod?.erro ? `<div class="text-xs text-red-700 mt-1">Erro no sistema: ${escapeHtml(p.prod.erro)}</div>` : '';
+            if (!s) return erro;
+            const cor = { ok: 'border-green-500 bg-green-50 text-green-800', warn: 'border-amber-500 bg-amber-50 text-amber-800', crit: 'border-red-500 bg-red-50 text-red-700', meta: 'border-purple-500 bg-purple-50 text-purple-800' }[s.cls] || 'border-gray-300 bg-gray-50 text-gray-700';
+            return `<div class="flex justify-between gap-2 text-xs border-l-4 ${cor} rounded px-2 py-1 mt-1"${s.dica ? ` title="${escapeHtml(s.dica)}"` : ''}><span>${escapeHtml(s.txt)}</span>${s.em ? `<time class="whitespace-nowrap opacity-80">${escapeHtml(gabDataHora(s.em))}</time>` : ''}</div>${erro}`;
+        }
+        async function gabCopiar(texto, ok = 'Copiado. Cole numa conversa com o Claude.') {
+            try {
+                await navigator.clipboard.writeText(texto);
+                showNotification(ok, 'success');
+            } catch (e) {
+                window.prompt('Copie o texto (Ctrl+C):', texto);
+            }
+        }
+
+        // ---------- tela ----------
+        function renderGabinete() {
+            const view = document.getElementById('gabinete-view');
+            if (!view) return;
+            view.classList.remove('hidden');
+            if (!currentUser?.isJuiz) {
+                view.innerHTML = '<div class="max-w-4xl mx-auto px-4 py-8 text-gray-600">Esta tela é exclusiva do juiz.</div>';
+                return;
+            }
+            gabIniciarListeners();
+            view.innerHTML = `
+                <div class="max-w-7xl mx-auto px-4 py-6 space-y-4">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h2 class="text-2xl font-bold text-gray-800">Gabinete · esteira de minutas</h2>
+                        <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">🔒 visível apenas no seu login</span>
+                    </div>
+                    <div id="gab-topo" class="space-y-3"></div>
+                    <div class="flex items-center justify-between flex-wrap gap-2 border-b border-gray-200 pb-2">
+                        <nav id="gab-abas" class="flex gap-1 flex-wrap" role="tablist" aria-label="Seções do gabinete"></nav>
+                        <div class="flex gap-2">
+                            <button onclick="gabAbrir(null)" class="bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 text-sm">+ Novo processo</button>
+                            <button onclick="gabAbrirLote()" class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-100 text-sm">Lote de processos</button>
+                        </div>
+                    </div>
+                    <div id="gab-barra" class="flex items-center gap-2 flex-wrap">
+                        <input id="gab-busca" type="search" placeholder="Buscar número, classe, matéria ou orientação" value="${escapeHtml(gab.busca)}"
+                            oninput="gab.busca = this.value; gab.tabelaTudo = false; gabRenderCorpo()"
+                            class="border border-gray-300 rounded-md px-3 py-1.5 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        <div id="gab-vista" class="flex gap-1"></div>
+                    </div>
+                    <div id="gab-barra-arq" class="hidden">
+                        <input id="gab-busca-arq" type="search" placeholder="Buscar no Arquivo" value="${escapeHtml(gab.buscaArq)}"
+                            oninput="gab.buscaArq = this.value; gabRenderCorpo()"
+                            class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-full max-w-md focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    </div>
+                    <div id="gab-corpo"></div>
+                </div>`;
+            if (!document.getElementById('gab-gaveta')) {
+                const g = document.createElement('div');
+                g.id = 'gab-gaveta';
+                document.body.appendChild(g);
+            }
+            gabRenderTopo();
+            gabRenderCorpo();
+        }
+
+        function gabRenderTopo() {
+            const el = document.getElementById('gab-topo');
+            if (!el) return;
+            if (gabErroLeitura) {
+                el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-600 text-red-800 rounded p-4 text-sm"><strong>O banco não liberou a esteira do gabinete:</strong> ${escapeHtml(gabErroLeitura)} Confira se as regras do banco com o nó <code>gabinete</code> foram publicadas.</div>`;
+                return;
+            }
+            if (!gabCarregado) { el.innerHTML = '<p class="text-sm text-gray-500">Carregando a esteira…</p>'; return; }
+            const docs = gabDocs();
+            const naFila = docs.filter(p => p.execStatus === 'fila');
+            const rodando = docs.filter(p => p.execStatus === 'executando');
+            const g = gabSistema.gatilho || null;
+            const pendente = g?.status === 'pendente', disparado = g?.status === 'disparado';
+            const ex = gabSistema.executor || {}, trava = gabSistema.trava || {}, varredura = gabSistema.varredura || {};
+            const travado = !!trava.status && trava.status !== 'livre';
+
+            // sinal de vida: verde na última hora; depois, neutro (não é falha: só roda quando o juiz ativa)
+            const ult = ex.ultimaVerificacao;
+            const minVida = ult ? (Date.now() - Date.parse(ult)) / 60000 : null;
+            const vida = !ult ? 'O executor ainda não deu sinal de vida neste banco' : `Última rodada ${gabHaQuanto(ult)} · só roda quando você ativa`;
+            let estado = '';
+            if (pendente) estado = `Executor ativado ${gabHaQuanto(g.pedidoEm)}${g.pedidoPor ? ` por ${g.pedidoPor}` : ''} · começa em até 5 min`;
+            else if (disparado || rodando.length || travado) {
+                const r = rodando[0];
+                estado = `Executando agora${r ? ` · ${r.numero || 'processo'} (${r.exec?.fase || 'iniciando'})` : ''}${rodando.length > 1 ? ` e mais ${rodando.length - 1}` : ''}`;
+            } else if (g?.atendidoEm) estado = `Último pedido atendido ${gabHaQuanto(g.atendidoEm)}`;
+
+            const erros = docs.filter(p => p.execStatus === 'erro')
+                .sort((a, b) => String(b.exec?.concluidoEm || b.atualizadoEm || '').localeCompare(String(a.exec?.concluidoEm || a.atualizadoEm || '')));
+            const n = naFila.length;
+            const rotuloBotao = !n ? 'Ativar o executor' : n > GAB_LIMITE_RODADA ? `Ativar o executor (${GAB_LIMITE_RODADA} de ${n})` : `Ativar o executor (${n})`;
+            const tituloBotao = n > GAB_LIMITE_RODADA
+                ? `Processa ${GAB_LIMITE_RODADA} dos ${n} da fila (Meta 2 primeiro, depois os mais antigos) e registra as minutas novas da pasta Processos.`
+                : 'O executor só roda quando você ativa: processa a fila e registra as minutas novas da pasta Processos.';
+
+            // faixas de alerta
+            const faixas = [];
+            const faixa = (cls, titulo, texto, botao = '') => {
+                const cor = { warn: 'bg-amber-50 border-amber-500 text-amber-900', crit: 'bg-red-50 border-red-600 text-red-800', info: 'bg-cyan-50 border-cyan-600 text-cyan-900' }[cls];
+                return `<div class="border-l-4 ${cor} rounded p-3 text-sm flex items-start justify-between gap-3 flex-wrap"><div><strong>${titulo}</strong> ${texto}</div>${botao}</div>`;
+            };
+            const btnFiltro = (alvo, rot) => `<button onclick="gabIrPara('${escapeAttr(alvo)}')" class="text-xs bg-white border border-gray-300 rounded px-2 py-1 hover:bg-gray-100 whitespace-nowrap">${escapeHtml(rot)}</button>`;
+            const emCaptcha = naFila.filter(p => p.exec?.aviso === 'captcha').length;
+            if (emCaptcha && !pendente) {
+                faixas.push(faixa('warn', `O e-SAJ pediu captcha${ex.captchaEm ? ' ' + escapeHtml(gabHaQuanto(ex.captchaEm)) : ''}.`,
+                    `${gabPlural(emCaptcha, 'processo ficou', 'processos ficaram')} na fila sem baixar. Abra o e-SAJ na aba do Chrome do Claude, resolva o captcha e aperte <strong>Ativar o executor</strong>: ele retoma de onde parou.`, btnFiltro('col:fila', 'Ver a fila')));
+            }
+            const reExpirado = /sess[aã]o[^.]{0,40}(expir|encerr)|expirad[ao]|fa[cç]a (o )?login|login[^.]{0,30}e-?saj/i;
+            const expirados = docs.filter(p => ['esaj-expirado', 'sessao-expirada'].includes(p.exec?.aviso) || (p.execStatus === 'erro' && reExpirado.test(String(p.exec?.erro || ''))));
+            if (expirados.length && !pendente) {
+                faixas.push(faixa('warn', 'A sessão do e-SAJ expirou.', `${gabPlural(expirados.length, 'processo não foi baixado', 'processos não foram baixados')}. Entre de novo no e-SAJ na aba do Chrome do Claude, ponha os processos na fila outra vez e ative o executor.`, btnFiltro('f:erro', 'Ver')));
+            }
+            if (erros.length) {
+                const u = erros[0];
+                faixas.push(faixa('crit', `${gabPlural(erros.length, 'processo falhou', 'processos falharam')} na execução.`,
+                    `Último: <span class="font-mono">${escapeHtml(u.numero || '')}</span> — ${escapeHtml(String(u.exec?.erro || 'sem mensagem').slice(0, 160).replace(/[.\s]+$/, ''))}. Abra o processo, leia o erro na aba Execução e ponha na fila de novo.`, btnFiltro('f:erro', 'Ver os erros')));
+            }
+            const eSis = docs.filter(p => p.prod?.erro && !gabArquivado(p)).length;
+            if (eSis) faixas.push(faixa('crit', `${gabPlural(eSis, 'minuta com erro', 'minutas com erro')} no sistema.`, 'O motivo aparece no cartão e na aba Sistema.', btnFiltro('f:erro', 'Ver')));
+            const dup = docs.filter(p => p.lancarStatus === 'duplicidade' && !gabArquivado(p)).length;
+            if (dup) faixas.push(faixa('crit', `${gabPlural(dup, 'lançamento retido', 'lançamentos retidos')} por duplicidade.`, 'Há outra minuta do mesmo processo nos últimos 7 dias. Confira antes de lançar mesmo assim.', btnFiltro('col:assinar', 'Ver')));
+            const paradas = gabNaEsteira().filter(p => gabDiasParada(p)).length;
+            if (paradas) faixas.push(faixa('warn', `${gabPlural(paradas, 'minuta parada', 'minutas paradas')} há mais de ${GAB_DIAS_PARADA} dias.`, 'Revise ou arquive.', btnFiltro('f:atraso', 'Ver')));
+            if (n > GAB_LIMITE_RODADA) {
+                const faltam = Math.ceil(n / GAB_LIMITE_RODADA);
+                faixas.push(faixa('info', `${n} processos na fila.`, `Cada ativação processa até ${GAB_LIMITE_RODADA} (Meta 2 primeiro, depois os mais antigos): ${gabPlural(faltam, 'ativação esvazia', 'ativações esvaziam')} a fila${pendente || disparado ? ', contando a que já está pedida' : ''}.`));
+            }
+
+            // resumo da esteira (a Visão geral do Painel duplicava os painéis do sistema)
+            const esteira = gabNaEsteira();
+            const col = id => esteira.filter(p => gabColunaDe(p) === id).length;
+            const ativos = esteira.filter(p => !['assinar', 'lancada'].includes(gabColunaDe(p)));
+            const kpi = (alvo, rotulo, valor, cls = '') => `<button onclick="gabIrPara('${escapeAttr(alvo)}')" class="kpi clicavel"><div class="rotulo">${rotulo}</div><div class="valor ${valor && cls ? cls : ''}">${valor}</div></button>`;
+            const prontas = esteira.filter(p => gabColunaDe(p) === 'minuta' && p.etapa !== 'revisada').length;
+
+            el.innerHTML = `
+                <div class="bg-white rounded-lg shadow-md p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div class="space-y-1 text-sm">
+                        <div class="flex items-center gap-2"><span class="inline-block w-2.5 h-2.5 rounded-full ${minVida !== null && minVida <= 60 ? 'bg-green-500' : 'bg-gray-400'}"></span><span class="text-gray-700">${escapeHtml(vida)}</span></div>
+                        ${estado ? `<div class="flex items-center gap-2 ${pendente || disparado || rodando.length ? 'text-cyan-800 font-medium' : 'text-gray-600'}">${pendente || disparado || rodando.length ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-cyan-600 pulse"></span>' : ''}${escapeHtml(estado)}</div>` : ''}
+                        ${travado ? `<div class="text-xs text-gray-500">Trava do executor: ${escapeHtml(trava.status)}${trava.desde || trava.travadaEm ? ` desde ${escapeHtml(gabDataHora(trava.desde || trava.travadaEm))}` : ''}</div>` : ''}
+                        ${varredura.ultimaVarreduraLocal ? `<div class="text-xs text-gray-500">Última varredura da pasta Processos: ${escapeHtml(gabDataHora(varredura.ultimaVarreduraLocal))}${varredura.importados != null ? ` · ${escapeHtml(varredura.importados)} importada(s)` : ''}</div>` : ''}
+                    </div>
+                    ${pendente || disparado ? '' : `<button onclick="gabAtivarExecutor()" data-gravacao="gab-gatilho" title="${escapeHtml(tituloBotao)}" class="bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800 font-medium">${escapeHtml(rotuloBotao)}</button>`}
+                </div>
+                ${faixas.join('')}
+                <div class="kpis">
+                    ${kpi('col:fila', 'Na fila', col('fila'))}
+                    ${kpi('col:execucao', 'Em execução', col('execucao'))}
+                    ${kpi('col:minuta', 'Para revisar', prontas)}
+                    ${kpi('col:assinar', 'Falta lançar', col('assinar'), 'text-amber-700')}
+                    ${kpi('f:meta', 'Meta 2 na esteira', ativos.filter(p => p.meta2).length)}
+                    ${kpi('f:atraso', 'Atrasados', ativos.filter(gabEmAtraso).length, 'text-amber-700')}
+                    ${kpi('f:erro', 'Com erro', esteira.filter(gabComErro).length, 'text-red-700')}
+                </div>
+                <p class="text-xs text-gray-500">Produtividade e metas ficam nos painéis do sistema:
+                    <button class="underline" onclick="showView('dashboard')">Painel do Dia</button> ·
+                    <button class="underline" onclick="showView('meta2')">Meta 2</button> ·
+                    <button class="underline" onclick="showView('meta180')">180/120/100</button> ·
+                    <button class="underline" onclick="showView('balcao')">Balcão Virtual</button> ·
+                    <button class="underline" onclick="showView('historico')">Histórico</button></p>`;
+        }
+
+        function gabMostraAba(aba) {
+            gab.aba = aba;
+            gabRenderCorpo();
+        }
+        function gabIrPara(alvo) {
+            const [tipo, v] = alvo.split(':');
+            gab.f = gabFiltrosVazios();
+            gab.busca = '';
+            const busca = document.getElementById('gab-busca');
+            if (busca) busca.value = '';
+            if (tipo === 'col') gab.f.col = v; else gab.f[v] = true;
+            gab.vista = 'lista';
+            gab.aba = 'esteira';
+            gabSalvaPreferencias();
+            gabRenderCorpo();
+            document.getElementById('gab-corpo')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }
+
+        function gabRenderCorpo() {
+            const corpo = document.getElementById('gab-corpo');
+            if (!corpo) return;
+            const docs = gabDocs();
+            const nArq = docs.filter(gabArquivado).length;
+            const aba = (id, rot) => `<button role="tab" aria-selected="${gab.aba === id}" onclick="gabMostraAba('${id}')" class="px-3 py-1.5 rounded-md text-sm ${gab.aba === id ? 'bg-cyan-700 text-white' : 'text-gray-700 hover:bg-gray-100'}">${rot}</button>`;
+            document.getElementById('gab-abas').innerHTML = aba('esteira', `Esteira <span class="opacity-75">${gabNaEsteira().length}</span>`) + aba('arquivo', `Arquivo <span class="opacity-75">${nArq}</span>`) + aba('comandos', 'Comandos rápidos');
+            document.getElementById('gab-barra').classList.toggle('hidden', gab.aba !== 'esteira');
+            document.getElementById('gab-barra-arq').classList.toggle('hidden', gab.aba !== 'arquivo');
+            if (!gabCarregado && !gabErroLeitura) { corpo.innerHTML = ''; return; }
+            if (gab.aba === 'arquivo') { corpo.innerHTML = gabArquivoHTML(); return; }
+            if (gab.aba === 'comandos') { corpo.innerHTML = gabComandosHTML(); return; }
+
+            const botao = (ativo, rot, acao) => `<button onclick="${acao}" aria-pressed="${ativo}" class="px-3 py-1.5 rounded-md text-sm border ${ativo ? 'bg-cyan-700 text-white border-cyan-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}">${rot}</button>`;
+            document.getElementById('gab-vista').innerHTML =
+                botao(gab.vista === 'kanban', 'Kanban', "gab.vista='kanban'; gabSalvaPreferencias(); gabRenderCorpo()") +
+                botao(gab.vista === 'lista', 'Lista', "gab.vista='lista'; gabSalvaPreferencias(); gabRenderCorpo()") +
+                (gab.vista === 'kanban' ? botao(gab.modoLote, 'Selecionar', 'gabAlternaModoLote()') : '');
+
+            const lista = gabNaEsteira().filter(gabPassa);
+            const q = gab.busca.trim().toLowerCase();
+            const noArq = q ? docs.filter(p => gabArquivado(p) && `${p.numero} ${p.classe} ${p.notas}`.toLowerCase().includes(q)).length : 0;
+            corpo.innerHTML = `
+                ${gabChipsHTML()}
+                ${gabLoteBarHTML()}
+                ${gab.vista === 'kanban' ? gabBoardHTML(lista) : gabListaHTML(lista)}
+                ${noArq ? `<p class="text-sm text-gray-600 mt-3">${noArq} resultado(s) no Arquivo · <button class="underline" onclick="gab.buscaArq = gab.busca; document.getElementById('gab-busca-arq').value = gab.busca; gabMostraAba('arquivo')">Ver no Arquivo</button></p>` : ''}`;
+        }
+
+        function gabChipsHTML() {
+            const base = gabNaEsteira();
+            const n = fx => base.filter(fx).length;
+            const f = gab.f;
+            const chip = (rot, on, cnt, acao, titulo = '') => `<button onclick="${acao}" aria-pressed="${on}"${titulo ? ` title="${escapeHtml(titulo)}"` : ''} class="px-2.5 py-1 rounded-full text-xs border ${on ? 'bg-cyan-700 text-white border-cyan-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}">${rot} <span class="opacity-75">${cnt}</span></button>`;
+            const mats = [...new Set(base.map(p => p.materia).filter(Boolean))].sort();
+            const partes = [
+                chip('Meta 2', f.meta, n(p => p.meta2), "gabChip('meta')"),
+                chip('Atrasados', f.atraso, n(gabEmAtraso), "gabChip('atraso')", `Conclusos há mais de 60 dias ou minutas prontas há mais de ${GAB_DIAS_PARADA} dias sem revisão (parada há X dias)`),
+                chip('Com erro', f.erro, n(gabComErro), "gabChip('erro')"),
+                chip('Falta lançar', f.lancar, n(p => gabColunaDe(p) === 'assinar'), "gabChip('lancar')")
+            ];
+            if (mats.length > 1 || f.materia) partes.push('<span class="text-gray-300">|</span>', ...mats.map(m => chip(escapeHtml(GAB_MATERIAS_CURTO[m] || m), f.materia === m, n(p => p.materia === m), `gabChipMateria('${escapeAttr(m)}')`)));
+            if (f.col) partes.push(`<button onclick="gab.f.col=''; gabRenderCorpo()" class="px-2.5 py-1 rounded-full text-xs bg-gray-700 text-white">Etapa: ${escapeHtml(GAB_COLUNAS.find(c => c.id === f.col)?.nome || f.col)} ×</button>`);
+            if (Object.values(f).some(Boolean)) partes.push(`<button onclick="gab.f = gabFiltrosVazios(); gabSalvaPreferencias(); gabRenderCorpo()" class="text-xs underline text-gray-600">Limpar filtros</button>`);
+            return `<div class="flex flex-wrap items-center gap-1.5 mb-3">${partes.join('')}</div>`;
+        }
+        function gabChip(k) { gab.f[k] = !gab.f[k]; gab.tabelaTudo = false; gabSalvaPreferencias(); gabRenderCorpo(); }
+        function gabChipMateria(m) { gab.f.materia = gab.f.materia === m ? '' : m; gabSalvaPreferencias(); gabRenderCorpo(); }
+
+        function gabDetalheCartao(p, c) {
+            const ex = p.exec || {};
+            if (c === 'execucao') return `<div class="text-xs text-blue-800">▸ ${escapeHtml(ex.fase || 'iniciando')}${ex.iniciadoEm ? ` <span class="text-gray-500">desde ${escapeHtml(gabDataHora(ex.iniciadoEm).split(' ').pop())}</span>` : ''}</div>`;
+            if (c === 'fila') {
+                if (p.execStatus === 'erro') return `<div>${gabPill('Erro: ' + String(ex.erro || 'sem mensagem').slice(0, 60), 'crit', ex.erro || '')}</div>`;
+                if (p.execStatus !== 'fila') return `<div>${gabPill('não pedida · abra e ponha na fila')}</div>`;
+                if (ex.aviso === 'captcha') return `<div>${gabPill('Aguardando captcha no e-SAJ', 'warn', 'O e-SAJ pediu captcha: resolva-o na aba do e-SAJ e ative o executor')}</div>`;
+                return '';
+            }
+            if (c === 'minuta') {
+                const conferir = (String(ex.resumo || '').match(/\[CONFERIR/g) || []).length;
+                const parada = gabDiasParada(p);
+                return `<div class="flex flex-wrap gap-1">${[
+                    p.origem?.tipo === 'pasta' ? gabPill('feita fora do painel') : gabPill('✓ autos', 'ok'),
+                    ex.ficha || (p.origem?.tipo !== 'pasta' && ex.resumo) ? gabPill('✓ FIRAC+', 'ok') : '',
+                    conferir ? gabPill(`${conferir} [CONFERIR]`, 'warn') : '',
+                    p.etapa === 'revisada' ? gabPill('✓ revisada', 'ok') : gabPill('a revisar', 'meta'),
+                    parada ? gabPill(`parada há ${parada} dias`, 'crit', `Minuta pronta há ${parada} dias sem revisão: revise ou arquive`) : ''
+                ].join('')}</div>`;
+            }
+            return '';
+        }
+        function gabTagsHTML(p, c) {
+            return `<div class="flex flex-wrap gap-1">
+                ${gabPill(p.atoGerado || GAB_ESPECIES[p.especie]?.curto || p.especie || 'ato', 'ato')}
+                ${gabAtoDivergente(p) ? gabPill(`pedido era ${gabTipoPadrao(p.especie)}`, 'warn', `Pedido: ${GAB_ESPECIES[p.especie]?.curto || ''}`) : ''}
+                ${gabLancadaComOutroAto(p) ? gabPill(`lançada como ${p.prod.tipo}`, 'crit') : ''}
+                ${p.meta2 ? gabPill('Meta 2', 'meta') : ''}
+                ${['fila', 'execucao', 'minuta'].includes(c) ? gabPillDias(gabDiasDesde(p.concluso), p.etapa) : ''}
+                ${p.exemplo ? gabPill('exemplo') : ''}
+            </div>`;
+        }
+        function gabCardHTML(p) {
+            const c = gabColunaDe(p), sel = gab.sel.has(p.id), id = escapeAttr(p.id);
+            return `<div class="bg-white border ${sel ? 'border-cyan-600 ring-2 ring-cyan-200' : 'border-gray-200'} ${c === 'execucao' ? 'border-l-4 border-l-blue-500' : ''} rounded-lg p-3 shadow-sm hover:shadow cursor-pointer space-y-1.5"
+                    role="button" tabindex="0" data-gab-id="${escapeHtml(p.id)}" aria-label="Processo ${escapeHtml(p.numero || 'sem número')}"
+                    onclick="gabClicaCartao('${id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); gabClicaCartao('${id}'); }">
+                <div class="flex items-start justify-between gap-2">
+                    <span class="font-mono text-xs font-semibold text-gray-800 break-all">${escapeHtml(p.numero || 'sem número')}</span>
+                    ${gab.modoLote ? `<input type="checkbox" ${sel ? 'checked' : ''} onclick="event.stopPropagation(); gabAlternaSel('${id}', this.checked)" aria-label="Selecionar ${escapeHtml(p.numero || '')}">` : ''}
+                </div>
+                ${p.classe ? `<div class="text-xs text-gray-600">${escapeHtml(p.classe)}</div>` : ''}
+                ${gabTagsHTML(p, c)}
+                ${gabDetalheCartao(p, c)}
+                ${gabSisHTML(p)}
+            </div>`;
+        }
+        function gabBoardHTML(lista) {
+            return `<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">${GAB_COLUNAS.map(c => {
+                const itens = lista.filter(p => gabColunaDe(p) === c.id).sort(gabOrdemPadrao);
+                const lim = gab.mais[c.id] ? itens.length : GAB_POR_COLUNA;
+                return `<section class="bg-gray-50 border border-gray-200 rounded-lg p-2 min-w-0" aria-label="${escapeHtml(c.nome)}" data-gab-col="${c.id}">
+                    <div class="flex justify-between items-center px-1 pb-2 text-sm font-semibold text-gray-700"><span>${escapeHtml(c.nome)}</span><span class="text-xs bg-white border border-gray-200 rounded-full px-2">${itens.length}</span></div>
+                    <div class="space-y-2">${itens.slice(0, lim).map(gabCardHTML).join('')}</div>
+                    ${itens.length ? '' : `<p class="text-xs text-gray-500 px-1 py-3">${escapeHtml(c.vazio)}</p>`}
+                    ${itens.length > GAB_POR_COLUNA ? `<button onclick="gab.mais['${c.id}'] = !gab.mais['${c.id}']; gabRenderCorpo()" class="mt-2 w-full text-xs border border-gray-300 rounded py-1 bg-white hover:bg-gray-100">${gab.mais[c.id] ? 'Mostrar menos' : `Mostrar mais (${itens.length - GAB_POR_COLUNA})`}</button>` : ''}
+                </section>`;
+            }).join('')}</div>`;
+        }
+        const GAB_ORDENS = {
+            numero: p => p.numero || '',
+            ato: p => gabTipoDe(p) || GAB_ESPECIES[p.especie]?.curto || '',
+            etapa: p => GAB_COLUNAS.findIndex(c => c.id === gabColunaDe(p)),
+            dias: p => gabDiasDesde(p.concluso) ?? -1,
+            sistema: p => gabSituacao(p)?.ordem ?? 9,
+            atualizado: p => p.atualizadoEm || ''
+        };
+        function gabOrdenar(k) {
+            const o = gab.ordem;
+            gab.ordem = o.k === k ? (o.dir > 0 ? { k, dir: -1 } : { k: 'padrao', dir: 1 }) : { k, dir: k === 'dias' || k === 'atualizado' ? -1 : 1 };
+            gabRenderCorpo();
+        }
+        function gabListaHTML(lista) {
+            const { k, dir } = gab.ordem;
+            const ord = k === 'padrao'
+                ? [...lista].sort((a, b) => (GAB_ORDENS.etapa(a) - GAB_ORDENS.etapa(b)) || gabOrdemPadrao(a, b))
+                : [...lista].sort((a, b) => { const x = GAB_ORDENS[k](a), y = GAB_ORDENS[k](b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+            const mostra = gab.tabelaTudo ? ord : ord.slice(0, GAB_POR_TABELA);
+            const selVis = mostra.filter(p => gab.sel.has(p.id)).length;
+            const th = (chave, rot, extra = '') => `<th class="py-2 pr-3 ${extra}" aria-sort="${k === chave ? (dir > 0 ? 'ascending' : 'descending') : 'none'}"><button onclick="gabOrdenar('${chave}')" class="hover:underline">${rot}${k === chave ? (dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
+            const ids = mostra.map(p => p.id);
+            gab.idsVisiveis = ids;
+            return `<div class="bg-white rounded-lg shadow-md overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead><tr class="text-left text-gray-500 border-b">
+                        <th class="py-2 px-3"><input type="checkbox" aria-label="Selecionar todos os visíveis" ${mostra.length && selVis === mostra.length ? 'checked' : ''} onchange="gabSelecionaVisiveis(this.checked)"></th>
+                        ${th('numero', 'Processo')}${th('ato', 'Ato')}${th('etapa', 'Etapa')}${th('dias', 'Dias', 'text-right')}${th('sistema', 'Sistema')}${th('atualizado', 'Atualizado')}
+                    </tr></thead>
+                    <tbody>${mostra.map(p => {
+                        const c = gabColunaDe(p), d = gabDiasDesde(p.concluso), id = escapeAttr(p.id);
+                        return `<tr class="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer ${gab.sel.has(p.id) ? 'bg-cyan-50' : ''}" tabindex="0" data-gab-id="${escapeHtml(p.id)}"
+                                onclick="gabAbrir('${id}')" onkeydown="if (event.key === 'Enter') gabAbrir('${id}')">
+                            <td class="py-2 px-3" onclick="event.stopPropagation()"><input type="checkbox" ${gab.sel.has(p.id) ? 'checked' : ''} onchange="gabAlternaSel('${id}', this.checked)" aria-label="Selecionar ${escapeHtml(p.numero || '')}"></td>
+                            <td class="py-2 pr-3"><div class="font-mono whitespace-nowrap">${escapeHtml(p.numero || 'sem número')} ${p.meta2 ? gabPill('Meta 2', 'meta') : ''}</div><div class="text-xs text-gray-500">${escapeHtml(p.classe || '')}</div></td>
+                            <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(p.atoGerado || GAB_ESPECIES[p.especie]?.curto || p.especie || '')}</td>
+                            <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(GAB_COLUNAS.find(x => x.id === c)?.nome || '')} ${p.execStatus === 'erro' ? gabPill('erro', 'crit') : ''}${gabDiasParada(p) ? gabPill('parada', 'crit') : ''}${p.exec?.aviso === 'captcha' && p.execStatus === 'fila' ? gabPill('captcha', 'warn') : ''}</td>
+                            <td class="py-2 pr-3 text-right">${['fila', 'execucao', 'minuta'].includes(c) && d != null ? gabPillDias(d, p.etapa) : `<span class="text-gray-400">${d ?? '—'}</span>`}</td>
+                            <td class="py-2 pr-3 min-w-48">${gabSisHTML(p) || '<span class="text-gray-400">—</span>'}</td>
+                            <td class="py-2 pr-3 whitespace-nowrap text-gray-500">${escapeHtml(gabDataHora(p.atualizadoEm))}</td>
+                        </tr>`;
+                    }).join('')}</tbody>
+                </table>
+                ${!ord.length ? '<p class="text-sm text-gray-500 p-4">Nenhum processo com esses filtros.</p>' : ''}
+                ${ord.length > mostra.length ? `<p class="text-sm text-gray-600 p-3">Mostrando ${mostra.length} de ${ord.length}. <button class="underline" onclick="gab.tabelaTudo = true; gabRenderCorpo()">Mostrar todos</button></p>` : ''}
+            </div>`;
+        }
+
+        // ---------- seleção e ações em lote ----------
+        function gabClicaCartao(id) { if (gab.modoLote) gabAlternaSel(id); else gabAbrir(id); }
+        function gabAlternaModoLote() { gab.modoLote = !gab.modoLote; if (!gab.modoLote) gab.sel.clear(); gab.loteArmado = false; gab.excArmado = ''; gabRenderCorpo(); }
+        function gabAlternaSel(id, marcado) {
+            if (marcado ?? !gab.sel.has(id)) gab.sel.add(id); else gab.sel.delete(id);
+            gab.loteArmado = false; gab.excArmado = '';
+            gabRenderCorpo();
+        }
+        function gabSelecionaVisiveis(marcar) {
+            for (const id of gab.idsVisiveis || []) { if (marcar) gab.sel.add(id); else gab.sel.delete(id); }
+            gab.loteArmado = false; gab.excArmado = '';
+            gabRenderCorpo();
+        }
+        function gabLimparSelecao() { gab.sel.clear(); gab.modoLote = false; gab.loteArmado = false; gab.excArmado = ''; gabRenderCorpo(); }
+        const gabAssinaveis = () => gabDocs().filter(p => gab.sel.has(p.id) && gabColunaDe(p) === 'minuta' && gabTemMinuta(p));
+        function gabLoteBarHTML() {
+            if (!gab.modoLote && !gab.sel.size) return '';
+            const n = gab.sel.size, k = gabAssinaveis().length;
+            const btn = (rot, acao, cls, desab = false, chave = '') => `<button onclick="${acao}" ${desab ? 'disabled' : ''} ${chave ? `data-gravacao="${chave}"` : ''} class="px-3 py-1.5 rounded-md text-sm disabled:opacity-40 ${cls}">${rot}</button>`;
+            return `<div class="sticky top-16 z-20 bg-cyan-50 border border-cyan-300 rounded-lg p-2 mb-3 flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium text-cyan-900 mr-2">${gabPlural(n, 'selecionado', 'selecionados')}</span>
+                ${btn('Pôr na fila e ativar', 'gabLotePorNaFila()', 'bg-cyan-700 text-white hover:bg-cyan-800', !n, 'gab-lote-fila')}
+                ${btn(gab.loteArmado ? `Confirmar: assinar e lançar ${k}` : `Assinar e lançar${k ? ` (${k})` : ''}`, 'gabLoteAssinar()', gab.loteArmado ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-green-600 text-white hover:bg-green-700', !k, 'gab-lote-assinar')}
+                ${btn('Copiar comando do lote', 'gabCopiar(gabComandoLote(gabDocs().filter(p => gab.sel.has(p.id))), \'Comando do lote copiado.\')', 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100', !n)}
+                ${btn(gab.excArmado ? `Confirmar exclusão de ${n}` : `Excluir do painel (${n})`, 'gabLoteExcluir()', gab.excArmado ? 'bg-red-700 text-white' : 'bg-white border border-red-300 text-red-700 hover:bg-red-50', !n, 'gab-lote-excluir')}
+                ${btn('Limpar seleção', 'gabLimparSelecao()', 'text-gray-600 underline')}
+            </div>`;
+        }
+        async function gabLotePorNaFila() {
+            const lista = gabDocs().filter(p => gab.sel.has(p.id) && p.execStatus !== 'fila' && p.execStatus !== 'executando');
+            if (!lista.length) { showNotification('Os processos selecionados já estão na fila ou em execução.', 'info'); return; }
+            if (!iniciarGravacao('gab-lote-fila')) return;
+            const loteId = lista.length > 1 ? 'lote-' + new Date().toISOString().slice(0, 16).replace(/\D/g, '') : '';
+            let ok = 0, ultimoErro = null;
+            try {
+                for (const p of lista) {
+                    try { await gabRef(p.id).update({ ...gabPedidoExec(p, loteId), atualizadoEm: new Date().toISOString() }); ok++; }
+                    catch (e) { ultimoErro = e; }
+                }
+                let ativou = false;
+                if (ok) { try { ativou = await gabPedirExecutor(); } catch (e) { ultimoErro = e; } }
+                gab.sel.clear(); gab.modoLote = false;
+                if (ultimoErro && ok < lista.length) avisarFalhaGravacao(ultimoErro, `${ok} de ${lista.length} foram para a fila`);
+                else showNotification(`${gabPlural(ok, 'processo na fila', 'processos na fila')}${ativou ? ' · executor ativado (começa em até 5 min)' : ' · já havia um pedido ao executor'}.`, 'success');
+            } finally {
+                encerrarGravacao('gab-lote-fila');
+                gabRenderCorpo();
+            }
+        }
+        async function gabLoteAssinar() {
+            const alvo = gabAssinaveis();
+            if (!alvo.length) { showNotification('Selecione minutas prontas para assinar e lançar.', 'info'); return; }
+            if (!gab.loteArmado) { gab.loteArmado = true; gabRenderCorpo(); return; }
+            gab.loteArmado = false;
+            if (!iniciarGravacao('gab-lote-assinar')) return;
+            let ok = 0, semTipo = 0, retidas = 0, falhas = 0;
+            const lancadasAgora = [];
+            try {
+                for (const p of alvo) {
+                    const tipo = p.atoGerado || p.prod?.tipo || gabTipoPadrao(p.especie);
+                    if (!tipo) { semTipo++; continue; }
+                    let cats = p.prod?.categorias?.length ? [...p.prod.categorias] : gabCatsPadrao(p);
+                    if (tipo !== 'Sentença') cats = cats.filter(c => c !== 'meta2');
+                    if (!cats.length) cats = ['outros'];
+                    try {
+                        const r = await gabLancar(p.id, tipo, cats, { lancadasAgora });
+                        if (r.ok) { ok++; gab.sel.delete(p.id); } else if (r.aguardando) retidas++; else falhas++;
+                    } catch (e) { falhas++; log('Erro ao assinar e lançar em lote', e); }
+                }
+            } finally {
+                encerrarGravacao('gab-lote-assinar');
+            }
+            if (!gab.sel.size) gab.modoLote = false;
+            gabRenderCorpo();
+            const partes = [ok ? `${gabPlural(ok, 'minuta lançada', 'minutas lançadas')} no sistema, já ${ok === 1 ? 'assinada' : 'assinadas'}` : '',
+                retidas ? `${gabPlural(retidas, 'retida', 'retidas')} por possível duplicidade (abra o processo, aba Sistema)` : '',
+                semTipo ? `${gabPlural(semTipo, 'ficou', 'ficaram')} de fora: o tipo do ato não está definido` : '',
+                falhas ? `${gabPlural(falhas, 'falhou', 'falharam')}: tente de novo` : ''].filter(Boolean);
+            showNotification(partes.join(' · ') || 'Nada foi lançado.', ok && !retidas && !semTipo && !falhas ? 'success' : 'warning');
+        }
+        async function gabLoteExcluir() {
+            if (!gab.sel.size) return;
+            const assinatura = [...gab.sel].sort().join(',');
+            if (gab.excArmado !== assinatura) {
+                gab.excArmado = assinatura; gabRenderCorpo();
+                showNotification('Clique de novo para confirmar. A exclusão tira o processo do painel e não pode ser desfeita (as minutas do sistema não são tocadas).', 'warning');
+                return;
+            }
+            gab.excArmado = '';
+            if (!iniciarGravacao('gab-lote-excluir')) return;
+            const alvo = gabDocs().filter(p => gab.sel.has(p.id));
+            const rodando = alvo.filter(p => p.execStatus === 'executando');
+            let ok = 0, ultimoErro = null;
+            try {
+                for (const p of alvo.filter(x => x.execStatus !== 'executando')) {
+                    try { await gabRef(p.id).remove(); ok++; gab.sel.delete(p.id); } catch (e) { ultimoErro = e; }
+                }
+            } finally {
+                encerrarGravacao('gab-lote-excluir');
+            }
+            if (!gab.sel.size) gab.modoLote = false;
+            gabRenderCorpo();
+            if (ultimoErro) avisarFalhaGravacao(ultimoErro, 'Parte dos processos não foi excluída');
+            else showNotification([ok ? gabPlural(ok, 'processo excluído do painel', 'processos excluídos do painel') : 'Nada foi excluído',
+                rodando.length ? `${rodando.length} em execução ${rodando.length === 1 ? 'ficou' : 'ficaram'} de fora` : ''].filter(Boolean).join(' · '), 'success');
+        }
+
+        // ---------- Arquivo e comandos rápidos ----------
+        function gabArquivoHTML() {
+            const q = gab.buscaArq.trim().toLowerCase();
+            const lista = gabDocs().filter(p => gabArquivado(p) && (!q || `${p.numero} ${p.classe} ${p.notas}`.toLowerCase().includes(q)))
+                .sort((a, b) => String(b.prod?.lancadaEm || b.atualizadoEm || '').localeCompare(String(a.prod?.lancadaEm || a.atualizadoEm || '')));
+            return `<div class="bg-white rounded-lg shadow-md p-4">
+                <p class="text-sm text-gray-600 mb-3">${lista.length} processo(s). Entram aqui as lançadas no sistema há ${GAB_DIAS_ARQUIVO} dia ou mais, as minutas da pasta que já chegaram lançadas e as arquivadas à mão. Nada é apagado: abra e use “Devolver à esteira”.</p>
+                <ul class="divide-y divide-gray-200">${lista.map(p => `
+                    <li><button onclick="gabAbrir('${escapeAttr(p.id)}')" data-gab-id="${escapeHtml(p.id)}" class="w-full text-left py-2 px-1 hover:bg-gray-50 grid md:grid-cols-3 gap-1">
+                        <span class="font-mono text-sm">${escapeHtml(p.numero || 'sem número')}</span>
+                        <span class="text-xs text-gray-600">${escapeHtml([p.atoGerado || p.prod?.tipo || GAB_ESPECIES[p.especie]?.curto, p.classe].filter(Boolean).join(' · '))}</span>
+                        <span class="text-xs text-gray-500">${p.arquivado === true ? `arquivado à mão${p.arquivadoEm ? ' em ' + escapeHtml(gabDataHora(p.arquivadoEm)) : ''}` : gabLancadaFora(p) ? `chegou lançada da pasta · em nome de ${escapeHtml(gabEmNomeDe(p))}` : `lançado em ${escapeHtml(gabDataHora(p.prod?.lancadaEm || p.atualizadoEm))}`}</span>
+                    </button></li>`).join('') || `<li class="py-3 text-sm text-gray-500">Nada no Arquivo${q ? ' com essa busca' : ''}.</li>`}</ul>
+            </div>`;
+        }
+        function gabComandosHTML() {
+            const cartao = (titulo, texto, corpo) => `<div class="bg-white rounded-lg shadow-md p-4 space-y-2"><h3 class="font-semibold text-gray-800">${titulo}</h3><p class="text-sm text-gray-600">${texto}</p>${corpo}</div>`;
+            return `<p class="text-sm text-gray-600 mb-3">Copie e cole numa conversa com o Claude.</p>
+                <div class="grid md:grid-cols-3 gap-4">
+                    ${cartao('Briefing do DJE', 'Publicações de interesse do gabinete no Caderno 3 (Administrativo).',
+                        `<button onclick="gabCopiar(GAB_CMD_DJE)" class="bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 text-sm">Copiar comando</button>`)}
+                    ${cartao('Jurisprudência do TJAL', 'Acórdãos recentes sobre um tema (e-SAJ, cjsg).',
+                        `<div class="flex gap-2"><input id="gab-q-juris" placeholder="Tema, ex.: dano moral negativação" aria-label="Tema da pesquisa" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm flex-1 min-w-0"><button onclick="gabCopiarJuris()" class="bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 text-sm">Copiar</button></div>`)}
+                    ${cartao('Incluir modelo', 'Anonimiza, generaliza e guarda nos modelos do gabinete.',
+                        `<button onclick="gabCopiar(GAB_CMD_MODELO)" class="bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 text-sm">Copiar comando</button>`)}
+                </div>`;
+        }
+        const GAB_CMD_DJE = 'Faz o briefing executivo do DJE/AL de hoje (Caderno 3 – Administrativo).';
+        const GAB_CMD_MODELO = 'Inclua esse modelo nos modelos do gabinete:\n\n[cole aqui o texto da decisão, sentença ou despacho]';
+        function gabCopiarJuris() {
+            const t = (document.getElementById('gab-q-juris')?.value || '').trim();
+            gabCopiar(`Pesquisa na jurisprudência do TJAL (e-SAJ, cjsg) acórdãos recentes sobre: ${t || '[tema]'}. Traga ementas, números e datas de julgamento.`);
+        }
+
+        // ---------- gaveta do processo ----------
+        function gabAbrir(id) {
+            const p = id ? gabDoc(id) : null;
+            gab.aberto = p ? id : 'novo';
+            gab.form = p ? { ...gabVazio(), ...p } : gabVazio();
+            gab.prodForm = null;
+            gab.armado = false;
+            const c = p ? gabColunaDe(p) : '';
+            gab.dtab = !p ? 'dados' : (['minuta', 'assinar', 'lancada'].includes(c) && gabMostraSistema(p)) ? 'sis' : (p.execStatus === 'erro' || c === 'execucao') ? 'exec' : 'dados';
+            gabRenderGaveta();
+            setTimeout(() => document.querySelector(p ? '#gab-gaveta [role=tab][aria-selected=true]' : '#gab-f-numero')?.focus(), 30);
+        }
+        function gabFechar() {
+            gab.aberto = null;
+            gab.form = null;
+            const g = document.getElementById('gab-gaveta');
+            if (g) g.innerHTML = '';
+        }
+        function gabMostraSistema(p) { return !!p && (gabTemMinuta(p) || !!p.prod?.status || !!gabMinutaNoSistema(p) || !!gab.retidas[p.id]); }
+        function gabSetDTab(t) { gab.dtab = t; gabRenderGaveta(); }
+
+        // campos do formulário: guardam o valor sem redesenhar (para não perder o cursor)
+        function gabCampo(k, v, redesenhar = false) {
+            if (!gab.form) return;
+            gab.form[k] = v;
+            if (k === 'especie' && String(v).startsWith('inv-')) { gab.form.materia = 'sucessoes'; redesenhar = true; }
+            if (k === 'numero') {
+                const dica = document.getElementById('gab-f-numero-dica');
+                const r = validarCNJ(v);
+                if (dica) {
+                    dica.textContent = !String(v).trim() ? 'Cole o número; a pontuação é ajustada ao sair do campo.' : r.ok ? (r.formatado.slice(16, 20) === '0046' || /\.8\.02\./.test(r.formatado) ? 'Número válido · TJAL' : 'Número válido') : `Número inválido: ${r.motivo}.`;
+                    dica.className = 'text-xs mt-1 ' + (!String(v).trim() ? 'text-gray-500' : r.ok ? 'text-green-700' : 'text-red-600');
+                }
+            }
+            if (redesenhar) gabRenderGaveta();
+        }
+        function gabFormatarNumero(el) {
+            const r = validarCNJ(el.value);
+            if (r.ok) { el.value = r.formatado; gabCampo('numero', r.formatado); }
+        }
+
+        function gabRenderGaveta() {
+            const g = document.getElementById('gab-gaveta');
+            if (!g) return;
+            if (gab.aberto === 'lote') { gabRenderLote(); return; }
+            if (!gab.aberto || !gab.form) { g.innerHTML = ''; return; }
+            const novo = gab.aberto === 'novo';
+            const p = novo ? null : gabDoc(gab.aberto);
+            if (!novo && !p) { gabFechar(); return; }
+            const mostraSis = !novo && gabMostraSistema(p);
+            if (gab.dtab === 'sis' && !mostraSis) gab.dtab = 'dados';
+            if (novo && gab.dtab !== 'dados' && gab.dtab !== 'cmd') gab.dtab = 'dados';
+            const e = p ? GAB_EXEC[p.execStatus] : null;
+            const s = p ? gabSituacao(p) : null;
+            const tab = (id, rot, pill = '') => `<button role="tab" aria-selected="${gab.dtab === id}" onclick="gabSetDTab('${id}')" class="px-3 py-2 text-sm border-b-2 ${gab.dtab === id ? 'border-cyan-700 text-cyan-800 font-medium' : 'border-transparent text-gray-600 hover:text-gray-800'}">${rot} ${pill}</button>`;
+            const abas = [tab('dados', 'Dados')];
+            if (!novo) abas.push(tab('exec', 'Execução', e ? gabPill(e.nome, e.cls) : ''));
+            if (mostraSis) abas.push(tab('sis', 'Sistema', s ? gabPill(s.k === 'lancada' ? 'lançada' : s.txt.split(' (')[0].split(' · ')[0], s.cls) : ''));
+            abas.push(tab('cmd', 'Comando'));
+            const conteudo = gab.dtab === 'exec' ? gabGavetaExec(p) : gab.dtab === 'sis' ? gabGavetaSistema(p) : gab.dtab === 'cmd' ? gabGavetaComando() : gabGavetaDados(novo);
+            const arquivadoAgora = p && gabArquivado(p);
+            g.innerHTML = `
+                <div class="fixed inset-0 bg-black/40 z-50" onclick="gabFechar()"></div>
+                <aside class="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col" role="dialog" aria-modal="true" aria-label="${escapeHtml(novo ? 'Novo processo' : 'Processo ' + (p.numero || ''))}">
+                    <header class="p-4 border-b border-gray-200 flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-xs uppercase tracking-wide text-gray-500">${novo ? 'Cadastro' : p.exemplo ? 'Processo de exemplo' : 'Processo'}</div>
+                            <h3 class="text-lg font-semibold text-gray-800 font-mono break-all">${escapeHtml(novo ? 'Novo processo' : p.numero || 'Processo')}</h3>
+                            <div class="text-sm text-gray-600">${escapeHtml(novo ? 'Esc fecha.' : [p.classe, arquivadoAgora ? 'Arquivo' : GAB_COLUNAS.find(c => c.id === gabColunaDe(p))?.nome].filter(Boolean).join(' · '))}</div>
+                        </div>
+                        <button onclick="gabFechar()" class="text-gray-500 hover:text-gray-800 text-xl leading-none" aria-label="Fechar">×</button>
+                    </header>
+                    <nav class="flex gap-1 px-2 border-b border-gray-200 overflow-x-auto" role="tablist">${abas.join('')}</nav>
+                    <div class="flex-1 overflow-y-auto p-4 space-y-4">${conteudo}</div>
+                    <footer class="p-3 border-t border-gray-200 flex flex-wrap gap-2 justify-between">
+                        <div class="flex gap-2">
+                            ${novo ? '' : `<button onclick="gabExcluir()" data-gravacao="gab-excluir" class="px-3 py-1.5 rounded-md text-sm ${gab.armado ? 'bg-red-700 text-white' : 'border border-red-300 text-red-700 hover:bg-red-50'}">${gab.armado ? 'Confirmar exclusão' : 'Excluir'}</button>
+                            <button onclick="gabArquivar()" data-gravacao="gab-arquivar" class="px-3 py-1.5 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-100">${arquivadoAgora ? 'Devolver à esteira' : 'Arquivar'}</button>`}
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="gabFechar()" class="px-3 py-1.5 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-100">Cancelar</button>
+                            <button onclick="gabSalvar()" data-gravacao="gab-salvar" class="px-4 py-1.5 rounded-md text-sm bg-cyan-700 text-white hover:bg-cyan-800">Salvar</button>
+                        </div>
+                    </footer>
+                </aside>`;
+        }
+
+        function gabGavetaDados(novo) {
+            const f = gab.form;
+            const seg = (campo, opcoes) => `<div class="inline-flex rounded-md border border-gray-300 overflow-hidden" role="group">${opcoes.map(([v, rot]) =>
+                `<button type="button" aria-pressed="${String(f[campo]) === String(v)}" onclick="gabCampo('${campo}', ${typeof v === 'number' ? v : `'${escapeAttr(v)}'`}, true)" class="px-2.5 py-1 text-sm ${String(f[campo]) === String(v) ? 'bg-cyan-700 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}">${escapeHtml(rot)}</button>`).join('')}</div>`;
+            const r = validarCNJ(f.numero);
+            const rotulo = (txt, para) => `<label for="${para}" class="block text-sm font-medium text-gray-700 mb-1">${txt}</label>`;
+            const entrada = 'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500';
+            const marca = (campo, txt) => `<label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" ${f[campo] ? 'checked' : ''} onchange="gabCampo('${campo}', this.checked)"> ${txt}</label>`;
+            return `
+                <div>${rotulo('Número do processo (CNJ)', 'gab-f-numero')}
+                    <input id="gab-f-numero" class="${entrada} font-mono" value="${escapeHtml(f.numero)}" placeholder="0000000-00.0000.8.02.0046" oninput="gabCampo('numero', this.value.trim())" onblur="gabFormatarNumero(this)">
+                    <p id="gab-f-numero-dica" class="text-xs mt-1 ${!f.numero ? 'text-gray-500' : r.ok ? 'text-green-700' : 'text-red-600'}">${!f.numero ? 'Cole o número; a pontuação é ajustada ao sair do campo.' : r.ok ? 'Número válido' : `Número inválido: ${escapeHtml(r.motivo)}.`}</p></div>
+                <div>${rotulo('Classe e assunto', 'gab-f-classe')}<input id="gab-f-classe" class="${entrada}" value="${escapeHtml(f.classe)}" oninput="gabCampo('classe', this.value)"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>${rotulo('Concluso em', 'gab-f-concluso')}<input id="gab-f-concluso" type="date" class="${entrada}" value="${escapeHtml(f.concluso || '')}" oninput="gabCampo('concluso', this.value)"></div>
+                    <div>${rotulo('Matéria (bibliotecário)', 'gab-f-materia')}<select id="gab-f-materia" class="${entrada}" onchange="gabCampo('materia', this.value)">${Object.entries(GAB_MATERIAS_ROTULO).map(([k, v]) => `<option value="${k}" ${f.materia === k ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select></div>
+                </div>
+                <div>${rotulo('Tipo de ato', 'gab-f-especie')}<select id="gab-f-especie" class="${entrada}" onchange="gabCampo('especie', this.value)">${Object.entries(GAB_ESPECIES).map(([k, v]) => `<option value="${k}" ${f.especie === k ? 'selected' : ''}>${escapeHtml(v.rotulo)}</option>`).join('')}</select></div>
+                ${marca('meta2', 'Processo da Meta 2 do CNJ')}
+                <div><span class="block text-sm font-medium text-gray-700 mb-1">Etapa</span>${seg('etapa', GAB_ETAPAS.map(x => [x.id, x.nome]))}
+                    <p class="text-xs text-gray-500 mt-1">Mudar para “Assinada” numa minuta pronta já lança no sistema, como “Assinar e lançar”.</p></div>
+                <div class="flex flex-wrap gap-4">
+                    <div><span class="block text-sm font-medium text-gray-700 mb-1">Modo</span>${seg('modo', [['minuta', 'Minuta'], ['chat', 'Chat']])}</div>
+                    <div><span class="block text-sm font-medium text-gray-700 mb-1">Rigor</span>${seg('rigor', [['rigoroso', 'Rigoroso'], ['livre', 'Livre']])}</div>
+                    <div><span class="block text-sm font-medium text-gray-700 mb-1">Esforço</span>${seg('esforco', [1, 2, 3, 4, 5].map(n => [n, String(n)]))}</div>
+                </div>
+                ${marca('biblio', 'Ativar o bibliotecário da matéria')}
+                ${marca('juris', 'Consultar a jurisprudência do TJAL')}
+                <div>${rotulo('Orientações ao Claude', 'gab-f-notas')}<textarea id="gab-f-notas" rows="4" class="${entrada}" oninput="gabCampo('notas', this.value)">${escapeHtml(f.notas || '')}</textarea></div>
+                ${novo ? `<div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                    <button onclick="gabExecutar(false)" data-gravacao="gab-executar" class="px-3 py-1.5 rounded-md text-sm border border-cyan-700 text-cyan-800 hover:bg-cyan-50">Salvar e pôr na fila</button>
+                    <button onclick="gabExecutar(true)" data-gravacao="gab-executar" class="px-3 py-1.5 rounded-md text-sm bg-cyan-700 text-white hover:bg-cyan-800">Pôr na fila e ativar</button></div>` : ''}`;
+        }
+
+        function gabGavetaExec(p) {
+            const st = p.execStatus || '', ex = p.exec || {}, e = GAB_EXEC[st];
+            const linhas = [];
+            if (ex.pedidoEm) linhas.push(['Pedido', escapeHtml(gabDataHora(ex.pedidoEm))]);
+            if (ex.iniciadoEm) linhas.push(['Início', escapeHtml(gabDataHora(ex.iniciadoEm))]);
+            if (ex.fase && st === 'executando') linhas.push(['Fase', escapeHtml(ex.fase)]);
+            if (ex.concluidoEm) linhas.push(['Fim', escapeHtml(gabDataHora(ex.concluidoEm))]);
+            if (ex.loteId) linhas.push(['Lote', `<span class="font-mono">${escapeHtml(ex.loteId)}</span>`]);
+            if (ex.arquivo) linhas.push(['Minuta', `<span class="font-mono text-xs break-all select-all">${escapeHtml(ex.arquivo)}</span>`]);
+            if (ex.ficha) linhas.push(['Ficha', `<span class="font-mono text-xs break-all select-all">${escapeHtml(ex.ficha)}</span>`]);
+            if (p.minutaAnterior) linhas.push(['Minuta anterior', `<span class="font-mono text-xs break-all select-all">${escapeHtml(p.minutaAnterior)}</span>`]);
+            const captcha = st === 'fila' && ex.aviso === 'captcha';
+            const btnFila = st === 'concluido' || st === 'erro' ? 'Pôr na fila de novo' : st === 'executando' ? 'Em execução' : st === 'fila' ? 'Na fila · aguardando ativação' : 'Só pôr na fila';
+            const btnAgora = st === 'fila' ? 'Ativar o executor' : st === 'concluido' || st === 'erro' ? 'Executar de novo e ativar' : 'Pôr na fila e ativar';
+            return `
+                <div>${e ? gabPill(e.nome, e.cls) : gabPill('Não executado')}</div>
+                ${linhas.length ? `<dl class="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-sm">${linhas.map(([k, v]) => `<dt class="text-gray-500">${k}</dt><dd class="text-gray-800 min-w-0">${v}</dd>`).join('')}</dl>`
+                    : '<p class="text-sm text-gray-600">Ao pôr na fila, o Claude roda as skills do gabinete no seu computador quando você ativar o executor. A ficha FIRAC+ e o caminho da minuta aparecem aqui.</p>'}
+                ${st === 'erro' || captcha ? `<div class="bg-red-50 border-l-4 border-red-600 text-red-800 rounded p-3 text-sm whitespace-pre-wrap">${captcha ? 'Pausado: o e-SAJ pediu captcha antes de baixar este processo. Resolva o captcha na aba do e-SAJ (Chrome do Claude) e aperte “Ativar o executor”.' : escapeHtml(ex.erro || 'A execução falhou sem mensagem de erro.')}</div>` : ''}
+                ${ex.resumo ? `<div><h4 class="text-sm font-semibold text-gray-700 mb-1">Ficha / resumo</h4><div class="bg-gray-50 border border-gray-200 rounded p-3 text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">${escapeHtml(ex.resumo)}</div></div>` : ''}
+                <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                    ${st === 'fila' ? `<button onclick="gabTirarDaFila()" data-gravacao="gab-tirar" class="px-3 py-1.5 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-100">Tirar da fila</button>` : ''}
+                    <button onclick="gabExecutar(false)" data-gravacao="gab-executar" ${st === 'fila' || st === 'executando' ? 'disabled' : ''} class="px-3 py-1.5 rounded-md text-sm border border-cyan-700 text-cyan-800 hover:bg-cyan-50 disabled:opacity-40">${btnFila}</button>
+                    <button onclick="gabExecutar(true)" data-gravacao="gab-executar" ${st === 'executando' ? 'disabled' : ''} class="px-3 py-1.5 rounded-md text-sm bg-cyan-700 text-white hover:bg-cyan-800 disabled:opacity-40">${btnAgora}</button>
+                </div>`;
+        }
+
+        function gabGavetaSistema(p) {
+            const st = p.prod?.status || '';
+            const corrigir = gabLancadaComOutroAto(p);
+            if (!gab.prodForm) {
+                gab.prodForm = corrigir
+                    ? { tipo: p.atoGerado, categorias: (p.prod.categorias || []).filter(c => c !== 'meta2' || p.atoGerado === 'Sentença').concat(p.atoGerado === 'Sentença' && !(p.prod.categorias || []).some(c => ['meta1', 'meta2'].includes(c)) ? ['meta1'] : []) }
+                    : { tipo: (st ? p.prod?.tipo : '') || gabTipoDe(p), categorias: [...(p.prod?.categorias?.length ? p.prod.categorias : gabCatsPadrao(p))] };
+            }
+            const pf = gab.prodForm;
+            const s = gabSituacao(p), no = gabMinutaNoSistema(p), quem = gabEmNomeDe(p);
+            const lancada = st === 'lancada' || st === 'assinada' || no?.m?.status === 'assinada';
+            const editavel = !lancada || corrigir;
+            const retida = gab.retidas[p.id];
+            const dica = corrigir
+                ? `Esta minuta é ${p.atoGerado}, mas foi lançada no sistema como ${p.prod.tipo}. Confira o tipo e as categorias e clique em “Corrigir no sistema”: o registro existente é atualizado (nada é apagado).`
+                : !pf.tipo ? 'O ato foi deixado para o Claude decidir e a minuta ainda não informou qual é. Escolha o tipo antes de lançar.'
+                : lancada ? `Lançada no sistema${p.prod?.lancadaEm ? ` (confirmado em ${gabDataHora(p.prod.lancadaEm)})` : ''}.`
+                : 'Tipo e categorias sugeridos pela esteira. Ajuste se precisar antes de assinar ou aprovar.';
+            return `
+                <div class="space-y-1">
+                    ${s ? gabSisHTML(p) : `<div class="text-sm border-l-4 border-gray-300 bg-gray-50 rounded px-2 py-1">Ainda não está no sistema</div>${p.prod?.erro ? `<div class="text-xs text-red-700">Erro no sistema: ${escapeHtml(p.prod.erro)}</div>` : ''}`}
+                    ${s?.dica ? `<p class="text-xs text-gray-500">${escapeHtml(s.dica)}</p>` : ''}
+                    ${quem ? `<p class="text-xs text-gray-500">No sistema em nome de: ${escapeHtml(quem)}${no ? ` · registro ${escapeHtml(no.id)}` : p.prod?.minutaId ? ` · registro ${escapeHtml(p.prod.minutaId)}` : ''}</p>` : ''}
+                </div>
+                ${retida ? `<div class="bg-amber-50 border-l-4 border-amber-500 text-amber-900 rounded p-3 text-sm space-y-2">
+                    <div>⚠️ ${escapeHtml(retida.texto)}</div>
+                    <div>Antes de lançar, confira se o ato já registrado não é o mesmo: a produtividade contaria duas vezes.</div>
+                    <button onclick="gabConfirmarDuplicada('${escapeAttr(p.id)}')" data-gravacao="gab-lancar" class="bg-amber-600 text-white px-3 py-1 rounded text-xs hover:bg-amber-700">${retida.aprovar ? 'Registrar mesmo assim' : 'Lançar mesmo assim'}</button></div>` : ''}
+                <div>
+                    <label for="gab-p-tipo" class="block text-sm font-medium text-gray-700 mb-1">Tipo do ato no sistema</label>
+                    <select id="gab-p-tipo" ${editavel ? '' : 'disabled'} onchange="gab.prodForm.tipo = this.value" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">Escolha o ato…</option>${['Despacho', 'Decisão', 'Sentença'].map(t => `<option ${pf.tipo === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                </div>
+                <fieldset><legend class="block text-sm font-medium text-gray-700 mb-1">Categorias</legend>
+                    <div class="grid sm:grid-cols-2 gap-1">${GAB_CATS.map(k => `<label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" ${pf.categorias.includes(k) ? 'checked' : ''} ${editavel ? '' : 'disabled'} onchange="gabProdCat('${k}', this.checked)"> ${escapeHtml(categorias[k]?.nome || k)}</label>`).join('')}</div>
+                </fieldset>
+                <p class="text-xs text-gray-500">${escapeHtml(dica)}</p>
+                <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                    ${editavel ? `<button onclick="gabAssinarELancar()" data-gravacao="gab-lancar" class="px-3 py-1.5 rounded-md text-sm bg-green-600 text-white hover:bg-green-700">${corrigir ? 'Corrigir no sistema' : 'Assinar e lançar'}</button>` : ''}
+                    ${!lancada && !no && ['', 'aprovada'].includes(st) ? `<button onclick="gabAprovarParaRevisao()" data-gravacao="gab-lancar" class="px-3 py-1.5 rounded-md text-sm border border-purple-600 text-purple-800 hover:bg-purple-50">Aprovar para revisão</button>` : ''}
+                    ${(st === 'lancar' || st === 'aprovada') && !no ? `<button onclick="gabDesfazer()" data-gravacao="gab-desfazer" class="px-3 py-1.5 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-100">${st === 'lancar' ? 'Desfazer assinatura' : 'Desfazer aprovação'}</button>` : ''}
+                </div>
+                <p class="text-xs text-gray-500">“Assinar e lançar” registra a minuta em seu nome, já assinada (chave <span class="font-mono">painel-${escapeHtml(p.id)}</span>), com os mesmos efeitos do Registrar Minuta. “Aprovar para revisão” registra como minuta do Claude (IA), pendente (chave <span class="font-mono">painel-ia-${escapeHtml(p.id)}</span>). Registro existente nunca é sobrescrito.</p>`;
+        }
+        function gabProdCat(k, marcado) {
+            if (!gab.prodForm) return;
+            gab.prodForm.categorias = marcado ? [...new Set([...gab.prodForm.categorias, k])] : gab.prodForm.categorias.filter(c => c !== k);
+        }
+        function gabGavetaComando() {
+            const texto = gabComando(gab.form);
+            return `<p class="text-sm text-gray-600">É este o texto que o executor roda. Também serve para colar numa conversa com o Claude.</p>
+                <pre id="gab-cmd" class="bg-gray-50 border border-gray-200 rounded p-3 text-sm whitespace-pre-wrap select-all">${escapeHtml(texto)}</pre>
+                <button onclick="gabCopiar(gabComando(gab.form), 'Comando copiado.')" class="px-3 py-1.5 rounded-md text-sm bg-cyan-700 text-white hover:bg-cyan-800">Copiar comando</button>`;
+        }
+
+        // ---------- gravações da gaveta ----------
+        // grava só os campos do formulário (update), para não apagar o que o executor escreveu
+        async function gabGravarForm() {
+            const f = gab.form;
+            const r = validarCNJ(f.numero);
+            if (!r.ok) {
+                gab.dtab = 'dados'; gabRenderGaveta();
+                showNotification(String(f.numero || '').trim() ? `Corrija o número do processo: ${r.motivo}.` : 'Informe o número do processo.', 'warning');
+                return null;
+            }
+            f.numero = r.formatado;
+            const idAtual = gab.aberto === 'novo' ? null : gab.aberto;
+            const dup = gabDocs().find(d => d.id !== idAtual && normalizarNumeroCNJ(d.numero) === normalizarNumeroCNJ(f.numero));
+            if (dup) { showNotification(`Esse processo já está no painel${gabArquivado(dup) ? ' (no Arquivo)' : ''}.`, 'warning'); return null; }
+            const base = gabVazio(), dados = {};
+            for (const k of GAB_CAMPOS) dados[k] = f[k] ?? base[k];
+            dados.esforco = Number(dados.esforco) || 3;
+            dados.atualizadoEm = new Date().toISOString();
+            if (idAtual) { await gabRef(idAtual).update(dados); return idAtual; }
+            const ref = database.ref('gabinete/processos').push();
+            await ref.set({ ...dados, exemplo: false, criadoEm: dados.atualizadoEm, execStatus: '' });
+            gab.aberto = ref.key;
+            return ref.key;
+        }
+        async function gabSalvar() {
+            if (!currentUser?.isJuiz || !database) return;
+            if (!iniciarGravacao('gab-salvar')) return;
+            const antes = gab.aberto && gab.aberto !== 'novo' ? gabDoc(gab.aberto) : null;
+            try {
+                const id = await gabGravarForm();
+                if (!id) return;
+                // mudar a etapa para "Assinada" numa minuta pronta também lança no sistema
+                const f = gab.form;
+                const virouAssinada = f.etapa === 'assinada' && antes && antes.etapa !== 'assinada';
+                if (virouAssinada && gabTemMinuta(antes) && !['lancar', 'lancada', 'assinada'].includes(antes.prod?.status)) {
+                    const pf = gab.prodForm || { tipo: antes.atoGerado || antes.prod?.tipo || gabTipoPadrao(f.especie), categorias: antes.prod?.categorias?.length ? antes.prod.categorias : gabCatsPadrao({ ...antes, ...f }) };
+                    if (!pf.tipo) { showNotification('Processo salvo. Escolha o tipo do ato na aba Sistema para lançar.', 'warning'); gab.dtab = 'sis'; gabRenderGaveta(); return; }
+                    const res = await gabLancar(id, pf.tipo, gabAjustaCats(pf.tipo, pf.categorias));
+                    gabAvisoLancamento(res);
+                    if (!res.ok) { gab.dtab = 'sis'; gabRenderGaveta(); return; }
+                } else {
+                    showNotification('Processo salvo.', 'success');
+                }
+                gabFechar();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível salvar o processo');
+            } finally {
+                encerrarGravacao('gab-salvar');
+            }
+        }
+        async function gabExecutar(imediato) {
+            if (!currentUser?.isJuiz || !database) return;
+            if (!iniciarGravacao('gab-executar')) return;
+            try {
+                const id = await gabGravarForm();
+                if (!id) return;
+                const atual = gabDoc(id);
+                if (atual?.execStatus !== 'fila') await gabRef(id).update(gabPedidoExec({ ...gab.form }));
+                let ativou = false;
+                if (imediato) ativou = await gabPedirExecutor();
+                showNotification(imediato ? (ativou ? 'Na fila · o executor começa em até 5 minutos.' : 'Na fila · já havia um pedido ao executor, que vai atendê-lo.') : 'Processo na fila · aperte “Ativar o executor” quando quiser.', 'success');
+                gabFechar();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível pôr na fila');
+            } finally {
+                encerrarGravacao('gab-executar');
+            }
+        }
+        async function gabTirarDaFila() {
+            if (!iniciarGravacao('gab-tirar')) return;
+            try { await gabRef(gab.aberto).update({ execStatus: '' }); showNotification('Processo retirado da fila.', 'success'); }
+            catch (e) { avisarFalhaGravacao(e, 'Não foi possível retirar da fila'); }
+            finally { encerrarGravacao('gab-tirar'); }
+        }
+        async function gabExcluir() {
+            const p = gabDoc(gab.aberto);
+            if (!p) return;
+            if (p.execStatus === 'executando') { showNotification('O processo está em execução agora: espere terminar para excluir.', 'warning'); return; }
+            if (!gab.armado) { gab.armado = true; gabRenderGaveta(); showNotification('Clique de novo para confirmar. A exclusão tira o processo do painel e não pode ser desfeita (as minutas do sistema não são tocadas).', 'warning'); return; }
+            if (!iniciarGravacao('gab-excluir')) return;
+            try { await gabRef(p.id).remove(); gab.sel.delete(p.id); showNotification('Processo excluído do painel.', 'success'); gabFechar(); }
+            catch (e) { avisarFalhaGravacao(e, 'Não foi possível excluir'); }
+            finally { encerrarGravacao('gab-excluir'); }
+        }
+        async function gabArquivar() {
+            const p = gabDoc(gab.aberto);
+            if (!p) return;
+            const vai = !gabArquivado(p);
+            if (!iniciarGravacao('gab-arquivar')) return;
+            try {
+                await gabRef(p.id).update(vai ? { arquivado: true, arquivadoEm: new Date().toISOString() } : { arquivado: false, arquivadoEm: '' });
+                showNotification(vai ? 'Processo arquivado · está no Arquivo.' : 'Processo devolvido à esteira.', 'success');
+                gabFechar();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível arquivar');
+            } finally {
+                encerrarGravacao('gab-arquivar');
+            }
+        }
+
+        function gabValidaProd(pf) {
+            if (!pf?.tipo) return 'Escolha o tipo do ato (despacho, decisão ou sentença).';
+            if (!pf.categorias.length) return 'Marque ao menos uma categoria.';
+            if (pf.categorias.includes('meta2') && pf.tipo !== 'Sentença') return 'Meta 2 aceita apenas sentença.';
+            return '';
+        }
+        function gabAjustaCats(tipo, cats) {
+            let c = [...(cats || [])];
+            if (tipo !== 'Sentença') c = c.filter(x => x !== 'meta2');
+            return c.length ? c : ['outros'];
+        }
+        function gabNomeArquivo(p) { return p.exec?.arquivo ? String(p.exec.arquivo).split(/[\\/]/).pop() : ''; }
+
+        // Assinar e lançar (nativo): grava minutas/painel-<id> em nome do juiz, já assinada, pela mesma
+        // função do "Lançar assinadas do Painel" (validação, duplicidade de 7 dias, gravação
+        // condicional, efeitos e trava). Registro existente com o mesmo painelId só recebe a
+        // assinatura/correção. Depois mescla o resultado em gabinete/processos/<id>/prod.
+        async function gabLancar(id, tipo, cats, { forcar = false, lancadasAgora = [] } = {}) {
+            const p = gabDoc(id);
+            if (!p) return { ok: false, texto: 'processo não encontrado' };
+            const agora = new Date().toISOString();
+            const r = await lancarItemAssinadoPainelIA({ painelId: id, numeroProcesso: p.numero, tipoMinuta: tipo, categorias: cats, observacoes: gabNomeArquivo(p) }, { forcar, lancadasAgora });
+            const base = { etapa: 'assinada', atualizadoEm: agora, 'prod/tipo': tipo, 'prod/categorias': cats, 'prod/solicitadoEm': agora };
+            if (r.aguardando) {
+                gab.retidas[id] = { tipo, cats, texto: r.texto };
+                await gabRef(id).update({ ...base, lancarStatus: 'duplicidade', 'prod/status': 'lancar', 'prod/erro': '' });
+            } else if (r.ok) {
+                delete gab.retidas[id];
+                await gabRef(id).update({ ...base, lancarStatus: 'ok', 'prod/status': 'lancada', 'prod/lancadaEm': agora, 'prod/minutaId': r.minutaId || `painel-${id}`, 'prod/erro': '' });
+            }
+            return r;
+        }
+        function gabAvisoLancamento(r) {
+            if (r.ok) showNotification(`Lançada no sistema, já assinada: ${r.texto}.`, 'success');
+            else if (r.aguardando) showNotification(`Não lançada: ${r.texto.replace(/^não lançada · /, '')}. Confira e, se for outro ato, use “Lançar mesmo assim”.`, 'warning');
+            else showNotification(`Não lançada: ${r.texto}.`, 'error');
+        }
+        async function gabAssinarELancar() {
+            const id = gab.aberto, pf = gab.prodForm;
+            const erro = gabValidaProd(pf);
+            if (erro) { showNotification(erro, 'warning'); return; }
+            if (!iniciarGravacao('gab-lancar')) return;
+            try {
+                const r = await gabLancar(id, pf.tipo, [...pf.categorias]);
+                gabAvisoLancamento(r);
+                gab.prodForm = null;
+                gabRenderGaveta();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível assinar e lançar');
+            } finally {
+                encerrarGravacao('gab-lancar');
+            }
+        }
+
+        // Aprovar para revisão (nativo): minutas/painel-ia-<id> como minuta do Claude (IA), pendente,
+        // com gravação condicional (contrato, item 1). Os efeitos (sincronização das abas, baixa no
+        // Balcão) são aplicados aqui, com a trava em efeitosGabinete.
+        async function gabAprovar(id, tipo, cats, { forcar = false } = {}) {
+            const p = gabDoc(id);
+            if (!p) return { ok: false, texto: 'processo não encontrado' };
+            if (!validarNumeroProcesso(p.numero)) return { ok: false, texto: 'número inválido: ' + validarCNJ(p.numero).motivo };
+            const agora = new Date().toISOString();
+            const chave = `painel-ia-${id}`;
+            const existente = gabMinutaNoSistema(p);
+            if (!existente && !forcar) {
+                const dup = duplicidadesPainelIA(p.numero, { painelId: id });
+                if (dup.length) {
+                    const texto = 'não registrada · ' + textoDuplicidadesPainelIA(dup);
+                    gab.retidas[id] = { tipo, cats, texto, aprovar: true };
+                    return { ok: false, aguardando: true, texto };
+                }
+            }
+            let criou = false;
+            if (!existente) {
+                const catsFinal = [...cats, ...categoriasPeloProcesso(p.numero, tipo).filter(c => !cats.includes(c))];
+                const arquivo = gabNomeArquivo(p);
+                const pedidoBalcaoId = p.origem?.pedidoBalcaoId && pedidosBalcao[p.origem.pedidoBalcaoId] ? p.origem.pedidoBalcaoId : '';
+                const registro = {
+                    assessorId: PAINEL_IA_ASSESSOR_ID,
+                    assessorNome: PAINEL_IA_ASSESSOR_NOME,
+                    numeroProcesso: p.numero,
+                    tipoMinuta: tipo,
+                    categorias: catsFinal,
+                    observacoes: ('Minuta elaborada pelo Claude (IA) no Painel do Gabinete e aprovada pelo juiz para revisão. ' + (arquivo ? `Arquivo: ${arquivo}` : '')).trim().slice(0, 500),
+                    substituicao: false,
+                    status: 'pendente',
+                    data: hojeLocal(),
+                    timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
+                    createdAt: Date.now(),
+                    painelId: id,
+                    origem: 'painel-gabinete',
+                    registradoPor: currentUser.nome,
+                    ...(pedidoBalcaoId ? { pedidoBalcaoId } : {}),
+                    ...(forcar ? { duplicidadeConfirmada: true } : {})
+                };
+                const t = await database.ref(`minutas/${chave}`).transaction(v => (v ? undefined : registro));
+                criou = !!t.committed;
+                if (criou) {
+                    efeitosGabinete[chave] = marcaEfeitos();
+                    await database.ref(`efeitosGabinete/${chave}`).set(efeitosGabinete[chave]);
+                    try { await sincronizarAbasPorMinuta({ numeroProcesso: p.numero, tipoMinuta: tipo, assessorNome: PAINEL_IA_ASSESSOR_NOME }, chave); } catch (e) { log('sincronizar falhou', e); }
+                    if (pedidoBalcaoId && pedidosBalcao[pedidoBalcaoId]?.status === 'pendente') {
+                        await database.ref(`pedidosBalcao/${pedidoBalcaoId}`).update({ status: 'minutado', dataMinutado: hojeLocal(), minutadoPor: PAINEL_IA_ASSESSOR_NOME, minutadoEm: getDataHoraBrasilia().getTime() });
+                    }
+                }
+            }
+            delete gab.retidas[id];
+            await gabRef(id).update({ atualizadoEm: agora, 'prod/status': existente ? (existente.m.status === 'assinada' ? 'lancada' : existente.m.status === 'correcao' ? 'correcao' : 'enviada') : 'enviada',
+                'prod/tipo': tipo, 'prod/categorias': cats, 'prod/solicitadoEm': agora, 'prod/enviadaEm': agora,
+                'prod/minutaId': existente ? existente.id : chave, 'prod/erro': '' });
+            return { ok: true, texto: existente ? 'já estava no sistema; nada foi sobrescrito' : criou ? 'registrada como minuta do Claude (IA), pendente da sua revisão' : 'já estava no sistema (gravada por outra sessão); nada foi sobrescrito' };
+        }
+        async function gabAprovarParaRevisao() {
+            const id = gab.aberto, pf = gab.prodForm;
+            const erro = gabValidaProd(pf);
+            if (erro) { showNotification(erro, 'warning'); return; }
+            if (!iniciarGravacao('gab-lancar')) return;
+            try {
+                const r = await gabAprovar(id, pf.tipo, [...pf.categorias]);
+                showNotification(r.ok ? `Aprovada para revisão: ${r.texto}.` : r.aguardando ? `Não registrada: ${r.texto.replace(/^não registrada · /, '')}. Confira e, se for outro ato, use “Registrar mesmo assim”.` : `Não registrada: ${r.texto}.`, r.ok ? 'success' : 'warning');
+                gab.prodForm = null;
+                gabRenderGaveta();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível aprovar para revisão');
+            } finally {
+                encerrarGravacao('gab-lancar');
+            }
+        }
+        async function gabConfirmarDuplicada(id) {
+            const ret = gab.retidas[id];
+            if (!ret) return;
+            if (!iniciarGravacao('gab-lancar')) return;
+            try {
+                const r = ret.aprovar ? await gabAprovar(id, ret.tipo, ret.cats, { forcar: true }) : await gabLancar(id, ret.tipo, ret.cats, { forcar: true });
+                if (ret.aprovar) showNotification(r.ok ? `Aprovada para revisão (duplicidade confirmada): ${r.texto}.` : `Não registrada: ${r.texto}.`, r.ok ? 'success' : 'error');
+                else gabAvisoLancamento(r);
+                gab.prodForm = null;
+                gabRenderGaveta();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível lançar');
+            } finally {
+                encerrarGravacao('gab-lancar');
+            }
+        }
+        // desfaz a marcação antiga do Painel ("lancar"/"aprovada" sem registro no sistema)
+        async function gabDesfazer() {
+            const p = gabDoc(gab.aberto);
+            if (!p) return;
+            const st = p.prod?.status;
+            if (gabMinutaNoSistema(p)) { showNotification('Esta minuta já está no sistema. Ajuste por lá (Histórico).', 'info'); return; }
+            if (!iniciarGravacao('gab-desfazer')) return;
+            try {
+                if (st === 'lancar') await gabRef(p.id).update({ lancarStatus: '', etapa: 'minuta', 'prod/status': '', 'prod/erro': '' });
+                else if (st === 'aprovada') await gabRef(p.id).update({ 'prod/status': '', 'prod/erro': '' });
+                delete gab.retidas[p.id];
+                gab.prodForm = null;
+                showNotification(st === 'lancar' ? 'Assinatura desfeita na esteira.' : 'Aprovação desfeita.', 'success');
+                gabRenderGaveta();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível desfazer');
+            } finally {
+                encerrarGravacao('gab-desfazer');
+            }
+        }
+
+        // ---------- cadastro em lote ----------
+        function gabAbrirLote() {
+            gab.aberto = 'lote';
+            gab.lote = { texto: '', especie: 'auto', materia: 'civel', esforco: 3, rigor: 'rigoroso', biblio: true, juris: true, meta2: false, notas: '', executar: true, agora: true };
+            gab.loteItens = [];
+            gabRenderLote();
+            setTimeout(() => document.getElementById('gab-lote-numeros')?.focus(), 30);
+        }
+        function gabLoteCampo(k, v, redesenhar = false) {
+            gab.lote[k] = v;
+            if (k === 'especie' && String(v).startsWith('inv-')) { gab.lote.materia = 'sucessoes'; redesenhar = true; }
+            if (redesenhar) gabRenderLote(); else if (k === 'texto' || k === 'agora') gabLeLote();
+        }
+        function gabLeLote() {
+            const vistos = new Set();
+            gab.loteItens = [];
+            for (const m of String(gab.lote.texto || '').matchAll(GAB_RE_CNJ_TEXTO)) {
+                const bruto = m[1] + (m[2] ? '/' + m[2] : '');
+                const r = validarCNJ(bruto);
+                const numero = r.ok ? r.formatado : bruto;
+                const chave = normalizarNumeroCNJ(numero);
+                if (vistos.has(chave)) continue;
+                vistos.add(chave);
+                const ja = gabDocs().some(p => normalizarNumeroCNJ(p.numero) === chave);
+                gab.loteItens.push({ numero, problema: !r.ok ? r.motivo : ja ? 'já está no painel' : '' });
+            }
+            const validos = gab.loteItens.filter(i => !i.problema);
+            const previa = document.getElementById('gab-lote-previa');
+            if (previa) previa.innerHTML = gab.loteItens.map(i => `<li class="flex justify-between gap-2 text-sm"><span class="font-mono">${escapeHtml(i.numero)}</span><span class="${i.problema ? 'text-red-600' : 'text-green-700'}">${escapeHtml(i.problema || 'ok')}</span></li>`).join('');
+            const resumo = document.getElementById('gab-lote-resumo');
+            if (resumo) resumo.textContent = gab.loteItens.length ? `${gabPlural(gab.loteItens.length, 'número encontrado', 'números encontrados')} · ${validos.length} ${validos.length === 1 ? 'será adicionado' : 'serão adicionados'}` : 'Nenhum número encontrado ainda.';
+            const aviso = document.getElementById('gab-lote-aviso');
+            if (aviso) aviso.textContent = validos.length > 30 ? 'Lotes grandes demoram: o Claude baixa os autos um a um.' : validos.length > GAB_LIMITE_RODADA && gab.lote.agora ? `Cada ativação processa ${GAB_LIMITE_RODADA}; o resto espera você ativar de novo.` : '';
+            const btn = document.getElementById('gab-lote-salvar');
+            if (btn && !gravacoesEmCurso.has('gab-lote')) { btn.disabled = !validos.length; btn.textContent = validos.length ? `Adicionar ${gabPlural(validos.length, 'processo', 'processos')}` : 'Adicionar'; }
+        }
+        function gabRenderLote() {
+            const g = document.getElementById('gab-gaveta');
+            if (!g || !gab.lote) return;
+            const l = gab.lote;
+            const entrada = 'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500';
+            const seg = (campo, opcoes) => `<div class="inline-flex rounded-md border border-gray-300 overflow-hidden" role="group">${opcoes.map(([v, rot]) =>
+                `<button type="button" aria-pressed="${String(l[campo]) === String(v)}" onclick="gabLoteCampo('${campo}', ${typeof v === 'number' ? v : `'${escapeAttr(v)}'`}, true)" class="px-2.5 py-1 text-sm ${String(l[campo]) === String(v) ? 'bg-cyan-700 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}">${escapeHtml(rot)}</button>`).join('')}</div>`;
+            const marca = (campo, txt) => `<label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" ${l[campo] ? 'checked' : ''} onchange="gabLoteCampo('${campo}', this.checked)"> ${txt}</label>`;
+            g.innerHTML = `
+                <div class="fixed inset-0 bg-black/40 z-50" onclick="gabFechar()"></div>
+                <aside class="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col" role="dialog" aria-modal="true" aria-label="Lote de processos">
+                    <header class="p-4 border-b border-gray-200 flex items-start justify-between gap-3">
+                        <div><div class="text-xs uppercase tracking-wide text-gray-500">Cadastro</div><h3 class="text-lg font-semibold text-gray-800">Lote de processos</h3>
+                        <div class="text-sm text-gray-600">Cole uma lista de números (de planilha, e-mail ou do e-SAJ): o sistema acha os números CNJ e confere o dígito verificador.</div></div>
+                        <button onclick="gabFechar()" class="text-gray-500 hover:text-gray-800 text-xl leading-none" aria-label="Fechar">×</button>
+                    </header>
+                    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div><label for="gab-lote-numeros" class="block text-sm font-medium text-gray-700 mb-1">Números dos processos</label>
+                            <textarea id="gab-lote-numeros" rows="6" class="${entrada} font-mono" oninput="gabLoteCampo('texto', this.value)">${escapeHtml(l.texto)}</textarea>
+                            <p id="gab-lote-resumo" class="text-xs text-gray-500 mt-1"></p>
+                            <ul id="gab-lote-previa" class="mt-2 space-y-0.5 max-h-48 overflow-y-auto"></ul></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label for="gab-lote-especie" class="block text-sm font-medium text-gray-700 mb-1">Tipo de ato (para todos)</label><select id="gab-lote-especie" class="${entrada}" onchange="gabLoteCampo('especie', this.value)">${Object.entries(GAB_ESPECIES).map(([k, v]) => `<option value="${k}" ${l.especie === k ? 'selected' : ''}>${escapeHtml(v.rotulo)}</option>`).join('')}</select></div>
+                            <div><label for="gab-lote-materia" class="block text-sm font-medium text-gray-700 mb-1">Matéria (bibliotecário)</label><select id="gab-lote-materia" class="${entrada}" onchange="gabLoteCampo('materia', this.value)">${Object.entries(GAB_MATERIAS_ROTULO).map(([k, v]) => `<option value="${k}" ${l.materia === k ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select></div>
+                        </div>
+                        <div class="flex flex-wrap gap-4">
+                            <div><span class="block text-sm font-medium text-gray-700 mb-1">Esforço</span>${seg('esforco', [1, 2, 3, 4, 5].map(n => [n, String(n)]))}</div>
+                            <div><span class="block text-sm font-medium text-gray-700 mb-1">Rigor</span>${seg('rigor', [['rigoroso', 'Rigoroso'], ['livre', 'Livre']])}</div>
+                        </div>
+                        ${marca('biblio', 'Ativar o bibliotecário da matéria')}
+                        ${marca('juris', 'Consultar a jurisprudência do TJAL')}
+                        ${marca('meta2', 'Todos são da Meta 2 do CNJ')}
+                        <div><label for="gab-lote-notas" class="block text-sm font-medium text-gray-700 mb-1">Orientações comuns ao lote</label><textarea id="gab-lote-notas" rows="3" class="${entrada}" placeholder="Ex.: decisões inaugurais de consignados; observar o Tema 1.198 do STJ." oninput="gabLoteCampo('notas', this.value)">${escapeHtml(l.notas)}</textarea></div>
+                        ${marca('executar', 'Pôr na fila como um lote só (o Claude baixa e minuta todos juntos)')}
+                        ${marca('agora', `Ativar o executor ao pôr na fila (começa em até 5 minutos; até ${GAB_LIMITE_RODADA} processos por ativação)`)}
+                    </div>
+                    <footer class="p-3 border-t border-gray-200 flex flex-wrap gap-2 justify-between items-center">
+                        <span id="gab-lote-aviso" class="text-xs text-amber-700"></span>
+                        <div class="flex gap-2">
+                            <button onclick="gabFechar()" class="px-3 py-1.5 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-100">Cancelar</button>
+                            <button id="gab-lote-salvar" onclick="gabSalvarLote()" data-gravacao="gab-lote" disabled class="px-4 py-1.5 rounded-md text-sm bg-cyan-700 text-white hover:bg-cyan-800 disabled:opacity-40">Adicionar</button>
+                        </div>
+                    </footer>
+                </aside>`;
+            gabLeLote();
+        }
+        async function gabSalvarLote() {
+            if (!currentUser?.isJuiz || !database || !gab.lote) return;
+            const validos = gab.loteItens.filter(i => !i.problema);
+            if (!validos.length) return;
+            if (!iniciarGravacao('gab-lote')) return;
+            const l = gab.lote;
+            const agora = new Date().toISOString();
+            const loteId = l.executar && validos.length > 1 ? 'lote-' + agora.slice(0, 16).replace(/\D/g, '') : '';
+            const base = { ...gabVazio(), especie: l.especie, materia: l.materia, esforco: Number(l.esforco) || 3, rigor: l.rigor,
+                biblio: !!l.biblio, juris: !!l.juris, meta2: !!l.meta2, notas: String(l.notas || '').trim() };
+            let ok = 0, ultimoErro = null, ativou = false;
+            try {
+                for (const item of validos) {
+                    const p = { ...base, numero: item.numero };
+                    const dados = { ...p, origem: { tipo: 'lote', pedidoBalcaoId: '' }, exemplo: false, criadoEm: agora, atualizadoEm: agora, execStatus: '' };
+                    if (l.executar) Object.assign(dados, gabPedidoExec(p, loteId));
+                    try { await database.ref('gabinete/processos').push().set(dados); ok++; } catch (e) { ultimoErro = e; break; }
+                }
+                if (l.executar && ok && l.agora) { try { ativou = await gabPedirExecutor(); } catch (e) { ultimoErro = ultimoErro || e; } }
+            } finally {
+                encerrarGravacao('gab-lote');
+            }
+            if (ultimoErro && ok < validos.length) { avisarFalhaGravacao(ultimoErro, `${ok} de ${validos.length} processos adicionados`); gabLeLote(); return; }
+            gabFechar();
+            showNotification(`${gabPlural(ok, 'processo adicionado', 'processos adicionados')}${l.executar ? ' à fila de execução' : ''}${l.executar && l.agora ? (ativou ? ' · executor ativado' : ' · já havia um pedido ao executor') : ''}.`, 'success');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && gab.aberto) gabFechar();
+        });
+
         // ==================== FIREBASE ====================
 
         function setupFirebaseListeners() {
@@ -8570,6 +10002,10 @@
                     if (currentView === 'calendario') renderCalendario();
                     if (currentView === 'meta180') renderMeta180();
                     if (currentView === 'meta2') renderMeta2Painel();
+
+                    // aba Gabinete: situação no sistema de cada processo da esteira
+                    if (currentView === 'gabinete') gabAtualizar();
+                    gabAgendarConciliacao();
 
                     // integração automática com o gabinete (apenas na sessão do juiz)
                     processarMinutasDoGabinete();
@@ -8590,6 +10026,9 @@
                     metasJuizDiario = snapshot.val() || {};
                     if (currentView === 'dashboard' && currentUser?.isJuiz) renderDashboard();
                 });
+
+                // Esteira do gabinete (aba Gabinete): só a sessão do juiz lê gabinete/
+                if (currentUser?.isJuiz) gabIniciarListeners();
 
                 // Travas dos efeitos das minutas do gabinete (ver processarMinutasDoGabinete)
                 if (currentUser?.isJuiz) {
