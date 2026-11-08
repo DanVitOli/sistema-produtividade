@@ -1,11 +1,11 @@
 {
- "versao": "2026.11.06c",
- "geradoEm": "2026-11-07T08:15:49",
+ "versao": "2026.11.08",
+ "geradoEm": "2026-11-08T12:50:51",
  "partes": {
-  "novidades": "30bec71e355b3cb8fdf2d8a23e2daad452c67bb3a6690d0619e93246bb37efb6",
-  "instrucoesProjeto": "41ba249e4707871c28bfd9cf7fec049bb5ebeb12b4c1ce9f1ae2bdff59c9931a",
-  "teses": "4a5175bc543b33f6c422e568a6ffad042573eae3d3cb24a595cf9185b9b73e15",
-  "modelos": "a57721a061b342fa5f94eabd51515473ac2f7f9b0b21c210af90b37118350db8",
-  "skills": "16fccbbdc83425b0993a11f7ca268f338dd3e0ab52c7d3b4492a3184e1e055cb"
+  "novidades": "67960911a999e407f2b51e2fa11a43f4bcf8e19cad4e6264c99684d6382c1a81",
+  "instrucoesProjeto": "58ec6cd0d18a579594c93e5d785eb6ad343b62e9daab82d7541c80ce6bdabd90",
+  "teses": "decd9ae53518f5e25334eed70f38bf61d80a4cb5687b7873f665271f4272bde0",
+  "modelos": "d92c49cf7857688da107917d04b309d218d680f2ae2bf99718c1784c16df4c61",
+  "skills": "ed3d53f059da9e07186d530466377feb88983c9bda40296219957c007be6f4e9"
  }
 }
