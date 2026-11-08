@@ -552,7 +552,7 @@
                         <textarea id="observacoes-minuta" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Comentários sobre a minuta (opcional)"></textarea>
                     </div>
                     
-                    <button onclick="registrarMinuta()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                    <button onclick="registrarMinuta()" data-gravacao="minuta" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium">
                         <i data-lucide="save" class="h-5 w-5 mr-2 inline"></i>
                         Registrar Minuta
                     </button>
@@ -792,7 +792,7 @@
                     </div>
                 </div>
 
-                <button onclick="cadastrarPedidoBalcao()" class="w-full mt-4 bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 transition-colors font-medium">
+                <button onclick="cadastrarPedidoBalcao()" data-gravacao="pedido-balcao" class="w-full mt-4 bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 transition-colors font-medium">
                     <i data-lucide="plus" class="h-5 w-5 mr-2 inline"></i>
                     Cadastrar Pedido
                 </button>
@@ -933,7 +933,7 @@
             <textarea id="meta180-registro-obs" rows="2" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
             <p id="meta180-registro-nota" class="text-xs text-gray-500 mt-2">A minuta será registrada em seu nome na categoria "Sem movimentação 60+ dias" (Sentença também conta na Meta 1) e ficará pendente de assinatura.</p>
             <div class="flex gap-2 mt-4">
-                <button onclick="confirmarRegistroMeta180()" class="flex-1 bg-cyan-600 text-white py-2 px-4 rounded-md hover:bg-cyan-700 transition-colors font-medium">Registrar</button>
+                <button onclick="confirmarRegistroMeta180()" data-gravacao="minutei" class="flex-1 bg-cyan-600 text-white py-2 px-4 rounded-md hover:bg-cyan-700 transition-colors font-medium">Registrar</button>
                 <button onclick="fecharModaisMeta180()" class="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors">Cancelar</button>
             </div>
         </div>
@@ -1088,7 +1088,7 @@
                 </div>
             </div>
 
-            <button onclick="cadastrarProcessoMeta()" class="w-full mt-4 bg-amber-600 text-white py-3 px-4 rounded-md hover:bg-amber-700 transition-colors font-medium">
+            <button onclick="cadastrarProcessoMeta()" data-gravacao="processo-meta" class="w-full mt-4 bg-amber-600 text-white py-3 px-4 rounded-md hover:bg-amber-700 transition-colors font-medium">
                 <i data-lucide="plus" class="h-5 w-5 mr-2 inline"></i>
                 Cadastrar Processo
             </button>
@@ -1227,7 +1227,7 @@
 
                 <!-- Botão de importação -->
                 <div id="meta-botao-importar" class="hidden">
-                    <button onclick="executarImportacaoMeta()" class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition-colors font-medium">
+                    <button onclick="executarImportacaoMeta()" data-gravacao="importacao-meta" class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition-colors font-medium">
                         <i data-lucide="download" class="h-5 w-5 mr-2 inline"></i>
                         Importar Processos
                     </button>
@@ -1489,7 +1489,7 @@
                 </div>
 
                 <div class="flex gap-2 pt-4">
-                    <button onclick="salvarEdicao()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                    <button onclick="salvarEdicao()" data-gravacao="edicao-minuta" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
                         <i data-lucide="save" class="h-4 w-4 mr-1 inline"></i>
                         Salvar
                     </button>
@@ -2226,6 +2226,44 @@
             if (!error) return 'sem conexão com o banco de dados.';
             if (/network|offline|disconnect|timeout/i.test(msg)) return `sem conexão com o banco (${msg}).`;
             return msg || 'erro desconhecido.';
+        }
+
+        // Gravação única (08/11/2026): um duplo clique, ou cliques repetidos enquanto o banco
+        // ainda não respondeu, gravavam o mesmo registro duas vezes (cada push() cria uma chave
+        // nova). Enquanto a gravação "chave" está em curso, novas chamadas são ignoradas e os
+        // botões com data-gravacao="chave" ficam desabilitados, com "Gravando…". A trava sai
+        // quando a gravação termina, com sucesso ou com erro (o botão volta para nova tentativa).
+        // Sem internet o Firebase guarda a escrita e só responde ao reconectar: o botão fica
+        // travado até lá, de propósito (liberar antes permitiria gravar em dobro).
+        const gravacoesEmCurso = new Set();
+
+        function iniciarGravacao(chave) {
+            if (gravacoesEmCurso.has(chave)) {
+                log(`Gravação "${chave}" já em curso: clique repetido ignorado`);
+                return false;
+            }
+            gravacoesEmCurso.add(chave);
+            document.querySelectorAll(`[data-gravacao="${chave}"]`).forEach(b => {
+                if (b.dataset.rotuloOriginal === undefined) b.dataset.rotuloOriginal = b.innerHTML;
+                b.disabled = true;
+                b.setAttribute('aria-busy', 'true');
+                b.classList.add('opacity-60', 'cursor-wait');
+                b.textContent = 'Gravando…';
+            });
+            return true;
+        }
+
+        function encerrarGravacao(chave) {
+            gravacoesEmCurso.delete(chave);
+            document.querySelectorAll(`[data-gravacao="${chave}"]`).forEach(b => {
+                b.disabled = false;
+                b.removeAttribute('aria-busy');
+                b.classList.remove('opacity-60', 'cursor-wait');
+                if (b.dataset.rotuloOriginal !== undefined) {
+                    b.innerHTML = b.dataset.rotuloOriginal;
+                    delete b.dataset.rotuloOriginal;
+                }
+            });
         }
 
         function avisarFalhaGravacao(error, oQue = 'Não foi possível salvar no banco') {
@@ -4003,6 +4041,7 @@
                 createdAt: getDataHoraBrasilia().getTime()
             };
 
+            if (!iniciarGravacao('pedido-balcao')) return;
             try {
                 if (database) {
                     database.ref('pedidosBalcao').push(novoPedido)
@@ -4026,7 +4065,8 @@
                         .catch((error) => {
                             log('Erro ao salvar pedido no Firebase:', error);
                             avisarFalhaGravacao(error, 'Erro ao cadastrar pedido');
-                        });
+                        })
+                        .finally(() => encerrarGravacao('pedido-balcao'));
                 } else {
                     avisarFalhaGravacao(null, 'Pedido NÃO cadastrado');
                 }
@@ -5243,7 +5283,8 @@
             };
 
             if (database) {
-                database.ref(meta.colecaoFirebase).push(novoProcesso)
+                if (!iniciarGravacao('processo-meta')) return;
+                Promise.resolve().then(() => database.ref(meta.colecaoFirebase).push(novoProcesso))
                     .then(() => {
                         limparFormularioMeta();
                         showNotification('Processo cadastrado na meta com sucesso!', 'success');
@@ -5252,7 +5293,8 @@
                     .catch((error) => {
                         log('Erro ao cadastrar processo na meta:', error);
                         avisarFalhaGravacao(error, 'Erro ao cadastrar processo');
-                    });
+                    })
+                    .finally(() => encerrarGravacao('processo-meta'));
             } else {
                 avisarFalhaGravacao(null, 'Processo NÃO cadastrado');
             }
@@ -5997,6 +6039,15 @@
         }
 
         async function executarImportacaoMeta() {
+            if (!iniciarGravacao('importacao-meta')) return;
+            try {
+                await executarImportacaoMetaInterna();
+            } finally {
+                encerrarGravacao('importacao-meta');
+            }
+        }
+
+        async function executarImportacaoMetaInterna() {
             const novosProcessos = processosParaImportar.filter(p => !p.jaExiste);
 
             if (novosProcessos.length === 0) {
@@ -6696,16 +6747,17 @@
                 origem: meta180ModalContexto === 'meta2' ? 'painel_meta2' : 'painel_180_120_100'
             };
 
-            database.ref('minutas').push({
+            if (!iniciarGravacao('minutei')) return;
+            Promise.resolve().then(() => database.ref('minutas').push({
                 ...novaMinuta,
                 createdAt: firebase.database.ServerValue.TIMESTAMP
-            }).then(() => {
+            })).then(() => {
                 fecharModaisMeta180();
                 showNotification('✍️ Minuta registrada para o processo ' + item.numero + '! Pendente de assinatura.', 'success');
             }).catch((error) => {
                 log('Erro ao registrar minuta pelo painel:', error);
                 showNotification('⚠️ NÃO foi possível salvar no banco. Verifique a conexão e tente novamente.', 'error');
-            });
+            }).finally(() => encerrarGravacao('minutei'));
         }
 
         function abrirObsMeta180(chave) {
@@ -8368,6 +8420,15 @@
         }
 
         async function registrarImportacaoPainelIA() {
+            if (!iniciarGravacao('importacao-painel-ia')) return;
+            try {
+                await registrarImportacaoPainelIAInterna();
+            } finally {
+                encerrarGravacao('importacao-painel-ia');
+            }
+        }
+
+        async function registrarImportacaoPainelIAInterna() {
             if (!currentUser?.isJuiz || !painelIAImportacao) return;
             if (!database) { showNotification('Sem conexão com o banco de dados.', 'error'); return; }
             const validas = painelIAImportacao.filter(importacaoLiberadaPainelIA);
@@ -8741,6 +8802,7 @@
                 createdAt: getDataHoraBrasilia().getTime()
             };
 
+            if (!iniciarGravacao('minuta')) return;
             try {
                 if (database) {
                     const novaRef = database.ref('minutas').push({
@@ -8782,12 +8844,14 @@
                     }).catch((error) => {
                         log('Erro ao salvar no Firebase:', error);
                         salvarMinutaLocal(novaMinuta, error);
-                    });
+                    }).finally(() => encerrarGravacao('minuta'));
                 } else {
+                    encerrarGravacao('minuta');
                     salvarMinutaLocal(novaMinuta);
                 }
 
             } catch (error) {
+                encerrarGravacao('minuta');
                 log('Erro ao registrar minuta:', error);
                 salvarMinutaLocal(novaMinuta);
             }
@@ -10657,16 +10721,19 @@
                 };
 
                 if (database) {
-                    database.ref(`minutas/${minutaEditando}`).update(camposAlterados(minuta, minutaAtualizada))
+                    const idEditado = minutaEditando;
+                    if (!iniciarGravacao('edicao-minuta')) return;
+                    Promise.resolve().then(() => database.ref(`minutas/${idEditado}`).update(camposAlterados(minuta, minutaAtualizada)))
                         .then(() => {
                             showNotification('Minuta editada com sucesso', 'success');
                             fecharModalEdicao();
-                            log(`Minuta ${minutaEditando} editada`);
+                            log(`Minuta ${idEditado} editada`);
                         })
                         .catch((error) => {
                             avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                             renderHistorico();
-                        });
+                        })
+                        .finally(() => encerrarGravacao('edicao-minuta'));
                 } else {
                     avisarFalhaGravacao(typeof error !== 'undefined' ? error : null);
                     renderHistorico();
