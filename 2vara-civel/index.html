@@ -454,7 +454,7 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
-                        <input type="text" id="numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 1234567-89.2024.8.02.3456">
+                        <input type="text" id="numero-processo" onblur="formatarCampoCNJ(this)" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 1234567-89.2024.8.02.3456">
                     </div>
                     
                     <div class="grid md:grid-cols-2 gap-4">
@@ -719,7 +719,7 @@
                 <div class="grid md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
-                        <input type="text" id="balcao-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Ex: 1234567-89.2024.8.02.3456">
+                        <input type="text" id="balcao-processo" onblur="formatarCampoCNJ(this)" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Ex: 1234567-89.2024.8.02.3456">
                     </div>
 
                     <div>
@@ -1055,7 +1055,7 @@
             <div class="grid md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
-                    <input type="text" id="meta-processo-numero" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: 0000000-00.0000.8.02.0000">
+                    <input type="text" id="meta-processo-numero" onblur="formatarCampoCNJ(this)" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: 0000000-00.0000.8.02.0000">
                 </div>
 
                 <div>
@@ -1447,7 +1447,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
-                    <input type="text" id="edit-numero-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="text" id="edit-numero-processo" onblur="formatarCampoCNJ(this)" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
                 <div>
@@ -1688,7 +1688,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Número do Processo *</label>
-                    <input type="text" id="edicao-pedido-processo" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0000000-00.0000.0.00.0000">
+                    <input type="text" id="edicao-pedido-processo" onblur="formatarCampoCNJ(this)" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0000000-00.0000.0.00.0000">
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
@@ -4004,7 +4004,7 @@
         }
 
         function cadastrarPedidoBalcao() {
-            const numeroProcesso = document.getElementById('balcao-processo').value.trim();
+            let numeroProcesso = document.getElementById('balcao-processo').value.trim();
             const sequencial = document.getElementById('balcao-sequencial').value;
             const classe = document.getElementById('balcao-classe').value;
             const categoria = document.getElementById('balcao-categoria').value;
@@ -4020,10 +4020,9 @@
                 return;
             }
 
-            if (!validarNumeroProcesso(numeroProcesso)) {
-                showNotification('Número do processo inválido.', 'error');
-                return;
-            }
+            const numeroValidado = numeroProcessoDoFormulario(numeroProcesso);
+            if (!numeroValidado) return;
+            numeroProcesso = numeroValidado;
 
             const novoPedido = {
                 numeroProcesso,
@@ -4186,6 +4185,7 @@
             document.getElementById('edicao-pedido-sequencial').textContent = pedido.sequencial || '-';
             document.getElementById('edicao-pedido-sequencial-input').value = pedido.sequencial || '';
             document.getElementById('edicao-pedido-processo').value = pedido.numeroProcesso || '';
+            avisarNumeroGravadoInvalido(pedido.numeroProcesso);
             document.getElementById('edicao-pedido-classe').value = pedido.classe || 'civel';
             document.getElementById('edicao-pedido-categoria').value = pedido.categoria || '';
             document.getElementById('edicao-pedido-data').value = pedido.dataPedido || '';
@@ -4213,7 +4213,7 @@
             }
 
             // Coletar dados do formulário
-            const numeroProcesso = document.getElementById('edicao-pedido-processo').value.trim();
+            let numeroProcesso = document.getElementById('edicao-pedido-processo').value.trim();
             const sequencial = document.getElementById('edicao-pedido-sequencial-input').value;
             const classe = document.getElementById('edicao-pedido-classe').value;
             const categoria = document.getElementById('edicao-pedido-categoria').value;
@@ -4229,10 +4229,10 @@
                 return;
             }
 
-            if (!validarNumeroProcesso(numeroProcesso)) {
-                showNotification('Número do processo inválido.', 'error');
-                return;
-            }
+            const numeroValidado = numeroProcessoDoFormulario(numeroProcesso, { numeroAnterior: pedidoOriginal.numeroProcesso || '' });
+            if (!numeroValidado) return;
+            // número antigo inválido e não mexido: grava como estava (não reescreve o campo)
+            numeroProcesso = numeroValidado;
 
             const pedidoAtualizado = {
                 ...pedidoOriginal,
@@ -5243,7 +5243,7 @@
         }
 
         function cadastrarProcessoMeta() {
-            const numeroProcesso = document.getElementById('meta-processo-numero').value.trim();
+            let numeroProcesso = document.getElementById('meta-processo-numero').value.trim();
             const status = document.getElementById('meta-processo-status').value;
             const fase = document.getElementById('meta-processo-fase').value;
             const ultimaMovimentacao = document.getElementById('meta-processo-ultima-mov').value;
@@ -5255,15 +5255,14 @@
                 return;
             }
 
-            if (!validarNumeroProcesso(numeroProcesso)) {
-                showNotification('Número do processo inválido.', 'error');
-                return;
-            }
+            const numeroValidado = numeroProcessoDoFormulario(numeroProcesso);
+            if (!numeroValidado) return;
+            numeroProcesso = numeroValidado;
 
-            // Verificar se já existe na meta atual
+            // Verificar se já existe na meta atual (pelos dígitos: com ou sem máscara é o mesmo)
             const processosAtuais = getProcessosMetaAtual();
             const existe = Object.values(processosAtuais).some(p =>
-                p && p.numeroProcesso === numeroProcesso
+                p && normalizarNumeroCNJ(p.numeroProcesso) === normalizarNumeroCNJ(numeroProcesso)
             );
             if (existe) {
                 showNotification('Este processo já está cadastrado na meta.', 'error');
@@ -8198,7 +8197,7 @@
             const cats = (Array.isArray(m.categorias) ? m.categorias : []).filter(c => categorias[c]);
             let problema = '';
             if (!/^[A-Za-z0-9_-]{1,120}$/.test(painelId)) problema = 'identificação do Painel inválida';
-            else if (!validarNumeroProcesso(numero)) problema = 'número inválido';
+            else if (!validarNumeroProcesso(numero)) problema = 'número inválido: ' + validarCNJ(numero).motivo;
             else if (!['Despacho', 'Decisão', 'Sentença'].includes(m.tipoMinuta)) problema = 'tipo inválido';
             else if (!cats.length) problema = 'sem categoria válida';
             else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
@@ -8345,7 +8344,7 @@
             const itens = dados.minutas.map(m => {
                 const cats = (Array.isArray(m.categorias) ? m.categorias : []).filter(c => categorias[c]);
                 let problema = '';
-                if (!validarNumeroProcesso(String(m.numeroProcesso || ''))) problema = 'número inválido';
+                if (!validarNumeroProcesso(String(m.numeroProcesso || ''))) problema = 'número inválido: ' + validarCNJ(String(m.numeroProcesso || '')).motivo;
                 else if (!['Despacho', 'Decisão', 'Sentença'].includes(m.tipoMinuta)) problema = 'tipo inválido';
                 else if (!cats.length) problema = 'sem categoria válida';
                 else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
@@ -8738,21 +8737,49 @@
 
         // ==================== REGISTRO DE MINUTAS ====================
         
-        // Função para validar formato do número do processo (padrão CNJ)
+        // Número do processo nos formulários (08/11/2026): mesma regra da importação, validarCNJ()
+        // (20 dígitos, dígito verificador módulo 97, sufixo /0001 opcional). Antes bastava ter 10
+        // caracteres entre dígitos, pontos e traços, e número com DV errado era gravado.
         function validarNumeroProcesso(numero) {
-            // Formato CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO
-            // Também aceita formatos mais flexíveis com números e pontos/traços
-            const regexCNJ = /^\d{7}-\d{2}\.\d{4}\.\d{1,2}\.\d{2}\.\d{4}$/;
-            const regexFlexivel = /^[\d.\-\/]+$/;
+            return validarCNJ(numero).ok;
+        }
 
-            if (regexCNJ.test(numero)) return true;
-            if (regexFlexivel.test(numero) && numero.length >= 10) return true;
+        // Confere o número digitado e devolve o número com a máscara CNJ, ou null (já avisou o
+        // motivo). Na edição, numeroAnterior é o número já gravado: registro antigo com número
+        // inválido continua editável se o número não for mexido (avisa, não bloqueia); trocar
+        // por outro número inválido é recusado.
+        function numeroProcessoDoFormulario(valor, { numeroAnterior = null } = {}) {
+            const texto = String(valor ?? '').trim();
+            const r = validarCNJ(texto);
+            if (r.ok) return r.formatado;
+            if (numeroAnterior !== null && normalizarNumeroCNJ(texto) === normalizarNumeroCNJ(numeroAnterior)) {
+                showNotification(`Atenção: o número gravado neste registro (${texto}) não é um número CNJ válido — ${r.motivo}. A edição foi aceita; corrija o número quando puder.`, 'warning');
+                return texto;
+            }
+            showNotification(`Número do processo inválido: ${r.motivo}. Use o formato CNJ, ex.: 0000000-00.0000.8.02.0000 (pontos e traço são opcionais; incidente com /0001).`, 'error');
+            return null;
+        }
 
-            return false;
+        // Ao sair do campo: aplica a máscara se o número for válido; se não, marca o campo e
+        // mostra o motivo na dica (a gravação é que avisa e bloqueia)
+        function formatarCampoCNJ(el) {
+            if (!el) return;
+            const texto = el.value.trim();
+            const r = texto ? validarCNJ(texto) : { ok: true };
+            if (r.ok && r.formatado) el.value = r.formatado;
+            el.classList.toggle('border-red-500', !r.ok);
+            el.title = r.ok ? '' : `Número inválido: ${r.motivo}`;
+        }
+
+        function avisarNumeroGravadoInvalido(numero) {
+            const r = validarCNJ(numero);
+            if (!r.ok && String(numero || '').trim()) {
+                showNotification(`Atenção: o número gravado (${String(numero).trim()}) não é um número CNJ válido — ${r.motivo}. Dá para editar o registro; corrija o número se puder.`, 'warning');
+            }
         }
 
         function registrarMinuta() {
-            const numeroProcesso = document.getElementById('numero-processo').value.trim();
+            let numeroProcesso = document.getElementById('numero-processo').value.trim();
             const tipoMinuta = document.getElementById('tipo-minuta').value;
             const observacoes = document.getElementById('observacoes-minuta').value.trim();
             const substituicao = document.getElementById('substituicao-checkbox').checked;
@@ -8766,11 +8793,11 @@
                 return;
             }
 
-            // Validação do formato do número do processo
-            if (!validarNumeroProcesso(numeroProcesso)) {
-                showNotification('Número do processo inválido. Use o formato CNJ (ex: 1234567-89.2024.8.02.0001) ou similar.', 'error');
-                return;
-            }
+            // Validação do número do processo (DV do CNJ) e máscara
+            const numeroValidado = numeroProcessoDoFormulario(numeroProcesso);
+            if (!numeroValidado) return;
+            numeroProcesso = numeroValidado;
+            document.getElementById('numero-processo').value = numeroValidado;
 
             // Validação de tamanho máximo das observações
             if (observacoes.length > 500) {
@@ -9839,6 +9866,7 @@
                 minutaEditando = id;
                 
                 document.getElementById('edit-numero-processo').value = minuta.numeroProcesso || '';
+                avisarNumeroGravadoInvalido(minuta.numeroProcesso);
                 document.getElementById('edit-tipo-minuta').value = minuta.tipoMinuta || 'Despacho';
 
                 const categorias = normalizarCategorias(minuta);
@@ -10693,7 +10721,7 @@
                     return;
                 }
 
-                const numeroProcesso = document.getElementById('edit-numero-processo').value.trim();
+                let numeroProcesso = document.getElementById('edit-numero-processo').value.trim();
                 const tipoMinuta = document.getElementById('edit-tipo-minuta').value;
                 const categoria = document.getElementById('edit-categoria-minuta').value;
                 const observacoes = document.getElementById('edit-observacoes-minuta').value.trim();
@@ -10705,6 +10733,9 @@
                 }
 
                 const minuta = minutas[minutaEditando];
+                const numeroValidado = numeroProcessoDoFormulario(numeroProcesso, { numeroAnterior: minuta?.numeroProcesso || '' });
+                if (!numeroValidado) return;
+                numeroProcesso = numeroValidado;
                 // o formulário edita só a categoria principal: as demais (Meta 2, painéis, extras) são preservadas
                 const categoriasAntes = normalizarCategorias(minuta);
                 let novasCategorias = [categoria, ...categoriasAntes.slice(1).filter(c => c !== categoria)];
