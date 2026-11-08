@@ -2,7 +2,13 @@
   "rules": {
     "gabinete": {
       ".read": "auth != null && (auth.uid === '5ZGGkumGcQQoryAcv2DZWSVVnyq2' || auth.uid === 'PcpjKkrVGBZbeJrDyXFd69uyeAe2' || auth.uid === 'ZkrcG7e2jWMXGKhSbSbpP5POd5i1' || auth.uid === 'BPnezQgbjYUNY33NTuXNRptQtJB2') && (auth.token.email === 'vital.danilo5@gmail.com' || auth.token.email === 'danilooliveira@tjal.jus.br')",
-      ".write": "auth != null && (auth.uid === '5ZGGkumGcQQoryAcv2DZWSVVnyq2' || auth.uid === 'PcpjKkrVGBZbeJrDyXFd69uyeAe2' || auth.uid === 'ZkrcG7e2jWMXGKhSbSbpP5POd5i1' || auth.uid === 'BPnezQgbjYUNY33NTuXNRptQtJB2') && (auth.token.email === 'vital.danilo5@gmail.com' || auth.token.email === 'danilooliveira@tjal.jus.br')"
+      ".write": "auth != null && (auth.uid === '5ZGGkumGcQQoryAcv2DZWSVVnyq2' || auth.uid === 'PcpjKkrVGBZbeJrDyXFd69uyeAe2' || auth.uid === 'ZkrcG7e2jWMXGKhSbSbpP5POd5i1' || auth.uid === 'BPnezQgbjYUNY33NTuXNRptQtJB2') && (auth.token.email === 'vital.danilo5@gmail.com' || auth.token.email === 'danilooliveira@tjal.jus.br')",
+      "processos": {
+        ".indexOn": [
+          "execStatus",
+          "lancarStatus"
+        ]
+      }
     },
     "$outro": {
       ".read": "auth != null && (auth.uid === '5ZGGkumGcQQoryAcv2DZWSVVnyq2' || auth.uid === 'PcpjKkrVGBZbeJrDyXFd69uyeAe2' || auth.uid === 'ZkrcG7e2jWMXGKhSbSbpP5POd5i1' || auth.uid === 'BPnezQgbjYUNY33NTuXNRptQtJB2')",
