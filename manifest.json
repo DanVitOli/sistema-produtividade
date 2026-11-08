@@ -1,34 +1,20 @@
 {
-  "name": "Sistema de Produtividade Judicial",
-  "short_name": "Produtividade",
-  "description": "Sistema de controle de produtividade para gabinete judicial",
-  "start_url": "/index.html",
+  "name": "2ª Vara Cível de Palmeira dos Índios - Produtividade",
+  "short_name": "2ª Vara Cível",
+  "description": "O sistema legado da raiz foi retirado; este manifesto aponta para o sistema em uso.",
+  "start_url": "./2vara-civel/index.html",
+  "scope": "./2vara-civel/",
   "display": "standalone",
-  "background_color": "#4F46E5",
-  "theme_color": "#4F46E5",
-  "orientation": "any",
-  "scope": "/",
+  "background_color": "#0891B2",
+  "theme_color": "#0891B2",
   "icons": [
     {
-      "src": "icons/icon.svg",
+      "src": "2vara-civel/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
-    },
-    {
-      "src": "icons/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
     }
   ],
-  "categories": ["productivity", "business"],
   "lang": "pt-BR",
   "dir": "ltr"
 }
