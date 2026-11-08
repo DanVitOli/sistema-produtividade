@@ -29,15 +29,27 @@
     <!-- Tipografia do layout -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <!-- 08/11/2026: CDNs com versão fixa; integrity (SRI) com o hash publicado pelo cdnjs
+         (api.cdnjs.com/libraries/<lib>/<versão>?fields=sri), conferido contra o arquivo servido.
+         Ao trocar de versão, trocar também o hash, senão o navegador recusa o script. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"
+            integrity="sha512-xnQu5InPxk9UM2QOML/SDJLZ1g9cpdJOsfp5XGXjZq5GjuJyxomyDpljDuQYbJFO1Lx5datzD+43g9c2NCytXQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"
+            integrity="sha512-s+3+gFWJgwYopnCFKyYJ4mRu9e3FuQCC4uaBKuJGZK/zN8ik0pw4YtvmSKFqrYhP7oGuf13iPSpryG+qLm3esA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"
+            integrity="sha512-vsLYaHLUNiI++4FR5dZ2pUzPW5M3u/dwNCgESTug/aMiBsAl5z6qPv8OzJfe5zxSNzp6T9vzD8jcKoVlW9uFIQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Tailwind: Play CDN, sem versão fixa e sem SRI possível (o script muda sem aviso e o próprio
+         Tailwind desaconselha em produção). Pendente: trocar por um CSS gerado no build
+         (tailwindcss CLI) e servido junto com o site. Mantido assim por ora (08/11/2026). -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons com fallbacks -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"
-            onerror="this.onerror=null;this.src='https://unpkg.com/lucide@latest/dist/umd/lucide.js'"></script>
+    <!-- Lucide: não existe no cdnjs (a URL antiga do cdnjs, 0.263.1, dava 404 e o sistema sempre caía
+         no unpkg com @latest). Versão fixa no unpkg, com o mesmo arquivo no jsDelivr como reserva;
+         sem integrity porque o cdnjs não publica hash para ele. -->
+    <script src="https://unpkg.com/lucide@1.61.0/dist/umd/lucide.min.js"
+            onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/lucide@1.61.0/dist/umd/lucide.min.js'"></script>
     <!-- SheetJS para leitura de arquivos Excel -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+            integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         .loading-spinner {
             border: 4px solid #f3f3f3;
@@ -651,11 +663,11 @@
                     </div>
                     <div class="flex gap-2 no-print">
                         <button onclick="gerarRelatorio('semanal')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm">
-                            <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
+                            <i data-lucide="calendar-range" class="h-4 w-4 mr-1 inline"></i>
                             Relatório Semanal
                         </button>
                         <button onclick="gerarRelatorio('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
-                            <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
+                            <i data-lucide="calendar-days" class="h-4 w-4 mr-1 inline"></i>
                             Relatório Mensal
                         </button>
                         <button onclick="mostrarRelatorioPersonalizado()" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors text-sm">
@@ -836,7 +848,7 @@
                         </div>
                         <div class="flex gap-2 no-print">
                             <button onclick="gerarRelatorioBalcao('semanal')" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm">
-                                <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
+                                <i data-lucide="calendar-range" class="h-4 w-4 mr-1 inline"></i>
                                 Semanal
                             </button>
                             <button onclick="gerarRelatorioBalcao('mensal')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm">
@@ -3257,6 +3269,10 @@
             return new Promise((ok, erro) => {
                 const s = document.createElement('script');
                 s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                // hash publicado pelo cdnjs para a 3.10.1 (08/11/2026)
+                s.integrity = 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==';
+                s.crossOrigin = 'anonymous';
+                s.referrerPolicy = 'no-referrer';
                 s.onload = () => ok(window.JSZip);
                 s.onerror = () => erro(new Error('não foi possível carregar o compactador de arquivos'));
                 document.head.appendChild(s);
@@ -8973,7 +8989,7 @@
                                 <button onclick="gerarRelatorio('semanal')" 
                                         class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors text-sm font-medium"
                                         ${totalMinutas === 0 ? 'disabled' : ''}>
-                                    <i data-lucide="calendar-week" class="h-4 w-4 mr-1 inline"></i>
+                                    <i data-lucide="calendar-range" class="h-4 w-4 mr-1 inline"></i>
                                     Gerar Semanal
                                 </button>
                             </div>
@@ -8984,7 +9000,7 @@
                                 <button onclick="gerarRelatorio('mensal')" 
                                         class="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors text-sm font-medium"
                                         ${totalMinutas === 0 ? 'disabled' : ''}>
-                                    <i data-lucide="calendar-month" class="h-4 w-4 mr-1 inline"></i>
+                                    <i data-lucide="calendar-days" class="h-4 w-4 mr-1 inline"></i>
                                     Gerar Mensal
                                 </button>
                             </div>
