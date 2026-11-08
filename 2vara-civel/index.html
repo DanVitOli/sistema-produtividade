@@ -1019,7 +1019,7 @@
                 </select>
                 <select id="filtro-metas-parado" class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" onchange="renderListaMetas()">
                     <option value="">Movimentação</option>
-                    <option value="30">Parados há +30 dias</option>
+                    <option value="30">Parados há 30 dias ou mais</option>
                     <option value="60">Parados há +60 dias</option>
                     <option value="90">Parados há +90 dias</option>
                 </select>
@@ -2158,6 +2158,13 @@
             if (!m) return null;
             const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hora, 0, 0, 0);
             return isNaN(d.getTime()) ? null : d;
+        }
+
+        // "Parado" nas Metas CNJ: 30 dias ou mais sem movimentação (card, alerta, filtro e relatório
+        // usam o mesmo critério; antes uns usavam > 30 e outros >= 30)
+        const LIMITE_PARADO_DIAS = 30;
+        function diasParadoProcessoMeta(p) {
+            return p?.ultimaMovimentacao ? diasEntreDatas(p.ultimaMovimentacao, hojeLocal()) : null;
         }
 
         // dias corridos de a até b (strings 'AAAA-MM-DD'); null se alguma for inválida
@@ -4791,12 +4798,8 @@
             // Calcular processos parados por faixa de dias
             const hoje = getDataHoraBrasilia();
 
-            // Função auxiliar para calcular dias parado
-            const calcularDiasParado = (processo) => {
-                if (!processo.ultimaMovimentacao) return 0;
-                const ultimaMov = new Date(processo.ultimaMovimentacao + 'T00:00:00');
-                return Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
-            };
+            // Função auxiliar para calcular dias parado (sem data de movimentação: não conta como parado)
+            const calcularDiasParado = (processo) => diasParadoProcessoMeta(processo) ?? 0;
 
             // Processos ativos (não baixados)
             const processosAtivos = processos.filter(p => p.status !== 'baixado');
@@ -4817,8 +4820,8 @@
                 return dias >= 45;
             });
 
-            // Total de processos parados (30+ dias para o card existente)
-            const parados = processosAtivos.filter(p => calcularDiasParado(p) > 30).length;
+            // Total de processos parados (30 dias ou mais: mesmo critério do alerta, da lista e do relatório)
+            const parados = processosAtivos.filter(p => calcularDiasParado(p) >= LIMITE_PARADO_DIAS).length;
 
             // Calcular dias até o prazo final
             const prazoFinal = new Date(meta.prazoFinal + 'T23:59:59');
@@ -4900,7 +4903,7 @@
                     <div class="bg-red-50 border border-red-200 rounded-lg p-4">
                         <div class="flex items-center justify-between">
                             <div>
-                                <div class="text-sm text-red-600 font-medium">Parados (+30 dias)</div>
+                                <div class="text-sm text-red-600 font-medium">Parados (30+ dias)</div>
                                 <div class="text-3xl font-bold text-red-700">${parados}</div>
                             </div>
                             <i data-lucide="alert-triangle" class="h-10 w-10 text-red-400"></i>
@@ -5022,9 +5025,8 @@
                 const diasFiltro = parseInt(filtroParado);
                 processosArray = processosArray.filter(p => {
                     if (p.status === 'baixado') return false;
-                    const ultimaMov = new Date(p.ultimaMovimentacao + 'T00:00:00');
-                    const diasParado = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
-                    return diasParado >= diasFiltro;
+                    const diasParado = diasParadoProcessoMeta(p);
+                    return diasParado !== null && diasParado >= diasFiltro;
                 });
             }
 
@@ -5063,9 +5065,7 @@
             const faseInfo = fases[processo.fase] || { nome: 'Não definida', ordem: 0 };
 
             // Calcular dias desde última movimentação
-            const hoje = getDataHoraBrasilia();
-            const ultimaMov = new Date(processo.ultimaMovimentacao + 'T00:00:00');
-            const diasParado = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
+            const diasParado = diasParadoProcessoMeta(processo) ?? 0;
 
             let alertaParado = '';
             let borderClass = 'border-gray-200';
@@ -5076,7 +5076,7 @@
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                         ${diasParado} dias parado!
                     </span>`;
-                } else if (diasParado >= 30) {
+                } else if (diasParado >= LIMITE_PARADO_DIAS) {
                     borderClass = 'border-orange-300 bg-orange-50';
                     alertaParado = `<span class="px-2 py-1 bg-orange-500 text-white text-xs rounded flex items-center gap-1">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -5376,9 +5376,7 @@
             // Processos parados
             const parados30 = processos.filter(p => {
                 if (p.status === 'baixado') return false;
-                const ultimaMov = new Date(p.ultimaMovimentacao + 'T00:00:00');
-                const dias = Math.floor((hoje - ultimaMov) / (1000 * 60 * 60 * 24));
-                return dias > 30;
+                return (diasParadoProcessoMeta(p) ?? 0) >= LIMITE_PARADO_DIAS;
             }).length;
 
             const percentualConcluido = total > 0 ? Math.round((porStatus.baixado / total) * 100) : 0;
@@ -5424,7 +5422,7 @@
                         </div>
                         ${parados30 > 0 ? `
                             <div class="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg">
-                                <span class="text-red-700 font-medium">⚠️ Atenção: ${parados30} processo(s) parado(s) há mais de 30 dias</span>
+                                <span class="text-red-700 font-medium">⚠️ Atenção: ${parados30} processo(s) parado(s) há 30 dias ou mais</span>
                             </div>
                         ` : ''}
                     </div>
@@ -6161,7 +6159,8 @@
         // ==================== ACOMPANHAMENTO 180/120/100 DIAS ====================
         // Processos sem movimentação (lista da Corregedoria, referência 09/2026),
         // organizados por faixa de dias parados e cruzados com as minutas em tempo
-        // real: o processo é CUMPRIDO quando a minuta correspondente é ASSINADA.
+        // real: o processo é CUMPRIDO quando a minuta correspondente é ASSINADA com data
+        // igual ou posterior à última movimentação (número do processo comparado por inteiro).
 
         // Divisão de trabalho do gabinete por sequencial, válida para todos os
         // processos (instituída em 11/2026): Juiz (0-1), Gilbert (2-5), Laíse (6-9).
@@ -6410,15 +6409,18 @@
             return String(str || '').replace(/\D/g, '');
         }
 
+        // 08/11/2026: o processo só conta como cumprido com minuta assinada de data igual ou
+        // posterior à última movimentação da lista (uma minuta antiga não tirou o processo da
+        // paralisação), e o número é comparado por inteiro: a minuta do incidente (/0001) não
+        // cumpre o processo principal, nem a do principal cumpre o incidente.
+        function minutaDepoisDaMovimentacao(m, ultimaMov) {
+            return !ultimaMov || (m.data || '') >= ultimaMov;
+        }
+
         function getStatusMeta180() {
             const todas = Object.values(minutas).filter(m => m && m.numeroProcesso && m.status !== 'excluida');
             return PROCESSOS_ACOMPANHAMENTO.map(p => {
-                const matches = todas.filter(m => {
-                    const d = normalizarNumeroCNJ(m.numeroProcesso);
-                    // Entrada com sufixo (incidente): exige o número completo.
-                    // Entrada sem sufixo: aceita o número base (com ou sem sufixo digitado).
-                    return p.temSufixo ? d === p.chave : (d === p.chave || d.startsWith(p.chave));
-                });
+                const matches = todas.filter(m => mesmoProcesso(p, m.numeroProcesso) && minutaDepoisDaMovimentacao(m, p.ultimaMov));
                 const assinadas = matches.filter(m => m.status === 'assinada')
                     .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
                 const emAndamento = matches.filter(m => m.status === 'pendente' || m.status === 'correcao')
@@ -6947,11 +6949,20 @@
         // Acervo da Meta 2 (planilha SAJ 09/2026): processos distribuídos até
         // 2022 pendentes de julgamento (grupo 'a_julgar') e já julgados
         // (grupo 'julgado'). Um processo 'a julgar' é CUMPRIDO quando uma
-        // minuta de SENTENÇA dele é ASSINADA pelo juiz.
+        // minuta de SENTENÇA dele é ASSINADA pelo juiz dentro de META2_PERIODO
+        // (número do processo comparado por inteiro, sem contar incidentes).
 
         const META2_REFERENCIA = '11/2026';
         // Alvo do índice da Meta 2 (ajuste conforme o glossário anual do CNJ)
         const META2_ALVO = 0.80;
+        // Período de apuração da Meta 2 (ano do glossário do CNJ): só a sentença assinada com
+        // data dentro dele conta como julgamento. Ajustar a cada ano junto com a planilha.
+        const META2_PERIODO = { inicio: '2026-01-01', fim: '2026-12-31' };
+
+        function dentroDoPeriodoMeta2(m) {
+            const d = m.data || '';
+            return d >= META2_PERIODO.inicio && d <= META2_PERIODO.fim;
+        }
 
         const PROCESSOS_META2 = [
             { numero: "0700013-19.2022.8.02.0013", grupo: "a_julgar", classe: "Inventário", assunto: "Sucessões" },
@@ -7222,11 +7233,10 @@
                 if (p.grupo === 'julgado') {
                     return { ...p, status: 'julgado', minutaRef: null, outraMinuta: null };
                 }
-                const matches = todas.filter(m => {
-                    const d = normalizarNumeroCNJ(m.numeroProcesso);
-                    return p.temSufixo ? d === p.chave : (d === p.chave || d.startsWith(p.chave));
-                });
-                const sentencas = matches.filter(m => m.tipoMinuta === 'Sentença');
+                // número inteiro (sentença no cumprimento /0001 não julga o processo de conhecimento)
+                const matches = todas.filter(m => mesmoProcesso(p, m.numeroProcesso));
+                // só sentença dentro do período da meta (uma sentença antiga, anulada ou de outra fase não conta)
+                const sentencas = matches.filter(m => m.tipoMinuta === 'Sentença' && dentroDoPeriodoMeta2(m));
                 const assinadas = sentencas.filter(m => m.status === 'assinada')
                     .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
                 const emAndamento = sentencas.filter(m => m.status === 'pendente' || m.status === 'correcao')
@@ -7678,10 +7688,10 @@
         function mesmoProcesso(item, numero) {
             const d = normalizarNumeroCNJ(numero);
             const chave = item.chave || normalizarNumeroCNJ(item.numero || item.numeroProcesso);
-            const temSufixo = item.temSufixo ?? String(item.numero || item.numeroProcesso || '').includes('/');
             if (d.length < 20 || chave.length < 20) return false;
-            // item sem sufixo aceita a minuta do incidente (/0001); item com sufixo exige o número completo
-            return temSufixo ? d === chave : (d === chave || d.startsWith(chave));
+            // 08/11/2026: número inteiro, com o sufixo. Antes o item sem sufixo aceitava a minuta do
+            // incidente (/0001), que cumpria o principal (Meta 2, 180/120/100, Balcão e Metas).
+            return d === chave;
         }
 
         // Categorias que a minuta deve ter pelo processo a que se refere (usado nos lançamentos do Painel)
