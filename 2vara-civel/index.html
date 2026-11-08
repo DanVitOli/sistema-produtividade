@@ -2403,6 +2403,12 @@
             };
         }
 
+        // Meta 10 (impulso dos processos antigos): 1 minuta por semana, semana de segunda 00:00 a
+        // domingo 23:59 (getInicioSemana/getFimSemana). O card mostra a semana em curso; o
+        // histórico (semanas cumpridas e percentual) só conta semanas JÁ FECHADAS, como a Meta 2
+        // (semanasPassadas = fim < hoje). Antes a semana corrente entrava no total e, até a
+        // minuta da semana ser lançada, derrubava o percentual. A semana corrente vai em
+        // semanas[] com emCurso: true, fora da contagem.
         function getMeta10Status() {
             const hoje = getDataHoraBrasilia();
             
@@ -2422,17 +2428,21 @@
                 const fimSemana = getFimSemana(semanaAtual);
                 const minutasSemana = getMinutasSemana(semanaAtual, fimSemana, null, 'meta10');
                 const cumprida = minutasSemana.length > 0;
+                const emCurso = fimSemana >= hoje;
                 
                 semanas.push({
                     inicio: new Date(semanaAtual),
                     fim: new Date(fimSemana),
                     numero: getNumeroSemana(semanaAtual),
                     cumprida: cumprida,
+                    emCurso,
                     minutas: minutasSemana.length
                 });
                 
-                if (cumprida) semanasComMeta10++;
-                totalSemanas++;
+                if (!emCurso) {
+                    if (cumprida) semanasComMeta10++;
+                    totalSemanas++;
+                }
                 
                 semanaAtual.setDate(semanaAtual.getDate() + 7);
             }
@@ -2441,9 +2451,13 @@
                 metaSemanaCumprida,
                 semanasComMeta10,
                 totalSemanas,
+                // mesmos nomes da Meta 2
+                semanasPassadas: totalSemanas,
+                semanasCumpridas: semanasComMeta10,
                 percentualCumprimento: totalSemanas > 0 ? Math.round((semanasComMeta10 / totalSemanas) * 100) : 0,
                 semanas,
-                status: metaSemanaCumprida ? 'em_dia' : 'atrasada'
+                // semana em curso sem minuta ainda não está atrasada: só "pendente"
+                status: metaSemanaCumprida ? 'em_dia' : 'pendente'
             };
         }
 
@@ -8945,6 +8959,7 @@
                             ${meta10Status.metaSemanaCumprida ? '1/1' : '0/1'}
                         </div>
                         <div class="text-xs text-gray-600">Minuta/semana</div>
+                        <div class="text-xs text-gray-500 mt-1" title="Só semanas fechadas (segunda a domingo); a semana em curso não entra">Semanas fechadas no ano: ${meta10Status.semanasComMeta10}/${meta10Status.totalSemanas} (${meta10Status.percentualCumprimento}%)</div>
                     </div>
                 </div>
             `;
