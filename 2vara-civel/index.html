@@ -3358,7 +3358,9 @@
                         `\n\n${rebaixa(t.md)}\n`).join('\n')
                 });
             }
-            for (const area of acervoAreas(acervo.modelos)) {
+            // 09/11/2026: com meta.modelosEmSkill, os modelos saem do Projeto (capacidade) e vão para a skill
+            // "modelos-gabinete", lida sob demanda (acervoBaixarSkillModelos); o Índice continua listando todos.
+            for (const area of (acervo.meta?.modelosEmSkill ? [] : acervoAreas(acervo.modelos))) {
                 const ms = acervo.modelos.filter(m => m.area === area);
                 arquivos.push({
                     nome: `Gabinete - Modelos ${area}.md`,
@@ -3373,7 +3375,8 @@
             }
             const indice = `# Índice do acervo e novidades\n\n${cab}\n\n## Novidades\n\n` +
                 (acervo.novidades || []).map(n => `### ${n.data} — ${n.titulo || 'Atualização'} (versão ${n.versao})\n\n` + (n.itens || []).map(i => `- ${i}`).join('\n')).join('\n\n') +
-                `\n\n## Modelos (${acervo.modelos.length})\n\n` + acervo.modelos.map(m => `- [${m.codigo || 's/c'}] ${m.area} › ${m.id}${m.resultado ? ' — ' + m.resultado : ''}`).join('\n') +
+                `\n\n## Modelos (${acervo.modelos.length})\n\n` +
+                (acervo.meta?.modelosEmSkill ? 'O texto de cada modelo está na skill **modelos-gabinete** (arquivo modelos/<matéria>/<código>.md). Use o código abaixo para abri-lo.\n\n' : '') + acervo.modelos.map(m => `- [${m.codigo || 's/c'}] ${m.area} › ${m.id}${m.resultado ? ' — ' + m.resultado : ''}`).join('\n') +
                 `\n\n## Teses (${acervo.teses.length})\n\n` + acervo.teses.map(t => `- ${t.area} › ${t.titulo}${(t.codigos || []).length ? ' (' + t.codigos.join(', ') + ')' : ''}`).join('\n') + '\n';
             arquivos.unshift({ nome: 'Gabinete - Índice e novidades.md', texto: indice });
             return arquivos;
@@ -3389,6 +3392,50 @@
                 acervoBaixar(`Projeto Gabinete - arquivos (versão ${acervo.meta.versao}).zip`, blob);
                 showNotification('Pacote baixado. Extraia o .zip e envie todos os arquivos ao Projeto.', 'success');
             } catch (e) { showNotification('Erro ao gerar o pacote: ' + e.message, 'error'); }
+        }
+
+        // skill "modelos-gabinete": um arquivo por modelo, montada no navegador a partir do pacote
+        // (não duplica os modelos no banco). Os modelos ficam fora do Projeto por causa da capacidade.
+        function acervoArquivosSkillModelos() {
+            const v = acervo.meta?.versao || '';
+            const arq = m => `modelos/${String(m.area || 'sem-area').slice(0, 2)}/${acervoNomeArquivo(m.codigo || ('sc-' + String(m.id).slice(9, 50)))}.md`;
+            const rebaixa = md => String(md || '').replace(/^(#{1,4}) /gm, (x, h) => '#'.repeat(Math.min(h.length + 1, 6)) + ' ');
+            const cel = s => String(s || '').replace(/\|/g, '/').replace(/\n+/g, ' ');
+            const skill = [
+                '---',
+                'name: modelos-gabinete',
+                `description: "Modelos de minuta da 2ª Vara Cível de Palmeira dos Índios (acervo ${v}): ${acervo.modelos.length} despachos, decisões e sentenças anonimizados, por matéria e código. Use sempre que for minutar ou escolher modelo do gabinete, ou quando outra skill ou o Projeto mandar consultar um modelo."`,
+                '---', '',
+                `# Modelos de minuta do gabinete (acervo ${v})`, '',
+                'Os modelos ficam nesta skill, e não no Projeto, para não ocupar a capacidade dele. As teses e o Índice continuam no Projeto.', '',
+                '## Como usar', '',
+                '1. Abra INDICE.md (código, matéria, modelo, resultado e teses) e escolha 1 ou 2 modelos pelo cenário: espécie, fase e tema.',
+                '2. Leia por inteiro o arquivo do modelo escolhido (modelos/<matéria>/<código>.md) antes de minutar. Não minute de memória.',
+                '3. Siga o modelo em modo rigoroso, preenchendo os [CONFERIR] com os autos, e cite na resposta o código e o nome do modelo usado.',
+                `4. Se o Projeto ou o sistema indicar versão do acervo diferente de ${v}, avise antes de minutar: esta skill pode estar desatualizada.`, ''
+            ].join('\n');
+            const indice = `# Índice dos modelos (acervo ${v})\n\n| Código | Matéria | Modelo | Resultado | Teses | Arquivo |\n|---|---|---|---|---|---|\n` +
+                acervo.modelos.map(m => `| ${m.codigo || 's/c'} | ${cel(m.area)} | ${cel(m.id)} | ${cel(m.resultado)} | ${cel([...new Set(m.teses || [])].join('; '))} | ${arq(m)} |`).join('\n') + '\n';
+            const arquivos = [{ path: 'SKILL.md', conteudo: skill }, { path: 'INDICE.md', conteudo: indice }];
+            acervo.modelos.forEach(m => arquivos.push({
+                path: arq(m),
+                conteudo: `# [${m.codigo || 's/c'}] ${m.id}\n\n` + (m.resultado ? `**Resultado:** ${m.resultado}\n\n` : '') +
+                    ((m.teses || []).length ? `**Teses vinculadas:** ${[...new Set(m.teses)].join('; ')}\n\n` : '') +
+                    (m.quandoUsar ? `## Quando usar\n\n${m.quandoUsar}\n\n` : '') + `## Minuta\n\n${rebaixa(m.minuta)}\n\n` +
+                    (m.observacoes ? `## Observações do gabinete\n\n${rebaixa(m.observacoes)}\n` : '')
+            }));
+            return arquivos;
+        }
+
+        async function acervoBaixarSkillModelos() {
+            if (!acervoLiberado()) { acervoAvisarBloqueio(); return; }
+            try {
+                const JSZip = await acervoJSZip();
+                const zip = new JSZip();
+                acervoArquivosSkillModelos().forEach(a => zip.file(`modelos-gabinete/${a.path}`, a.conteudo));
+                const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+                acervoBaixar('modelos-gabinete.zip', blob);
+            } catch (e) { showNotification('Erro ao gerar a skill de modelos: ' + e.message, 'error'); }
         }
 
         async function acervoBaixarSkill(i) {
@@ -3631,10 +3678,14 @@
                 ${passo(2, 'Cole as instruções do Projeto', `<p>No campo de instruções do Projeto, cole o texto abaixo, substituindo o anterior se houver.</p>
                     <button onclick="acervoCopiarInstrucoes()" class="bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800">Copiar instruções</button>
                     <details><summary class="cursor-pointer text-xs text-gray-500">Ver o texto</summary><pre class="mt-2 whitespace-pre-wrap text-xs bg-gray-50 border rounded p-3">${escapeHtml(acervo.instrucoesProjeto)}</pre></details>`)}
-                ${passo(3, 'Envie os arquivos do acervo ao Projeto', `<p>Baixe o pacote, extraia o .zip e envie <strong>todos</strong> os arquivos para o conhecimento do Projeto. Na atualização, apague antes os arquivos antigos que começam com "Gabinete - ".</p>
+                ${passo(3, 'Envie os arquivos do acervo ao Projeto', `<p>Baixe o pacote, extraia o .zip e envie <strong>todos</strong> os arquivos para o conhecimento do Projeto. Na atualização, apague antes os arquivos antigos que começam com "Gabinete - ".${acervo.meta?.modelosEmSkill ? ' <strong>Os modelos não vão mais ao Projeto:</strong> apague também os antigos "Gabinete - Modelos …" e instale a skill <strong>modelos-gabinete</strong> no passo 4.' : ''}</p>
                     <button onclick="acervoBaixarProjeto()" class="bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800">Baixar arquivos do Projeto (versão ${escapeHtml(acervo.meta?.versao || '')})</button>`)}
                 ${passo(4, 'Instale as skills do gabinete', `<p>Baixe cada skill e envie o .zip nas configurações do Claude, na seção de <strong>Skills</strong> (em Capacidades). Se a skill já existir, substitua pela nova.</p>
-                    <div class="grid sm:grid-cols-2 gap-2">${acervo.skills.map((s, i) => `
+                    <div class="grid sm:grid-cols-2 gap-2">${acervo.meta?.modelosEmSkill ? `
+                        <div class="border-2 border-cyan-600 rounded-md p-3 flex items-start justify-between gap-2">
+                            <div class="min-w-0"><div class="font-medium text-gray-800 text-sm">modelos-gabinete</div><div class="text-xs text-gray-500 line-clamp-2">Os ${acervo.modelos.length} modelos do gabinete, fora do Projeto para não ocupar a capacidade. Atualize a cada versão.</div></div>
+                            <button onclick="acervoBaixarSkillModelos()" class="text-xs bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 whitespace-nowrap">Baixar</button>
+                        </div>` : ''}${acervo.skills.map((s, i) => `
                         <div class="border rounded-md p-3 flex items-start justify-between gap-2">
                             <div class="min-w-0"><div class="font-medium text-gray-800 text-sm">${escapeHtml(s.nome)}</div><div class="text-xs text-gray-500 line-clamp-2">${escapeHtml(s.descricao)}</div></div>
                             <button onclick="acervoBaixarSkill(${i})" class="text-xs bg-gray-700 text-white px-3 py-1.5 rounded-md hover:bg-gray-800 whitespace-nowrap">Baixar</button>
