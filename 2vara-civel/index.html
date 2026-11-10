@@ -8689,7 +8689,7 @@
             gab.f.materia = typeof s.materia === 'string' ? s.materia : '';
         } catch (e) { /* sem armazenamento local: usa o padrão */ }
 
-        function gabFiltrosVazios() { return { meta: false, atraso: false, erro: false, lancar: false, materia: '', col: '' }; }
+        function gabFiltrosVazios() { return { meta: false, oral: false, atraso: false, erro: false, lancar: false, materia: '', col: '' }; }
         function gabSalvaPreferencias() {
             try {
                 const { col, ...resto } = gab.f;
@@ -8766,17 +8766,21 @@
             return gabColunaDe(p) === 'lancada' && (gabDiasISO(p.prod?.lancadaEm || p.atualizadoEm) ?? 0) >= GAB_DIAS_ARQUIVO;
         }
         function gabDiasParada(p) {
-            if (gabColunaDe(p) !== 'minuta' || p.etapa === 'revisada') return null;
+            if (gabColunaDe(p) !== 'minuta' || p.etapa === 'revisada' || p.exec?.aviso === 'prova-oral') return null;
             const d = gabDiasISO(p.exec?.concluidoEm || p.atualizadoEm);
             return d !== null && d > GAB_DIAS_PARADA ? d : null;
         }
         const gabNaEsteira = () => gabDocs().filter(p => !gabArquivado(p));
         const gabEmAtraso = (p) => ((gabDiasDesde(p.concluso) ?? 0) > 60 && p.etapa !== 'assinada') || !!gabDiasParada(p);
         const gabComErro = (p) => p.execStatus === 'erro' || !!p.prod?.erro;
-        const gabTemMinuta = (p) => !!p && (p.execStatus === 'concluido' || !!p.exec?.arquivo);
+        // R85 (10/11/2026): o executor não minuta ato que depende do conteúdo de prova oral de audiência;
+        // fecha com exec.aviso "prova-oral" e o alerta no resumo. Não há minuta: não se assina nem se lança.
+        const gabOuvirMidia = (p) => !!p && p.exec?.aviso === 'prova-oral' && !p.exec?.arquivo;
+        const gabTemMinuta = (p) => !!p && !gabOuvirMidia(p) && (p.execStatus === 'concluido' || !!p.exec?.arquivo);
         function gabPassa(p) {
             const f = gab.f;
             if (f.meta && !p.meta2) return false;
+            if (f.oral && !gabOuvirMidia(p)) return false;
             if (f.atraso && !gabEmAtraso(p)) return false;
             if (f.erro && !gabComErro(p)) return false;
             if (f.lancar && gabColunaDe(p) !== 'assinar') return false;
@@ -9100,6 +9104,9 @@
             if (eSis) faixas.push(faixa('crit', `${gabPlural(eSis, 'minuta com erro', 'minutas com erro')} no sistema.`, 'O motivo aparece no cartão e na aba Sistema.', btnFiltro('f:erro', 'Ver')));
             const dup = docs.filter(p => p.lancarStatus === 'duplicidade' && !gabArquivado(p)).length;
             if (dup) faixas.push(faixa('crit', `${gabPlural(dup, 'lançamento retido', 'lançamentos retidos')} por duplicidade.`, 'Há outra minuta do mesmo processo nos últimos 7 dias. Confira antes de lançar mesmo assim.', btnFiltro('col:assinar', 'Ver')));
+            const ouvir = gabNaEsteira().filter(gabOuvirMidia).length;
+            if (ouvir) faixas.push(faixa('warn', `🎙️ ${gabPlural(ouvir, 'processo aguarda', 'processos aguardam')} você ouvir a mídia da audiência.`,
+                'O ato depende da prova oral e não foi minutado (R85). O alerta, na aba Execução do processo, diz quem foi ouvido, o que a prova deve resolver e onde está a mídia. Depois de ouvir, dite as conclusões ao Claude ou peça "minute com base na degravação".', btnFiltro('f:oral', 'Ver')));
             const paradas = gabNaEsteira().filter(p => gabDiasParada(p)).length;
             if (paradas) faixas.push(faixa('warn', `${gabPlural(paradas, 'minuta parada', 'minutas paradas')} há mais de ${GAB_DIAS_PARADA} dias.`, 'Revise ou arquive.', btnFiltro('f:atraso', 'Ver')));
             if (n > GAB_LIMITE_RODADA) {
@@ -9197,6 +9204,7 @@
             const mats = [...new Set(base.map(p => p.materia).filter(Boolean))].sort();
             const partes = [
                 chip('Meta 2', f.meta, n(p => p.meta2), "gabChip('meta')"),
+                chip('🎙️ Ouvir mídia', f.oral, n(gabOuvirMidia), "gabChip('oral')", 'Atos que dependem da prova oral de audiência e não foram minutados (R85)'),
                 chip('Atrasados', f.atraso, n(gabEmAtraso), "gabChip('atraso')", `Conclusos há mais de 60 dias ou minutas prontas há mais de ${GAB_DIAS_PARADA} dias sem revisão (parada há X dias)`),
                 chip('Com erro', f.erro, n(gabComErro), "gabChip('erro')"),
                 chip('Falta lançar', f.lancar, n(p => gabColunaDe(p) === 'assinar'), "gabChip('lancar')")
@@ -9217,6 +9225,9 @@
                 if (p.execStatus !== 'fila') return `<div>${gabPill('não pedida · abra e ponha na fila')}</div>`;
                 if (ex.aviso === 'captcha') return `<div>${gabPill('Aguardando captcha no e-SAJ', 'warn', 'O e-SAJ pediu captcha: resolva-o na aba do e-SAJ e ative o executor')}</div>`;
                 return '';
+            }
+            if (c === 'minuta' && gabOuvirMidia(p)) {
+                return `<div class="flex flex-wrap gap-1">${gabPill('🎙️ ouvir a mídia — não minutado', 'warn', 'O ato depende da prova oral da audiência (R85). Veja o alerta na aba Execução.')}${ex.ficha || ex.resumo ? gabPill('✓ FIRAC+', 'ok') : ''}</div>`;
             }
             if (c === 'minuta') {
                 const conferir = (String(ex.resumo || '').match(/\[CONFERIR/g) || []).length;
@@ -9243,7 +9254,7 @@
         }
         function gabCardHTML(p) {
             const c = gabColunaDe(p), sel = gab.sel.has(p.id), id = escapeAttr(p.id);
-            return `<div class="bg-white border ${sel ? 'border-cyan-600 ring-2 ring-cyan-200' : 'border-gray-200'} ${c === 'execucao' ? 'border-l-4 border-l-blue-500' : ''} rounded-lg p-3 shadow-sm hover:shadow cursor-pointer space-y-1.5"
+            return `<div class="bg-white border ${sel ? 'border-cyan-600 ring-2 ring-cyan-200' : 'border-gray-200'} ${c === 'execucao' ? 'border-l-4 border-l-blue-500' : ''} ${gabOuvirMidia(p) ? 'border-l-4 border-l-amber-500' : ''} rounded-lg p-3 shadow-sm hover:shadow cursor-pointer space-y-1.5"
                     role="button" tabindex="0" data-gab-id="${escapeHtml(p.id)}" aria-label="Processo ${escapeHtml(p.numero || 'sem número')}"
                     onclick="gabClicaCartao('${id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); gabClicaCartao('${id}'); }">
                 <div class="flex items-start justify-between gap-2">
