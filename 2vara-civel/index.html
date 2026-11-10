@@ -3376,7 +3376,7 @@
             const indice = `# Índice do acervo e novidades\n\n${cab}\n\n## Novidades\n\n` +
                 (acervo.novidades || []).map(n => `### ${n.data} — ${n.titulo || 'Atualização'} (versão ${n.versao})\n\n` + (n.itens || []).map(i => `- ${i}`).join('\n')).join('\n\n') +
                 `\n\n## Modelos (${acervo.modelos.length})\n\n` +
-                (acervo.meta?.modelosEmSkill ? 'O texto de cada modelo está na skill **modelos-gabinete** (arquivo modelos/<matéria>/<código>.md). Use o código abaixo para abri-lo.\n\n' : '') + acervo.modelos.map(m => `- [${m.codigo || 's/c'}] ${m.area} › ${m.id}${m.resultado ? ' — ' + m.resultado : ''}`).join('\n') +
+                (acervo.meta?.modelosEmSkill ? 'O texto de cada modelo está na skill **modelos-gabinete** (um arquivo por matéria, modelos/<matéria>.md, com o modelo no título "## [CÓDIGO]"). Use o código abaixo para achá-lo.\n\n' : '') + acervo.modelos.map(m => `- [${m.codigo || 's/c'}] ${m.area} › ${m.id}${m.resultado ? ' — ' + m.resultado : ''}`).join('\n') +
                 `\n\n## Teses (${acervo.teses.length})\n\n` + acervo.teses.map(t => `- ${t.area} › ${t.titulo}${(t.codigos || []).length ? ' (' + t.codigos.join(', ') + ')' : ''}`).join('\n') + '\n';
             arquivos.unshift({ nome: 'Gabinete - Índice e novidades.md', texto: indice });
             return arquivos;
@@ -3394,12 +3394,13 @@
             } catch (e) { showNotification('Erro ao gerar o pacote: ' + e.message, 'error'); }
         }
 
-        // skill "modelos-gabinete": um arquivo por modelo, montada no navegador a partir do pacote
-        // (não duplica os modelos no banco). Os modelos ficam fora do Projeto por causa da capacidade.
+        // skill "modelos-gabinete": montada no navegador a partir do pacote (não duplica os modelos no banco).
+        // Os modelos ficam fora do Projeto por causa da capacidade. 10/11/2026: um arquivo por matéria, e não
+        // por modelo, porque o claude.ai recusa skill com mais de 200 arquivos.
         function acervoArquivosSkillModelos() {
             const v = acervo.meta?.versao || '';
-            const arq = m => `modelos/${String(m.area || 'sem-area').slice(0, 2)}/${acervoNomeArquivo(m.codigo || ('sc-' + String(m.id).slice(9, 50)))}.md`;
-            const rebaixa = md => String(md || '').replace(/^(#{1,4}) /gm, (x, h) => '#'.repeat(Math.min(h.length + 1, 6)) + ' ');
+            const arq = m => `modelos/${String(m.area || 'sem materia').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.md`;
+            const rebaixa = md => String(md || '').replace(/^(#{1,4}) /gm, (x, h) => '#'.repeat(Math.min(h.length + 2, 6)) + ' ');
             const cel = s => String(s || '').replace(/\|/g, '/').replace(/\n+/g, ' ');
             const skill = [
                 '---',
@@ -3410,20 +3411,24 @@
                 'Os modelos ficam nesta skill, e não no Projeto, para não ocupar a capacidade dele. As teses e o Índice continuam no Projeto.', '',
                 '## Como usar', '',
                 '1. Abra INDICE.md (código, matéria, modelo, resultado e teses) e escolha 1 ou 2 modelos pelo cenário: espécie, fase e tema.',
-                '2. Leia por inteiro o arquivo do modelo escolhido (modelos/<matéria>/<código>.md) antes de minutar. Não minute de memória.',
+                '2. Os modelos estão agrupados por matéria, um arquivo por matéria (coluna Arquivo do índice). Cada modelo começa no título `## [CÓDIGO]` e vai até o próximo `## [`. Procure o código no arquivo (ex.: `grep -n "^## \\[076\\]" modelos/01-bancario-e-consumidor.md`) e leia a seção inteira antes de minutar. Não minute de memória nem leia o arquivo todo sem necessidade.',
                 '3. Siga o modelo em modo rigoroso, preenchendo os [CONFERIR] com os autos, e cite na resposta o código e o nome do modelo usado.',
                 `4. Se o Projeto ou o sistema indicar versão do acervo diferente de ${v}, avise antes de minutar: esta skill pode estar desatualizada.`, ''
             ].join('\n');
             const indice = `# Índice dos modelos (acervo ${v})\n\n| Código | Matéria | Modelo | Resultado | Teses | Arquivo |\n|---|---|---|---|---|---|\n` +
                 acervo.modelos.map(m => `| ${m.codigo || 's/c'} | ${cel(m.area)} | ${cel(m.id)} | ${cel(m.resultado)} | ${cel([...new Set(m.teses || [])].join('; '))} | ${arq(m)} |`).join('\n') + '\n';
             const arquivos = [{ path: 'SKILL.md', conteudo: skill }, { path: 'INDICE.md', conteudo: indice }];
-            acervo.modelos.forEach(m => arquivos.push({
-                path: arq(m),
-                conteudo: `# [${m.codigo || 's/c'}] ${m.id}\n\n` + (m.resultado ? `**Resultado:** ${m.resultado}\n\n` : '') +
-                    ((m.teses || []).length ? `**Teses vinculadas:** ${[...new Set(m.teses)].join('; ')}\n\n` : '') +
-                    (m.quandoUsar ? `## Quando usar\n\n${m.quandoUsar}\n\n` : '') + `## Minuta\n\n${rebaixa(m.minuta)}\n\n` +
-                    (m.observacoes ? `## Observações do gabinete\n\n${rebaixa(m.observacoes)}\n` : '')
-            }));
+            for (const area of [...new Set(acervo.modelos.map(m => m.area || 'Sem matéria'))].sort()) {
+                const ms = acervo.modelos.filter(m => (m.area || 'Sem matéria') === area);
+                arquivos.push({
+                    path: arq(ms[0]),
+                    conteudo: `# Modelos de minuta do gabinete — ${area} (acervo ${v})\n\n${ms.length} modelos. Cada um começa em "## [CÓDIGO]".\n\n` + ms.map(m =>
+                        `## [${m.codigo || 's/c'}] ${m.id}\n\n` + (m.resultado ? `**Resultado:** ${m.resultado}\n\n` : '') +
+                        ((m.teses || []).length ? `**Teses vinculadas:** ${[...new Set(m.teses)].join('; ')}\n\n` : '') +
+                        (m.quandoUsar ? `### Quando usar\n\n${m.quandoUsar}\n\n` : '') + `### Minuta\n\n${rebaixa(m.minuta)}\n\n` +
+                        (m.observacoes ? `### Observações do gabinete\n\n${rebaixa(m.observacoes)}\n` : '')).join('\n')
+                });
+            }
             return arquivos;
         }
 
