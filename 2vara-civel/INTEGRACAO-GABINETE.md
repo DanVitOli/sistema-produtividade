@@ -203,6 +203,15 @@ Regras que a aba aplica (as mesmas do Painel):
   `"assinada"`, se o registro é do Claude IA) com `prod/lancadaEm` e `prod/minutaId`;
   minuta do Claude IA pendente ou com correção pedida espelha `prod/status`
   `"pendente"`/`"correcao"`.
+- **Conciliação por número (16/11/2026)**: card em "Minuta pronta" ou "Assinada · falta
+  lançar" sem registro ligado pelo `painelId` casa com o registro assinado sem `painelId`
+  do mesmo processo e incidente (`/0001`, `/01` e `-01` são o mesmo; card da pasta sem
+  incidente aceita o do incidente), com data na conclusão ou depois, ainda não usado por
+  outro card, e o mesmo ato (ou outro, se o registro for do juiz). Grava
+  `prod/status: "lancada"`, `prod/minutaId`, `prod/lancadoPor` e
+  `prod/conciliadoPor: "numero"`. Card da pasta cujo registro já pertence a um card do
+  painel é a cópia da minuta do executor: recebe `prod/conciliadoPor: "duplicata"` e vai
+  para o Arquivo. A fila não é conciliada por número.
 - Consequência para o executor: enviar `prod.status` `"aprovada"`/`"lancar"` (Passo 2B) e
   confirmar lançados (Passo 2C) deixam de ser necessários para a esteira. Se o executor
   encontrar um processo com `"lancar"` e `lancarStatus: "duplicidade"`, não deve lançar: a

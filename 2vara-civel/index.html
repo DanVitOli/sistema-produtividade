@@ -8856,6 +8856,44 @@
             return gabIndice.mapa.get(p.id) || null;
         }
 
+        // Minuta lançada no sistema sem passar pelo painel (16/11/2026): o juiz minuta por fora, lança no SAJ e
+        // registra no sistema; o registro não tem painelId. Casa pelo número: mesma base CNJ e mesmo incidente
+        // (a minuta da pasta vem do nome do .docx, que costuma omitir o /0001: aí aceita o incidente), registro
+        // assinado na data da conclusão ou depois, ainda não usado por outro card, e o mesmo ato (ou outro ato,
+        // se o registro for do próprio juiz: o ato da minuta da pasta é palpite do importador).
+        // Duplicata: a minuta que o próprio executor salvou na pasta Processos voltava como "feita fora do painel"
+        // (o importador perdia o "-01" do nome do arquivo). A da pasta casa também com o registro já ligado a um
+        // card do painel que não seja da pasta; o card da pasta vai então para o Arquivo.
+        function gabNumPartes(s) {
+            const m = String(s || '').match(/(\d{7})-?(\d{2})\.?(\d{4})\.?(\d)\.?(\d{2})\.?(\d{4})(?:\s*[\/-]\s*(\d{1,4}))?(?!\d)/);
+            return m ? { base: m.slice(1, 7).join(''), inc: m[7] ? Number(m[7]) : 0 } : null;
+        }
+        let gabIndiceNum = { fonte: null, mapa: new Map() };
+        function gabMinutaPorNumero(p, usadas) {
+            if (gabIndiceNum.fonte !== minutas) {
+                const mapa = new Map();
+                for (const [id, m] of Object.entries(minutas)) {
+                    if (!m || m.status !== 'assinada') continue;
+                    const n = gabNumPartes(m.numeroProcesso);
+                    if (!n) continue;
+                    if (!mapa.has(n.base)) mapa.set(n.base, []);
+                    mapa.get(n.base).push({ id, m, inc: n.inc });
+                }
+                gabIndiceNum = { fonte: minutas, mapa };
+            }
+            const n = gabNumPartes(p.numero);
+            if (!n) return null;
+            const pasta = p.origem?.tipo === 'pasta', desde = String(p.concluso || '').slice(0, 10), ato = gabTipoDe(p);
+            const dupDoPainel = c => { const dono = c.m.painelId || usadas.get(c.id); return pasta && !!dono && dono !== p.id && !!gabProcessos[dono] && gabProcessos[dono].origem?.tipo !== 'pasta'; };
+            const cands = (gabIndiceNum.mapa.get(n.base) || []).map(c => ({ ...c, dup: dupDoPainel(c) })).filter(c =>
+                (c.dup || (!c.m.painelId && !usadas.has(c.id))) && (c.inc === n.inc || (pasta && n.inc === 0)) && String(c.m.data || '') >= desde &&
+                (!ato || c.m.tipoMinuta === ato || c.m.assessorId === 'juiz'));
+            // o mesmo incidente antes, depois o mesmo ato, depois o primeiro lançamento após a conclusão
+            cands.sort((a, b) => (Number(b.inc === n.inc) - Number(a.inc === n.inc)) || (Number(b.m.tipoMinuta === ato) - Number(a.m.tipoMinuta === ato)) ||
+                String(a.m.data || '').localeCompare(String(b.m.data || '')));
+            return cands[0] || null;
+        }
+
         function gabSituacao(p) {
             const st = p.prod?.status || '', no = gabMinutaNoSistema(p), ms = no?.m?.status;
             if (st === 'lancada' || st === 'assinada') return { k: 'lancada', txt: 'Lançada (assinada no sistema)', cls: 'ok', em: p.prod.lancadaEm, ordem: 6 };
@@ -8892,9 +8930,34 @@
         }
         async function gabConciliar() {
             if (!currentUser?.isJuiz || !database) return;
-            for (const p of gabDocs()) {
+            // os cards do painel antes dos da pasta: a minuta do executor fica com o card dele, e a cópia da pasta vira duplicata
+            const docs = gabDocs().sort((a, b) => Number(a.origem?.tipo === 'pasta') - Number(b.origem?.tipo === 'pasta'));
+            const usadas = new Map(docs.filter(p => p.prod?.minutaId).map(p => [p.prod.minutaId, p.id]));
+            for (const p of docs) {
                 const no = gabMinutaNoSistema(p);
-                if (!no) continue;
+                if (!no) {
+                    // feita ou lançada por fora: só a minuta pronta ou a assinada que falta lançar (a fila fica como está)
+                    if (!['minuta', 'assinar'].includes(gabColunaDe(p)) || p.execStatus === 'executando' || p.arquivado === true) continue;
+                    const fora = gabMinutaPorNumero(p, usadas);
+                    if (!fora) continue;
+                    if (!fora.dup) usadas.set(fora.id, p.id);
+                    const m = fora.m, upd = { etapa: 'assinada', lancarStatus: 'ok', 'prod/status': 'lancada', 'prod/minutaId': fora.id,
+                        'prod/lancadaEm': `${String(m.data).slice(0, 10)}T12:00:00Z`, 'prod/lancadoPor': m.assessorId || '', 'prod/conciliadoPor': fora.dup ? 'duplicata' : 'numero', 'prod/erro': '' };
+                    if (m.tipoMinuta) upd['prod/tipo'] = m.tipoMinuta;
+                    if (p.origem?.tipo === 'pasta' && m.tipoMinuta) upd.atoGerado = m.tipoMinuta;
+                    const chave = `${p.id}:numero`;
+                    if (gabConcEmCurso.has(chave)) continue;
+                    gabConcEmCurso.add(chave);
+                    try {
+                        await gabRef(p.id).update(upd);
+                        log(`Esteira do gabinete: ${p.numero} ${fora.dup ? 'é duplicata de um card do painel já lançado' : 'já lançado no sistema por fora do painel'} (${m.tipoMinuta || 'ato'} de ${m.data})`);
+                    } catch (e) {
+                        log('Conciliação da esteira (por número) falhou', e);
+                    } finally {
+                        setTimeout(() => gabConcEmCurso.delete(chave), 10000);
+                    }
+                    continue;
+                }
                 const st = p.prod?.status || '', m = no.m, ia = m.assessorId === PAINEL_IA_ASSESSOR_ID;
                 let upd = null;
                 if (m.status === 'assinada') {
