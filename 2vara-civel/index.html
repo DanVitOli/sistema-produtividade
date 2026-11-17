@@ -8653,7 +8653,10 @@
             'conhecimento_10anos', 'fazenda_publica', 'acoes_saude', 'acoes_ambientais'];
         // arquivo e atrasos: nada é apagado; "arquivado" true/false no processo sobrepõe a regra automática
         const GAB_DIAS_ARQUIVO = 1, GAB_DIAS_PARADA = 30, GAB_POR_COLUNA = 15, GAB_POR_TABELA = 150;
-        const GAB_LIMITE_RODADA = 6; // processos por ativação do executor (o restante espera a próxima)
+        // 17/11/2026 (decisão do juiz): uma ativação esvazia a fila, em blocos de 6 dentro da mesma rodada;
+        // GAB_LIMITE_RODADA é só o teto de segurança por ativação (o restante espera a próxima).
+        const GAB_BLOCO = 6;
+        const GAB_LIMITE_RODADA = 30;
         const GAB_CAMPOS = ['numero', 'classe', 'concluso', 'materia', 'especie', 'meta2', 'etapa', 'modo', 'rigor', 'esforco', 'biblio', 'juris', 'notas'];
         const GAB_RE_CNJ_TEXTO = /\b(\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4})(?:\s*\/\s*(\d{1,4}))?/g;
 
@@ -9125,8 +9128,8 @@
             const n = naFila.length;
             const rotuloBotao = !n ? 'Ativar o executor' : n > GAB_LIMITE_RODADA ? `Ativar o executor (${GAB_LIMITE_RODADA} de ${n})` : `Ativar o executor (${n})`;
             const tituloBotao = n > GAB_LIMITE_RODADA
-                ? `Processa ${GAB_LIMITE_RODADA} dos ${n} da fila (Meta 2 primeiro, depois os mais antigos) e registra as minutas novas da pasta Processos.`
-                : 'O executor só roda quando você ativa: processa a fila e registra as minutas novas da pasta Processos.';
+                ? `Processa ${GAB_LIMITE_RODADA} dos ${n} da fila, em blocos de ${GAB_BLOCO} (Meta 2 primeiro, depois os mais antigos), e registra as minutas novas da pasta Processos.`
+                : `O executor só roda quando você ativa: processa a fila inteira, em blocos de ${GAB_BLOCO}, e registra as minutas novas da pasta Processos.`;
 
             // faixas de alerta
             const faixas = [];
@@ -9139,6 +9142,11 @@
             if (emCaptcha && !pendente) {
                 faixas.push(faixa('warn', `O e-SAJ pediu captcha${ex.captchaEm ? ' ' + escapeHtml(gabHaQuanto(ex.captchaEm)) : ''}.`,
                     `${gabPlural(emCaptcha, 'processo ficou', 'processos ficaram')} na fila sem baixar. Abra o e-SAJ na aba do Chrome do Claude, resolva o captcha e aperte <strong>Ativar o executor</strong>: ele retoma de onde parou.`, btnFiltro('col:fila', 'Ver a fila')));
+            }
+            const emLogin = naFila.filter(p => p.exec?.aviso === 'login').length;
+            if (emLogin && !pendente) {
+                faixas.push(faixa('warn', `A sessão do e-SAJ venceu${ex.loginEm ? ' ' + escapeHtml(gabHaQuanto(ex.loginEm)) : ''}.`,
+                    `${gabPlural(emLogin, 'processo voltou', 'processos voltaram')} para a fila sem baixar. Entre no e-SAJ com o certificado na aba do Chrome do Claude e aperte <strong>Ativar o executor</strong>: ele retoma de onde parou.`, btnFiltro('col:fila', 'Ver a fila')));
             }
             const reExpirado = /sess[aã]o[^.]{0,40}(expir|encerr)|expirad[ao]|fa[cç]a (o )?login|login[^.]{0,30}e-?saj/i;
             const expirados = docs.filter(p => ['esaj-expirado', 'sessao-expirada'].includes(p.exec?.aviso) || (p.execStatus === 'erro' && reExpirado.test(String(p.exec?.erro || ''))));
@@ -9161,7 +9169,7 @@
             if (paradas) faixas.push(faixa('warn', `${gabPlural(paradas, 'minuta parada', 'minutas paradas')} há mais de ${GAB_DIAS_PARADA} dias.`, 'Revise ou arquive.', btnFiltro('f:atraso', 'Ver')));
             if (n > GAB_LIMITE_RODADA) {
                 const faltam = Math.ceil(n / GAB_LIMITE_RODADA);
-                faixas.push(faixa('info', `${n} processos na fila.`, `Cada ativação processa até ${GAB_LIMITE_RODADA} (Meta 2 primeiro, depois os mais antigos): ${gabPlural(faltam, 'ativação esvazia', 'ativações esvaziam')} a fila${pendente || disparado ? ', contando a que já está pedida' : ''}.`));
+                faixas.push(faixa('info', `${n} processos na fila.`, `Cada ativação processa até ${GAB_LIMITE_RODADA}, em blocos de ${GAB_BLOCO} (Meta 2 primeiro, depois os mais antigos): ${gabPlural(faltam, 'ativação esvazia', 'ativações esvaziam')} a fila${pendente || disparado ? ', contando a que já está pedida' : ''}.`));
             }
 
             // resumo da esteira (a Visão geral do Painel duplicava os painéis do sistema)
@@ -9274,6 +9282,7 @@
                 if (p.execStatus === 'erro') return `<div>${gabPill('Erro: ' + String(ex.erro || 'sem mensagem').slice(0, 60), 'crit', ex.erro || '')}</div>`;
                 if (p.execStatus !== 'fila') return `<div>${gabPill('não pedida · abra e ponha na fila')}</div>`;
                 if (ex.aviso === 'captcha') return `<div>${gabPill('Aguardando captcha no e-SAJ', 'warn', 'O e-SAJ pediu captcha: resolva-o na aba do e-SAJ e ative o executor')}</div>`;
+                if (ex.aviso === 'login') return `<div>${gabPill('Aguardando login no e-SAJ', 'warn', 'A sessão do e-SAJ venceu: entre com o certificado na aba do e-SAJ e ative o executor')}</div>`;
                 return '';
             }
             if (c === 'minuta' && gabOuvirMidia(p)) {
@@ -9365,7 +9374,7 @@
                             <td class="py-2 px-3" onclick="event.stopPropagation()"><input type="checkbox" ${gab.sel.has(p.id) ? 'checked' : ''} onchange="gabAlternaSel('${id}', this.checked)" aria-label="Selecionar ${escapeHtml(p.numero || '')}"></td>
                             <td class="py-2 pr-3"><div class="font-mono whitespace-nowrap">${escapeHtml(p.numero || 'sem número')} ${p.meta2 ? gabPill('Meta 2', 'meta') : ''}</div><div class="text-xs text-gray-500">${escapeHtml(p.classe || '')}</div></td>
                             <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(p.atoGerado || GAB_ESPECIES[p.especie]?.curto || p.especie || '')}</td>
-                            <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(GAB_COLUNAS.find(x => x.id === c)?.nome || '')} ${p.execStatus === 'erro' ? gabPill('erro', 'crit') : ''}${gabDiasParada(p) ? gabPill('parada', 'crit') : ''}${p.exec?.aviso === 'captcha' && p.execStatus === 'fila' ? gabPill('captcha', 'warn') : ''}</td>
+                            <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(GAB_COLUNAS.find(x => x.id === c)?.nome || '')} ${p.execStatus === 'erro' ? gabPill('erro', 'crit') : ''}${gabDiasParada(p) ? gabPill('parada', 'crit') : ''}${p.exec?.aviso === 'captcha' && p.execStatus === 'fila' ? gabPill('captcha', 'warn') : ''}${p.exec?.aviso === 'login' && p.execStatus === 'fila' ? gabPill('login e-SAJ', 'warn') : ''}</td>
                             <td class="py-2 pr-3 text-right">${['fila', 'execucao', 'minuta'].includes(c) && d != null ? gabPillDias(d, p.etapa) : `<span class="text-gray-400">${d ?? '—'}</span>`}</td>
                             <td class="py-2 pr-3 min-w-48">${gabSisHTML(p) || '<span class="text-gray-400">—</span>'}</td>
                             <td class="py-2 pr-3 whitespace-nowrap text-gray-500">${escapeHtml(gabDataHora(p.atualizadoEm))}</td>
@@ -9651,13 +9660,14 @@
             if (ex.ficha) linhas.push(['Ficha', `<span class="font-mono text-xs break-all select-all">${escapeHtml(ex.ficha)}</span>`]);
             if (p.minutaAnterior) linhas.push(['Minuta anterior', `<span class="font-mono text-xs break-all select-all">${escapeHtml(p.minutaAnterior)}</span>`]);
             const captcha = st === 'fila' && ex.aviso === 'captcha';
+            const login = st === 'fila' && ex.aviso === 'login';
             const btnFila = st === 'concluido' || st === 'erro' ? 'Pôr na fila de novo' : st === 'executando' ? 'Em execução' : st === 'fila' ? 'Na fila · aguardando ativação' : 'Só pôr na fila';
             const btnAgora = st === 'fila' ? 'Ativar o executor' : st === 'concluido' || st === 'erro' ? 'Executar de novo e ativar' : 'Pôr na fila e ativar';
             return `
                 <div>${e ? gabPill(e.nome, e.cls) : gabPill('Não executado')}</div>
                 ${linhas.length ? `<dl class="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-sm">${linhas.map(([k, v]) => `<dt class="text-gray-500">${k}</dt><dd class="text-gray-800 min-w-0">${v}</dd>`).join('')}</dl>`
                     : '<p class="text-sm text-gray-600">Ao pôr na fila, o Claude roda as skills do gabinete no seu computador quando você ativar o executor. A ficha FIRAC+ e o caminho da minuta aparecem aqui.</p>'}
-                ${st === 'erro' || captcha ? `<div class="bg-red-50 border-l-4 border-red-600 text-red-800 rounded p-3 text-sm whitespace-pre-wrap">${captcha ? 'Pausado: o e-SAJ pediu captcha antes de baixar este processo. Resolva o captcha na aba do e-SAJ (Chrome do Claude) e aperte “Ativar o executor”.' : escapeHtml(ex.erro || 'A execução falhou sem mensagem de erro.')}</div>` : ''}
+                ${st === 'erro' || captcha || login ? `<div class="bg-red-50 border-l-4 border-red-600 text-red-800 rounded p-3 text-sm whitespace-pre-wrap">${captcha ? 'Pausado: o e-SAJ pediu captcha antes de baixar este processo. Resolva o captcha na aba do e-SAJ (Chrome do Claude) e aperte “Ativar o executor”.' : login ? 'Pausado: a sessão do e-SAJ venceu antes de baixar este processo. Entre no e-SAJ com o certificado na aba do Chrome do Claude e aperte “Ativar o executor”.' : escapeHtml(ex.erro || 'A execução falhou sem mensagem de erro.')}</div>` : ''}
                 ${ex.resumo ? `<div><h4 class="text-sm font-semibold text-gray-700 mb-1">Ficha / resumo</h4><div class="bg-gray-50 border border-gray-200 rounded p-3 text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">${escapeHtml(ex.resumo)}</div></div>` : ''}
                 <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
                     ${st === 'fila' ? `<button onclick="gabTirarDaFila()" data-gravacao="gab-tirar" class="px-3 py-1.5 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-100">Tirar da fila</button>` : ''}
@@ -10019,7 +10029,7 @@
             const resumo = document.getElementById('gab-lote-resumo');
             if (resumo) resumo.textContent = gab.loteItens.length ? `${gabPlural(gab.loteItens.length, 'número encontrado', 'números encontrados')} · ${validos.length} ${validos.length === 1 ? 'será adicionado' : 'serão adicionados'}` : 'Nenhum número encontrado ainda.';
             const aviso = document.getElementById('gab-lote-aviso');
-            if (aviso) aviso.textContent = validos.length > 30 ? 'Lotes grandes demoram: o Claude baixa os autos um a um.' : validos.length > GAB_LIMITE_RODADA && gab.lote.agora ? `Cada ativação processa ${GAB_LIMITE_RODADA}; o resto espera você ativar de novo.` : '';
+            if (aviso) aviso.textContent = validos.length > GAB_LIMITE_RODADA ? `Lotes grandes demoram: o Claude baixa os autos um a um, e cada ativação processa até ${GAB_LIMITE_RODADA}; o resto espera você ativar de novo.` : '';
             const btn = document.getElementById('gab-lote-salvar');
             if (btn && !gravacoesEmCurso.has('gab-lote')) { btn.disabled = !validos.length; btn.textContent = validos.length ? `Adicionar ${gabPlural(validos.length, 'processo', 'processos')}` : 'Adicionar'; }
         }
@@ -10057,7 +10067,7 @@
                         ${marca('meta2', 'Todos são da Meta 2 do CNJ')}
                         <div><label for="gab-lote-notas" class="block text-sm font-medium text-gray-700 mb-1">Orientações comuns ao lote</label><textarea id="gab-lote-notas" rows="3" class="${entrada}" placeholder="Ex.: decisões inaugurais de consignados; observar o Tema 1.198 do STJ." oninput="gabLoteCampo('notas', this.value)">${escapeHtml(l.notas)}</textarea></div>
                         ${marca('executar', 'Pôr na fila como um lote só (o Claude baixa e minuta todos juntos)')}
-                        ${marca('agora', `Ativar o executor ao pôr na fila (começa em até 5 minutos; até ${GAB_LIMITE_RODADA} processos por ativação)`)}
+                        ${marca('agora', `Ativar o executor ao pôr na fila (começa em até 5 minutos; a fila inteira, em blocos de ${GAB_BLOCO}, até ${GAB_LIMITE_RODADA} por ativação)`)}
                     </div>
                     <footer class="p-3 border-t border-gray-200 flex flex-wrap gap-2 justify-between items-center">
                         <span id="gab-lote-aviso" class="text-xs text-amber-700"></span>

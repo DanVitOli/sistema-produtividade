@@ -153,7 +153,7 @@ horas são ISO 8601 (`toISOString()`), exceto `concluso` (AAAA-MM-DD).
 | `etapa` | aba / executor | `fila`, `minuta`, `revisada`, `assinada` (o comando também trata `baixado` e `firac`) |
 | `modo`, `rigor`, `esforco` | aba | `minuta`/`chat`, `rigoroso`/`livre`, 1 a 5 |
 | `execStatus` | aba / executor | `""` (não pedido), `fila`, `executando`, `concluido`, `erro` |
-| `exec` | aba / executor | `{pedidoEm, comando, loteId, iniciadoEm, concluidoEm, fase, resumo, ficha, arquivo, erro, aviso}`; `aviso: "captcha"` = pausado pelo captcha (o processo volta à fila); a aba também reconhece `aviso: "esaj-expirado"` (ou erro que fale em sessão expirada) como e-SAJ expirado |
+| `exec` | aba / executor | `{pedidoEm, comando, loteId, iniciadoEm, concluidoEm, fase, resumo, ficha, arquivo, erro, aviso}`; `aviso: "captcha"` = pausado pelo captcha (o processo volta à fila); `aviso: "login"` (17/11/2026) = pausado porque a sessão do e-SAJ venceu (o processo volta à fila, como no captcha); a aba também reconhece `aviso: "esaj-expirado"` (ou erro que fale em sessão expirada) como e-SAJ expirado |
 | `atoGerado` | executor | `Despacho`, `Decisão` ou `Sentença`: o que a minuta realmente é |
 | `minutaAnterior` | executor | caminho da minuta anterior, quando houver |
 | `origem` | aba / executor | `{tipo: "lote" \| "pasta" \| "meta2" \| "meta180" \| "balcao", pedidoBalcaoId}` (ausente no cadastro avulso) |
@@ -203,6 +203,10 @@ Regras que a aba aplica (as mesmas do Painel):
   `"assinada"`, se o registro é do Claude IA) com `prod/lancadaEm` e `prod/minutaId`;
   minuta do Claude IA pendente ou com correção pedida espelha `prod/status`
   `"pendente"`/`"correcao"`.
+- **Uma ativação esvazia a fila (17/11/2026)**: por decisão do juiz, o executor trabalha em blocos de
+  6 dentro da mesma rodada e lê a fila de novo ao fim de cada bloco, até ela esvaziar, parar por captcha
+  ou login vencido, ou chegar a 30 processos (teto de segurança, `GAB_LIMITE_RODADA`). Continua sem rodada
+  automática: só o botão do juiz grava o gatilho "pendente".
 - **Conciliação por número (16/11/2026)**: card em "Minuta pronta" ou "Assinada · falta
   lançar" sem registro ligado pelo `painelId` casa com o registro assinado sem `painelId`
   do mesmo processo e incidente (`/0001`, `/01` e `-01` são o mesmo; card da pasta sem
@@ -224,7 +228,7 @@ Mesmos campos de `sistema/*` no artifact:
 | Nó | Quem grava | Conteúdo |
 |---|---|---|
 | `gabinete/sistema/gatilho` | aba e executor | aba: `{status: "pendente", modo: "completo", pedidoEm, pedidoPor}`, por transação (não grava se já houver `pendente` ou `disparado`); executor: `status: "disparado"` com `disparadoEm` e, ao terminar, `status: "atendido"` com `atendidoEm` |
-| `gabinete/sistema/executor` | executor | `{captchaEm, ultimaVerificacao}` (sinal de vida; `captchaEm` vazio quando não há captcha) |
+| `gabinete/sistema/executor` | executor | `{captchaEm, loginEm, ultimaVerificacao}` (sinal de vida; `captchaEm`/`loginEm` vazios quando não há captcha ou login vencido) |
 | `gabinete/sistema/trava` | executor | `{status: "livre" \| …, liberadaEm}`; a aba mostra a trava quando não está livre |
 | `gabinete/sistema/varredura` | executor | `{importados, pasta, ultimaVarreduraLocal}` (hora local, sem fuso) |
 
