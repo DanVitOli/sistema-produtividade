@@ -181,7 +181,7 @@ Regras que a aba aplica (as mesmas do Painel):
 
 ### Assinar e lançar / Aprovar para revisão (gravados pela aba)
 
-- **Assinar e lançar** usa a mesma função do botão "Lançar assinadas do Painel": valida
+- **Assinar e lançar** usa a função `lancarItemAssinadoPainelIA` (a do antigo botão "Lançar assinadas do Painel"): valida
   número, tipo e categorias; se já existe minuta com o mesmo `painelId` (por exemplo
   `painel-ia-<id>` do Claude IA, ou `painel-<id>` gravada pelo executor), só aplica a
   assinatura ou a correção de ato/categorias (`update`, nunca regrava); senão confere a
@@ -242,5 +242,13 @@ acontecem dentro do sistema.
 
 - `sistema/produtividade` (snapshot copiado para o Painel) e a ponte manual de
   copiar/colar: a aba usa os dados vivos. O `snapshotPainel/` continua sendo publicado
-  pela sessão do juiz enquanto o executor o ler.
+  pela sessão do juiz, porque o dashboard de produtividade (cópia diária) o lê.
 - A Visão geral e a Produtividade do Painel: o sistema já tem esses painéis.
+- 17/11/2026: a tela "Painel IA" (botões "Lançar assinadas do Painel", "Copiar código para
+  o Painel" e "Receber do Painel"), o "Copiar comando do lote", a aba "Comando" da gaveta e a
+  aba "Comandos rápidos" saíram do sistema; o endereço antigo `painelia` abre a aba Gabinete.
+  A função de lançamento (`lancarItemAssinadoPainelIA`) continua, usada pelo "Assinar e lançar".
+- 17/11/2026: card marcado como "Assinada" (etapa) sempre lança no sistema, com ou sem minuta
+  da esteira; no lote, "Assinar e lançar" inclui os de "Falta lançar"; e a aba avisa (faixa
+  vermelha) quando há card assinado sem registro no sistema, porque ele não conta na
+  produtividade.

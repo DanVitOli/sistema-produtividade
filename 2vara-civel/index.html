@@ -912,8 +912,6 @@
     <!-- Módulo Painel Meta 2 -->
     <div id="meta2-view" class="hidden"></div>
 
-    <!-- Módulo Painel IA (sincronização com o Painel do Gabinete; apenas juiz) -->
-    <div id="painelia-view" class="hidden"></div>
 
     <!-- Módulo Gabinete (esteira do Painel do Gabinete; apenas juiz) -->
     <div id="gabinete-view" class="hidden"></div>
@@ -2944,7 +2942,6 @@
             meta180: 'Processos Parados — 180/120/100',
             meta2: 'Meta 2 — Julgamento de Antigos',
             acervo: 'Acervo do Gabinete',
-            painelia: 'Painel IA',
             gabinete: 'Gabinete'
         };
 
@@ -2960,7 +2957,6 @@
             relatorios: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V8M5.75 13V2M9.5 13V5.5M13.25 13V9.5"/></svg>',
             acervo: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="1.5" width="10" height="12" rx="1.5"/><path d="M5.5 1.5v12"/></svg>',
             gabinete: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="2.5" width="3" height="10" rx="1"/><rect x="6" y="2.5" width="3" height="7" rx="1"/><rect x="10.5" y="2.5" width="3" height="4.5" rx="1"/></svg>',
-            painelia: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12.5 4.5A5.5 5.5 0 0 0 3.2 5.2M2.5 10.5a5.5 5.5 0 0 0 9.3-.7"/><path d="M12.5 1.5v3h-3M2.5 13.5v-3h3"/></svg>'
         };
 
         function itemNav(view, rotulo) {
@@ -2994,7 +2990,6 @@
             html += itemNav('acervo', 'Acervo');
             if (currentUser.isJuiz) {
                 html += itemNav('gabinete', 'Gabinete');
-                html += itemNav('painelia', 'Painel IA');
             }
 
             if (currentUser.isJuiz) {
@@ -3145,9 +3140,9 @@
                     case 'meta2':
                         renderMeta2Painel();
                         break;
-                    case 'painelia':
-                        renderPainelIA();
-                        break;
+                    case 'painelia': // tela retirada em 17/11/2026: o endereço antigo abre a aba Gabinete
+                        showView('gabinete');
+                        return;
                     case 'gabinete':
                         renderGabinete();
                         break;
@@ -8090,15 +8085,13 @@
             }, 4000);
         }
 
-        // ==================== PAINEL IA (SINCRONIZAÇÃO COM O PAINEL DO GABINETE) ====================
-        // Ponte manual, exclusiva do juiz, com o Painel do Gabinete (artifact privado no claude.ai).
-        // Sem credenciais e sem robô gravando no banco: o juiz copia um código daqui e cola no Painel
-        // (produtividade, metas, balcão e situação das minutas da IA) e, no caminho inverso, cola aqui
-        // as minutas aprovadas no Painel, que são registradas com o login dele.
+        // ==================== LANÇAMENTO DAS MINUTAS DA ESTEIRA (aba Gabinete) ====================
+        // 17/11/2026: a tela "Painel IA" (ponte de copiar/colar com o antigo Painel do Gabinete, artifact
+        // do claude.ai) foi retirada a pedido do juiz. Ficam aqui o snapshot (lido pelo dashboard de
+        // produtividade), o aviso de duplicidade e lancarItemAssinadoPainelIA, usados pela aba Gabinete.
 
         const PAINEL_IA_ASSESSOR_ID = 'claude_ia';
         const PAINEL_IA_ASSESSOR_NOME = 'Claude (IA) · Painel do Gabinete';
-        let painelIAImportacao = null;
 
         function painelIAMinutasIA() {
             return Object.entries(minutas)
@@ -8199,43 +8192,6 @@
                 `${d.tipoMinuta} de ${d.autor}${d.doPainel ? ' (pelo Painel)' : ''} em ${formatarDataBrasilia(d.data)}`).join('; ');
         }
 
-        // Lança, em nome do juiz e já assinadas, as minutas que ele marcou como assinadas no Painel.
-        // A chave no banco deriva do painelId, então lançar de novo não duplica.
-        let painelIALancamento = { resultados: [], aguardando: {} };
-
-        async function lancarAssinadasPainelIA() {
-            if (!currentUser?.isJuiz) return;
-            if (!database) { showNotification('Sem conexão com o banco de dados.', 'error'); return; }
-            let texto = '';
-            try {
-                texto = await navigator.clipboard.readText();
-            } catch (e) {
-                texto = (document.getElementById('painelia-lancar-entrada')?.value || '').trim();
-                if (!texto) {
-                    document.getElementById('painelia-lancar-entrada')?.classList.remove('hidden');
-                    showNotification('O navegador não liberou a área de transferência. Cole o código no campo que apareceu e clique de novo.', 'warning');
-                    return;
-                }
-            }
-            let dados;
-            try { dados = JSON.parse(texto); } catch (e) { dados = null; }
-            if (dados?.formato !== 'painel-gabinete/assinadas' || !Array.isArray(dados.minutas)) {
-                showNotification('A área de transferência não tem minutas assinadas do Painel. No Painel, marque como assinada (ou use "Copiar assinadas") e tente de novo.', 'warning');
-                return;
-            }
-            painelIALancamento = { resultados: [], aguardando: {} };
-            const lancadasAgora = [];
-            for (const m of dados.minutas) {
-                const r = await lancarItemAssinadoPainelIA(m, { lancadasAgora });
-                painelIALancamento.resultados.push(r);
-                if (r.aguardando) painelIALancamento.aguardando[r.painelId] = m;
-            }
-            const entrada = document.getElementById('painelia-lancar-entrada');
-            if (entrada) { entrada.value = ''; entrada.classList.add('hidden'); }
-            renderLancamentoPainelIA();
-            await concluirLancamentoPainelIA();
-        }
-
         // Grava uma minuta assinada do Painel. Sem "forcar", para antes de gravar se houver duplicidade.
         async function lancarItemAssinadoPainelIA(m, { forcar = false, lancadasAgora = [] } = {}) {
             const hoje = getHojeString();
@@ -8327,280 +8283,6 @@
                 log('Erro ao lançar assinada do Painel', e);
                 return { numero, painelId, texto: 'erro ao gravar; tente de novo', ok: false };
             }
-        }
-
-        // "Lançar mesmo assim" de um item retido por duplicidade
-        async function confirmarDuplicadaPainelIA(painelId) {
-            if (!currentUser?.isJuiz || !database) return;
-            const m = painelIALancamento.aguardando[painelId];
-            if (!m) return;
-            delete painelIALancamento.aguardando[painelId];
-            const r = await lancarItemAssinadoPainelIA(m, { forcar: true });
-            const idx = painelIALancamento.resultados.findIndex(x => x.painelId === painelId && x.aguardando);
-            if (idx >= 0) painelIALancamento.resultados[idx] = r; else painelIALancamento.resultados.push(r);
-            renderLancamentoPainelIA();
-            await concluirLancamentoPainelIA();
-        }
-
-        function renderLancamentoPainelIA() {
-            const alvo = document.getElementById('painelia-lancamento');
-            if (!alvo) return;
-            const resultados = painelIALancamento.resultados;
-            if (!resultados.length) { alvo.innerHTML = ''; return; }
-            alvo.innerHTML = `<ul class="mt-3 space-y-1 text-sm">${resultados.map(r => `
-                <li class="flex justify-between items-start gap-3"><span class="font-mono">${escapeHtml(r.numero)}</span>
-                <span class="text-right ${r.ok ? 'text-green-700' : r.aguardando ? 'text-amber-700' : 'text-red-600'}">${r.aguardando ? '⚠️ ' : ''}${escapeHtml(r.texto)}${r.aguardando ? `
-                    <button onclick="confirmarDuplicadaPainelIA('${escapeAttr(r.painelId)}')" class="ml-2 bg-amber-600 text-white px-2 py-0.5 rounded text-xs hover:bg-amber-700 whitespace-nowrap">Lançar mesmo assim</button>` : ''}</span></li>`).join('')}</ul>
-                ${resultados.some(r => r.aguardando) ? '<p class="text-xs text-amber-700 mt-2">Antes de lançar, confira se o ato já registrado não é o mesmo: a produtividade contaria duas vezes.</p>' : ''}
-                <p class="text-xs text-gray-500 mt-2">O Painel confirma sozinho na próxima rodada do executor. Para confirmar na hora, aperte Ctrl+V no Painel.</p>`;
-        }
-
-        async function concluirLancamentoPainelIA() {
-            const resultados = painelIALancamento.resultados;
-            const okN = resultados.filter(r => r.ok).length;
-            const aguardandoN = resultados.filter(r => r.aguardando).length;
-            // deixa a confirmação pronta na área de transferência: no Painel, basta Ctrl+V
-            let copiou = false;
-            try { await navigator.clipboard.writeText(JSON.stringify(gerarSnapshotPainelIA())); copiou = true; } catch (e) {}
-            if (okN === resultados.length) {
-                showNotification(`${okN} ${okN === 1 ? 'minuta lançada' : 'minutas lançadas'} em seu nome, já assinadas.${copiou ? ' Para atualizar o Painel agora, aperte Ctrl+V nele.' : ''}`, 'success');
-            } else if (aguardandoN) {
-                showNotification(`${okN} de ${resultados.length} lançadas. ${aguardandoN} ${aguardandoN === 1 ? 'aguarda' : 'aguardam'} sua confirmação por possível duplicidade: veja no Painel IA.`, 'warning');
-            } else {
-                showNotification(`${okN} de ${resultados.length} lançadas. Veja os detalhes no Painel IA.`, 'warning');
-            }
-        }
-
-        async function copiarSnapshotPainelIA() {
-            if (!currentUser?.isJuiz) return;
-            const texto = JSON.stringify(gerarSnapshotPainelIA());
-            const area = document.getElementById('painelia-snapshot');
-            if (area) area.value = texto;
-            try {
-                await navigator.clipboard.writeText(texto);
-                showNotification('Código copiado. Cole no Painel do Gabinete, em "Colar do sistema".', 'success');
-            } catch (e) {
-                if (area) { area.classList.remove('hidden'); area.select(); }
-                showNotification('Selecionei o código abaixo: use Ctrl+C para copiar.', 'info');
-            }
-        }
-
-        function lerImportacaoPainelIA() {
-            const texto = (document.getElementById('painelia-entrada')?.value || '').trim();
-            painelIAImportacao = null;
-            if (!texto) { renderPreviaImportacaoPainelIA('Cole aqui o código copiado no Painel do Gabinete.'); return; }
-            let dados;
-            try { dados = JSON.parse(texto); } catch (e) {
-                renderPreviaImportacaoPainelIA('O texto colado não é um código do Painel. Copie de novo pelo botão "Copiar para o sistema".'); return;
-            }
-            if (dados?.formato !== 'painel-gabinete/minutas' || !Array.isArray(dados.minutas)) {
-                renderPreviaImportacaoPainelIA('Este código não é de minutas do Painel do Gabinete.'); return;
-            }
-            const jaRegistradas = new Set(painelIAMinutasIA().filter(m => m.status !== 'excluida').map(m => m.painelId).filter(Boolean));
-            const itens = dados.minutas.map(m => {
-                const cats = (Array.isArray(m.categorias) ? m.categorias : []).filter(c => categorias[c]);
-                let problema = '';
-                if (!validarNumeroProcesso(String(m.numeroProcesso || ''))) problema = 'número inválido: ' + validarCNJ(String(m.numeroProcesso || '')).motivo;
-                else if (!['Despacho', 'Decisão', 'Sentença'].includes(m.tipoMinuta)) problema = 'tipo inválido';
-                else if (!cats.length) problema = 'sem categoria válida';
-                else if (cats.includes('meta2') && m.tipoMinuta !== 'Sentença') problema = 'Meta 2 exige Sentença';
-                else if (!m.painelId) problema = 'sem identificação do Painel';
-                else if (jaRegistradas.has(m.painelId)) problema = 'já registrada';
-                return { painelId: String(m.painelId || ''), numeroProcesso: String(m.numeroProcesso || '').trim(), tipoMinuta: m.tipoMinuta,
-                    categorias: cats, observacoes: String(m.observacoes || '').slice(0, 400),
-                    pedidoBalcaoId: m.pedidoBalcaoId && pedidosBalcao[m.pedidoBalcaoId] ? m.pedidoBalcaoId : '', problema,
-                    duplicidades: [], confirmada: false };
-            });
-            // duplicidade com minutas já no sistema ou com outra do mesmo código: só registra com confirmação
-            const anteriores = [];
-            for (const i of itens) {
-                if (i.problema) continue;
-                i.duplicidades = duplicidadesPainelIA(i.numeroProcesso, { painelId: i.painelId, extras: anteriores });
-                anteriores.push({ numeroProcesso: i.numeroProcesso, tipoMinuta: i.tipoMinuta, data: getHojeString(),
-                    assessorNome: 'Claude (IA), neste mesmo código' });
-            }
-            painelIAImportacao = itens;
-            renderPreviaImportacaoPainelIA();
-        }
-
-        function renderPreviaImportacaoPainelIA(mensagem) {
-            const alvo = document.getElementById('painelia-previa');
-            if (!alvo) return;
-            if (mensagem || !painelIAImportacao) {
-                alvo.innerHTML = `<p class="text-sm text-gray-500">${escapeHtml(mensagem || '')}</p>`;
-                return;
-            }
-            const validas = painelIAImportacao.filter(importacaoLiberadaPainelIA);
-            const situacao = (i, idx) => {
-                if (i.problema) return `<span class="text-red-600">${escapeHtml(i.problema)}</span>`;
-                const balcao = i.pedidoBalcaoId ? ' · baixa o pedido do balcão' : '';
-                if (!i.duplicidades.length) return `<span class="text-green-700">pronta para registrar${balcao}</span>`;
-                if (i.confirmada) return `<span class="text-green-700">duplicidade confirmada · será registrada${balcao}</span>
-                    <button onclick="confirmarDuplicadaImportacaoPainelIA(${idx}, false)" class="ml-2 text-xs text-gray-500 underline">desfazer</button>`;
-                return `<span class="text-amber-700">⚠️ ${escapeHtml(textoDuplicidadesPainelIA(i.duplicidades))}</span>
-                    <button onclick="confirmarDuplicadaImportacaoPainelIA(${idx}, true)" class="ml-2 bg-amber-600 text-white px-2 py-0.5 rounded text-xs hover:bg-amber-700 whitespace-nowrap">Lançar mesmo assim</button>`;
-            };
-            alvo.innerHTML = `
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead><tr class="text-left text-gray-500 border-b">
-                            <th class="py-2 pr-3">Processo</th><th class="py-2 pr-3">Tipo</th><th class="py-2 pr-3">Categorias</th><th class="py-2">Situação</th>
-                        </tr></thead>
-                        <tbody>${painelIAImportacao.map((i, idx) => `
-                            <tr class="border-b last:border-b-0">
-                                <td class="py-2 pr-3 font-mono">${escapeHtml(i.numeroProcesso)}</td>
-                                <td class="py-2 pr-3">${escapeHtml(i.tipoMinuta || '')}</td>
-                                <td class="py-2 pr-3">${i.categorias.map(c => escapeHtml(categorias[c]?.nome || c)).join(', ')}</td>
-                                <td class="py-2">${situacao(i, idx)}</td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                ${painelIAImportacao.some(i => !i.problema && i.duplicidades.length && !i.confirmada) ? '<p class="text-xs text-amber-700 mt-2">As minutas com aviso de duplicidade só entram se você confirmar uma a uma: a produtividade contaria duas vezes.</p>' : ''}
-                <button onclick="registrarImportacaoPainelIA()" ${validas.length ? '' : 'disabled'}
-                    class="mt-3 bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800 transition-colors disabled:opacity-40">
-                    Registrar ${validas.length} ${validas.length === 1 ? 'minuta' : 'minutas'} como Claude (IA)
-                </button>`;
-        }
-
-        function importacaoLiberadaPainelIA(i) {
-            return !i.problema && (!i.duplicidades.length || i.confirmada);
-        }
-
-        function confirmarDuplicadaImportacaoPainelIA(idx, confirmar) {
-            const i = painelIAImportacao?.[idx];
-            if (!i) return;
-            i.confirmada = !!confirmar;
-            renderPreviaImportacaoPainelIA();
-        }
-
-        async function registrarImportacaoPainelIA() {
-            if (!iniciarGravacao('importacao-painel-ia')) return;
-            try {
-                await registrarImportacaoPainelIAInterna();
-            } finally {
-                encerrarGravacao('importacao-painel-ia');
-            }
-        }
-
-        async function registrarImportacaoPainelIAInterna() {
-            if (!currentUser?.isJuiz || !painelIAImportacao) return;
-            if (!database) { showNotification('Sem conexão com o banco de dados.', 'error'); return; }
-            const validas = painelIAImportacao.filter(importacaoLiberadaPainelIA);
-            let ok = 0;
-            for (const i of validas) {
-                const obs = ('Minuta elaborada pelo Claude (IA) no Painel do Gabinete e aprovada pelo juiz para revisão. ' + i.observacoes).trim().slice(0, 500);
-                try {
-                    const novaRefIA = database.ref('minutas').push({
-                        assessorId: PAINEL_IA_ASSESSOR_ID,
-                        assessorNome: PAINEL_IA_ASSESSOR_NOME,
-                        numeroProcesso: i.numeroProcesso,
-                        tipoMinuta: i.tipoMinuta,
-                        categorias: i.categorias,
-                        observacoes: obs,
-                        substituicao: false,
-                        status: 'pendente',
-                        data: getHojeString(),
-                        timestamp: getDataHoraBrasilia().toLocaleTimeString('pt-BR'),
-                        createdAt: firebase.database.ServerValue.TIMESTAMP,
-                        painelId: i.painelId,
-                        registradoPor: currentUser.nome,
-                        ...(i.duplicidades.length ? { duplicidadeConfirmada: true } : {})
-                    });
-                    await novaRefIA;
-                    await sincronizarAbasPorMinuta({ numeroProcesso: i.numeroProcesso, tipoMinuta: i.tipoMinuta, assessorNome: PAINEL_IA_ASSESSOR_NOME }, novaRefIA.key);
-                    if (i.pedidoBalcaoId && pedidosBalcao[i.pedidoBalcaoId]?.status === 'pendente') {
-                        await database.ref(`pedidosBalcao/${i.pedidoBalcaoId}`).update({
-                            status: 'minutado', dataMinutado: getHojeString(),
-                            minutadoPor: PAINEL_IA_ASSESSOR_NOME, minutadoEm: getDataHoraBrasilia().getTime()
-                        });
-                    }
-                    ok++;
-                } catch (e) {
-                    log('Erro ao registrar minuta do Painel IA', e);
-                }
-            }
-            const entrada = document.getElementById('painelia-entrada');
-            if (entrada) entrada.value = '';
-            painelIAImportacao = null;
-            showNotification(ok === validas.length
-                ? `${ok} ${ok === 1 ? 'minuta registrada' : 'minutas registradas'}. Copie o código para o Painel para atualizar a situação lá.`
-                : `${ok} de ${validas.length} minutas registradas. Tente de novo as restantes.`, ok === validas.length ? 'success' : 'warning');
-            renderPainelIA();
-        }
-
-        function renderPainelIA() {
-            const view = document.getElementById('painelia-view');
-            if (!view) return;
-            view.classList.remove('hidden');
-            if (!currentUser?.isJuiz) {
-                view.innerHTML = '<div class="max-w-4xl mx-auto px-4 py-8 text-gray-600">Esta tela é exclusiva do juiz.</div>';
-                return;
-            }
-            const ia = painelIAMinutasIA().filter(m => m.status !== 'excluida')
-                .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
-            const rotulo = { pendente: 'Pendente', assinada: 'Assinada', correcao: 'Precisa correção' };
-            view.innerHTML = `
-                <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-                    <div class="flex items-center justify-between flex-wrap gap-2">
-                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                            <i data-lucide="refresh-cw" class="h-6 w-6 mr-2 text-cyan-700"></i>
-                            Painel IA
-                        </h2>
-                        <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">🔒 visível apenas no seu login</span>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-green-600">
-                        <div class="flex items-start justify-between gap-4 flex-wrap">
-                            <div>
-                                <h3 class="font-semibold text-gray-800 mb-1">Lançar assinadas do Painel</h3>
-                                <p class="text-sm text-gray-600">Ao marcar uma minuta como assinada no Painel, ela vai para a área de transferência. Um clique aqui lança em seu nome, já assinada. Lançar de novo não duplica.</p>
-                            </div>
-                            <button onclick="lancarAssinadasPainelIA()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">Lançar assinadas do Painel</button>
-                        </div>
-                        <textarea id="painelia-lancar-entrada" placeholder="Cole aqui o código copiado no Painel" class="hidden mt-3 w-full h-20 border border-gray-300 rounded-md p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
-                        <div id="painelia-lancamento"></div>
-                    </div>
-
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-cyan-600">
-                            <h3 class="font-semibold text-gray-800 mb-1">1. Enviar ao Painel</h3>
-                            <p class="text-sm text-gray-600 mb-3">Copia a produtividade de hoje e do mês, as Metas do Magistrado, a Meta 2, o painel 180/120/100, os pedidos pendentes do balcão e a situação das minutas da IA.</p>
-                            <button onclick="copiarSnapshotPainelIA()" class="bg-cyan-700 text-white px-4 py-2 rounded-md hover:bg-cyan-800 transition-colors">Copiar código para o Painel</button>
-                            <textarea id="painelia-snapshot" readonly class="hidden mt-3 w-full h-24 border border-gray-300 rounded-md p-2 text-xs font-mono"></textarea>
-                        </div>
-                        <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-indigo-600">
-                            <h3 class="font-semibold text-gray-800 mb-1">2. Receber do Painel</h3>
-                            <p class="text-sm text-gray-600 mb-3">Cole o código das minutas aprovadas no Painel. Elas entram como pendentes, com o autor "Claude (IA)", para você revisar e assinar aqui.</p>
-                            <textarea id="painelia-entrada" oninput="lerImportacaoPainelIA()" placeholder="Cole aqui o código copiado no Painel" class="w-full h-24 border border-gray-300 rounded-md p-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-                            <div id="painelia-previa" class="mt-3"></div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow-md p-5">
-                        <h3 class="font-semibold text-gray-800 mb-3">Minutas da IA no sistema (${ia.length})</h3>
-                        ${ia.length ? `
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm">
-                                <thead><tr class="text-left text-gray-500 border-b">
-                                    <th class="py-2 pr-3">Data</th><th class="py-2 pr-3">Processo</th><th class="py-2 pr-3">Tipo</th><th class="py-2">Situação</th>
-                                </tr></thead>
-                                <tbody>${ia.map(m => `
-                                    <tr class="border-b last:border-b-0">
-                                        <td class="py-2 pr-3">${escapeHtml(m.data || '')}</td>
-                                        <td class="py-2 pr-3 font-mono">${escapeHtml(m.numeroProcesso)}</td>
-                                        <td class="py-2 pr-3">${escapeHtml(m.tipoMinuta)}</td>
-                                        <td class="py-2">${escapeHtml(rotulo[m.status] || m.status)}</td>
-                                    </tr>`).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-2">Assine ou peça correção pelo Histórico, como nas demais minutas.</p>` :
-                        '<p class="text-sm text-gray-500">Nenhuma minuta da IA registrada ainda. Elas aparecem aqui depois do passo 2.</p>'}
-                    </div>
-                </div>`;
-            renderPreviaImportacaoPainelIA(painelIAImportacao ? undefined : 'Cole aqui o código copiado no Painel do Gabinete.');
-            criarIcones();
         }
 
         // ==================== GABINETE (esteira do Painel do Gabinete; exclusiva do juiz) ====================
@@ -8803,15 +8485,6 @@
             if (p.meta2) linhas.push('Processo da Meta 2: priorize.');
             if (p.notas && p.notas.trim()) linhas.push('', 'Orientações:', p.notas.trim());
             return linhas.join('\n');
-        }
-        function gabComandoLote(lista) {
-            const l = ['Processa em lote estes processos (download sequencial, um agente por processo, revisor independente e painel do lote):', ''];
-            for (const p of lista) {
-                const extra = [GAB_ESPECIES[p.especie]?.ato || 'ato', `esforço ${p.esforco}`, p.biblio ? `bibliotecário de ${GAB_MATERIAS[p.materia]}` : '', p.meta2 ? 'Meta 2' : ''].filter(Boolean).join('; ');
-                l.push(`- ${p.numero} → ${extra}${p.notas && p.notas.trim() ? ` · ${p.notas.trim().replace(/\s+/g, ' ')}` : ''}`);
-            }
-            l.push('', 'Modo minuta, consulte a jurisprudência do TJAL e entregue as minutas em .docx.');
-            return l.join('\n');
         }
         function gabPedidoExec(p, loteId) {
             return { execStatus: 'fila', exec: { pedidoEm: new Date().toISOString(), comando: gabComando(p), loteId: loteId || '', iniciadoEm: '', concluidoEm: '', resumo: '', arquivo: '', erro: '' } };
@@ -9041,15 +8714,6 @@
             const cor = { ok: 'border-green-500 bg-green-50 text-green-800', warn: 'border-amber-500 bg-amber-50 text-amber-800', crit: 'border-red-500 bg-red-50 text-red-700', meta: 'border-purple-500 bg-purple-50 text-purple-800' }[s.cls] || 'border-gray-300 bg-gray-50 text-gray-700';
             return `<div class="flex justify-between gap-2 text-xs border-l-4 ${cor} rounded px-2 py-1 mt-1"${s.dica ? ` title="${escapeHtml(s.dica)}"` : ''}><span>${escapeHtml(s.txt)}</span>${s.em ? `<time class="whitespace-nowrap opacity-80">${escapeHtml(gabDataHora(s.em))}</time>` : ''}</div>${erro}`;
         }
-        async function gabCopiar(texto, ok = 'Copiado. Cole numa conversa com o Claude.') {
-            try {
-                await navigator.clipboard.writeText(texto);
-                showNotification(ok, 'success');
-            } catch (e) {
-                window.prompt('Copie o texto (Ctrl+C):', texto);
-            }
-        }
-
         // ---------- tela ----------
         function renderGabinete() {
             const view = document.getElementById('gabinete-view');
@@ -9158,6 +8822,9 @@
                 faixas.push(faixa('crit', `${gabPlural(erros.length, 'processo falhou', 'processos falharam')} na execução.`,
                     `Último: <span class="font-mono">${escapeHtml(u.numero || '')}</span> — ${escapeHtml(String(u.exec?.erro || 'sem mensagem').slice(0, 160).replace(/[.\s]+$/, ''))}. Abra o processo, leia o erro na aba Execução e ponha na fila de novo.`, btnFiltro('f:erro', 'Ver os erros')));
             }
+            const semLancar = docs.filter(gabAssinadaSemLancar).length;
+            if (semLancar) faixas.push(faixa('crit', `${gabPlural(semLancar, 'minuta marcada como assinada ainda não está', 'minutas marcadas como assinadas ainda não estão')} no sistema.`,
+                'Elas não contam na produtividade enquanto não forem lançadas. Abra cada uma e use “Assinar e lançar” na aba Sistema, ou selecione-as no Kanban e lance em lote.', btnFiltro('col:assinar', 'Ver')));
             const eSis = docs.filter(p => p.prod?.erro && !gabArquivado(p)).length;
             if (eSis) faixas.push(faixa('crit', `${gabPlural(eSis, 'minuta com erro', 'minutas com erro')} no sistema.`, 'O motivo aparece no cartão e na aba Sistema.', btnFiltro('f:erro', 'Ver')));
             const dup = docs.filter(p => p.lancarStatus === 'duplicidade' && !gabArquivado(p)).length;
@@ -9231,12 +8898,11 @@
             const docs = gabDocs();
             const nArq = docs.filter(gabArquivado).length;
             const aba = (id, rot) => `<button role="tab" aria-selected="${gab.aba === id}" onclick="gabMostraAba('${id}')" class="px-3 py-1.5 rounded-md text-sm ${gab.aba === id ? 'bg-cyan-700 text-white' : 'text-gray-700 hover:bg-gray-100'}">${rot}</button>`;
-            document.getElementById('gab-abas').innerHTML = aba('esteira', `Esteira <span class="opacity-75">${gabNaEsteira().length}</span>`) + aba('arquivo', `Arquivo <span class="opacity-75">${nArq}</span>`) + aba('comandos', 'Comandos rápidos');
+            document.getElementById('gab-abas').innerHTML = aba('esteira', `Esteira <span class="opacity-75">${gabNaEsteira().length}</span>`) + aba('arquivo', `Arquivo <span class="opacity-75">${nArq}</span>`);
             document.getElementById('gab-barra').classList.toggle('hidden', gab.aba !== 'esteira');
             document.getElementById('gab-barra-arq').classList.toggle('hidden', gab.aba !== 'arquivo');
             if (!gabCarregado && !gabErroLeitura) { corpo.innerHTML = ''; return; }
             if (gab.aba === 'arquivo') { corpo.innerHTML = gabArquivoHTML(); return; }
-            if (gab.aba === 'comandos') { corpo.innerHTML = gabComandosHTML(); return; }
 
             const botao = (ativo, rot, acao) => `<button onclick="${acao}" aria-pressed="${ativo}" class="px-3 py-1.5 rounded-md text-sm border ${ativo ? 'bg-cyan-700 text-white border-cyan-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}">${rot}</button>`;
             document.getElementById('gab-vista').innerHTML =
@@ -9400,7 +9066,7 @@
             gabRenderCorpo();
         }
         function gabLimparSelecao() { gab.sel.clear(); gab.modoLote = false; gab.loteArmado = false; gab.excArmado = ''; gabRenderCorpo(); }
-        const gabAssinaveis = () => gabDocs().filter(p => gab.sel.has(p.id) && gabColunaDe(p) === 'minuta' && gabTemMinuta(p));
+        const gabAssinaveis = () => gabDocs().filter(p => gab.sel.has(p.id) && ((gabColunaDe(p) === 'minuta' && gabTemMinuta(p)) || gabAssinadaSemLancar(p)));
         function gabLoteBarHTML() {
             if (!gab.modoLote && !gab.sel.size) return '';
             const n = gab.sel.size, k = gabAssinaveis().length;
@@ -9409,7 +9075,6 @@
                 <span class="text-sm font-medium text-cyan-900 mr-2">${gabPlural(n, 'selecionado', 'selecionados')}</span>
                 ${btn('Pôr na fila e ativar', 'gabLotePorNaFila()', 'bg-cyan-700 text-white hover:bg-cyan-800', !n, 'gab-lote-fila')}
                 ${btn(gab.loteArmado ? `Confirmar: assinar e lançar ${k}` : `Assinar e lançar${k ? ` (${k})` : ''}`, 'gabLoteAssinar()', gab.loteArmado ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-green-600 text-white hover:bg-green-700', !k, 'gab-lote-assinar')}
-                ${btn('Copiar comando do lote', 'gabCopiar(gabComandoLote(gabDocs().filter(p => gab.sel.has(p.id))), \'Comando do lote copiado.\')', 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100', !n)}
                 ${btn(gab.excArmado ? `Confirmar exclusão de ${n}` : `Excluir do painel (${n})`, 'gabLoteExcluir()', gab.excArmado ? 'bg-red-700 text-white' : 'bg-white border border-red-300 text-red-700 hover:bg-red-50', !n, 'gab-lote-excluir')}
                 ${btn('Limpar seleção', 'gabLimparSelecao()', 'text-gray-600 underline')}
             </div>`;
@@ -9508,25 +9173,6 @@
                     </button></li>`).join('') || `<li class="py-3 text-sm text-gray-500">Nada no Arquivo${q ? ' com essa busca' : ''}.</li>`}</ul>
             </div>`;
         }
-        function gabComandosHTML() {
-            const cartao = (titulo, texto, corpo) => `<div class="bg-white rounded-lg shadow-md p-4 space-y-2"><h3 class="font-semibold text-gray-800">${titulo}</h3><p class="text-sm text-gray-600">${texto}</p>${corpo}</div>`;
-            return `<p class="text-sm text-gray-600 mb-3">Copie e cole numa conversa com o Claude.</p>
-                <div class="grid md:grid-cols-3 gap-4">
-                    ${cartao('Briefing do DJE', 'Publicações de interesse do gabinete no Caderno 3 (Administrativo).',
-                        `<button onclick="gabCopiar(GAB_CMD_DJE)" class="bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 text-sm">Copiar comando</button>`)}
-                    ${cartao('Jurisprudência do TJAL', 'Acórdãos recentes sobre um tema (e-SAJ, cjsg).',
-                        `<div class="flex gap-2"><input id="gab-q-juris" placeholder="Tema, ex.: dano moral negativação" aria-label="Tema da pesquisa" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm flex-1 min-w-0"><button onclick="gabCopiarJuris()" class="bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 text-sm">Copiar</button></div>`)}
-                    ${cartao('Incluir modelo', 'Anonimiza, generaliza e guarda nos modelos do gabinete.',
-                        `<button onclick="gabCopiar(GAB_CMD_MODELO)" class="bg-cyan-700 text-white px-3 py-1.5 rounded-md hover:bg-cyan-800 text-sm">Copiar comando</button>`)}
-                </div>`;
-        }
-        const GAB_CMD_DJE = 'Faz o briefing executivo do DJE/AL de hoje (Caderno 3 – Administrativo).';
-        const GAB_CMD_MODELO = 'Inclua esse modelo nos modelos do gabinete:\n\n[cole aqui o texto da decisão, sentença ou despacho]';
-        function gabCopiarJuris() {
-            const t = (document.getElementById('gab-q-juris')?.value || '').trim();
-            gabCopiar(`Pesquisa na jurisprudência do TJAL (e-SAJ, cjsg) acórdãos recentes sobre: ${t || '[tema]'}. Traga ementas, números e datas de julgamento.`);
-        }
-
         // ---------- gaveta do processo ----------
         function gabAbrir(id) {
             const p = id ? gabDoc(id) : null;
@@ -9545,7 +9191,11 @@
             const g = document.getElementById('gab-gaveta');
             if (g) g.innerHTML = '';
         }
-        function gabMostraSistema(p) { return !!p && (gabTemMinuta(p) || !!p.prod?.status || !!gabMinutaNoSistema(p) || !!gab.retidas[p.id]); }
+        function gabMostraSistema(p) { return !!p && (gabTemMinuta(p) || p.etapa === 'assinada' || !!p.prod?.status || !!gabMinutaNoSistema(p) || !!gab.retidas[p.id]); }
+        // card marcado como assinado na esteira que ainda não tem registro no sistema (17/11/2026): não pode ficar sem contar
+        function gabAssinadaSemLancar(p) {
+            return !!p && gabColunaDe(p) === 'assinar' && p.lancarStatus !== 'duplicidade' && !gab.retidas[p.id] && !gabMinutaNoSistema(p);
+        }
         function gabSetDTab(t) { gab.dtab = t; gabRenderGaveta(); }
 
         // campos do formulário: guardam o valor sem redesenhar (para não perder o cursor)
@@ -9578,15 +9228,14 @@
             if (!novo && !p) { gabFechar(); return; }
             const mostraSis = !novo && gabMostraSistema(p);
             if (gab.dtab === 'sis' && !mostraSis) gab.dtab = 'dados';
-            if (novo && gab.dtab !== 'dados' && gab.dtab !== 'cmd') gab.dtab = 'dados';
+            if (gab.dtab === 'cmd' || (novo && gab.dtab !== 'dados')) gab.dtab = 'dados';
             const e = p ? GAB_EXEC[p.execStatus] : null;
             const s = p ? gabSituacao(p) : null;
             const tab = (id, rot, pill = '') => `<button role="tab" aria-selected="${gab.dtab === id}" onclick="gabSetDTab('${id}')" class="px-3 py-2 text-sm border-b-2 ${gab.dtab === id ? 'border-cyan-700 text-cyan-800 font-medium' : 'border-transparent text-gray-600 hover:text-gray-800'}">${rot} ${pill}</button>`;
             const abas = [tab('dados', 'Dados')];
             if (!novo) abas.push(tab('exec', 'Execução', e ? gabPill(e.nome, e.cls) : ''));
             if (mostraSis) abas.push(tab('sis', 'Sistema', s ? gabPill(s.k === 'lancada' ? 'lançada' : s.txt.split(' (')[0].split(' · ')[0], s.cls) : ''));
-            abas.push(tab('cmd', 'Comando'));
-            const conteudo = gab.dtab === 'exec' ? gabGavetaExec(p) : gab.dtab === 'sis' ? gabGavetaSistema(p) : gab.dtab === 'cmd' ? gabGavetaComando() : gabGavetaDados(novo);
+            const conteudo = gab.dtab === 'exec' ? gabGavetaExec(p) : gab.dtab === 'sis' ? gabGavetaSistema(p) : gabGavetaDados(novo);
             const arquivadoAgora = p && gabArquivado(p);
             g.innerHTML = `
                 <div class="fixed inset-0 bg-black/40 z-50" onclick="gabFechar()"></div>
@@ -9634,7 +9283,7 @@
                 <div>${rotulo('Tipo de ato', 'gab-f-especie')}<select id="gab-f-especie" class="${entrada}" onchange="gabCampo('especie', this.value)">${Object.entries(GAB_ESPECIES).map(([k, v]) => `<option value="${k}" ${f.especie === k ? 'selected' : ''}>${escapeHtml(v.rotulo)}</option>`).join('')}</select></div>
                 ${marca('meta2', 'Processo da Meta 2 do CNJ')}
                 <div><span class="block text-sm font-medium text-gray-700 mb-1">Etapa</span>${seg('etapa', GAB_ETAPAS.map(x => [x.id, x.nome]))}
-                    <p class="text-xs text-gray-500 mt-1">Mudar para “Assinada” numa minuta pronta já lança no sistema, como “Assinar e lançar”.</p></div>
+                    <p class="text-xs text-gray-500 mt-1">Mudar para “Assinada” lança a minuta no sistema, como “Assinar e lançar” (o tipo do ato vem da aba Sistema).</p></div>
                 <div class="flex flex-wrap gap-4">
                     <div><span class="block text-sm font-medium text-gray-700 mb-1">Modo</span>${seg('modo', [['minuta', 'Minuta'], ['chat', 'Chat']])}</div>
                     <div><span class="block text-sm font-medium text-gray-700 mb-1">Rigor</span>${seg('rigor', [['rigoroso', 'Rigoroso'], ['livre', 'Livre']])}</div>
@@ -9725,13 +9374,6 @@
             if (!gab.prodForm) return;
             gab.prodForm.categorias = marcado ? [...new Set([...gab.prodForm.categorias, k])] : gab.prodForm.categorias.filter(c => c !== k);
         }
-        function gabGavetaComando() {
-            const texto = gabComando(gab.form);
-            return `<p class="text-sm text-gray-600">É este o texto que o executor roda. Também serve para colar numa conversa com o Claude.</p>
-                <pre id="gab-cmd" class="bg-gray-50 border border-gray-200 rounded p-3 text-sm whitespace-pre-wrap select-all">${escapeHtml(texto)}</pre>
-                <button onclick="gabCopiar(gabComando(gab.form), 'Comando copiado.')" class="px-3 py-1.5 rounded-md text-sm bg-cyan-700 text-white hover:bg-cyan-800">Copiar comando</button>`;
-        }
-
         // ---------- gravações da gaveta ----------
         // grava só os campos do formulário (update), para não apagar o que o executor escreveu
         async function gabGravarForm() {
@@ -9765,8 +9407,9 @@
                 if (!id) return;
                 // mudar a etapa para "Assinada" numa minuta pronta também lança no sistema
                 const f = gab.form;
-                const virouAssinada = f.etapa === 'assinada' && antes && antes.etapa !== 'assinada';
-                if (virouAssinada && gabTemMinuta(antes) && !['lancar', 'lancada', 'assinada'].includes(antes.prod?.status)) {
+                // (17/11/2026) vale também para card sem minuta da esteira e para etapa que já estava "Assinada" sem lançamento
+                const assinadaSemLancar = f.etapa === 'assinada' && antes && !['lancar', 'lancada', 'assinada'].includes(antes.prod?.status) && !gabMinutaNoSistema(antes);
+                if (assinadaSemLancar) {
                     const pf = gab.prodForm || { tipo: antes.atoGerado || antes.prod?.tipo || gabTipoPadrao(f.especie), categorias: antes.prod?.categorias?.length ? antes.prod.categorias : gabCatsPadrao({ ...antes, ...f }) };
                     if (!pf.tipo) { showNotification('Processo salvo. Escolha o tipo do ato na aba Sistema para lançar.', 'warning'); gab.dtab = 'sis'; gabRenderGaveta(); return; }
                     const res = await gabLancar(id, pf.tipo, gabAjustaCats(pf.tipo, pf.categorias));
