@@ -8339,7 +8339,14 @@
         // GAB_LIMITE_RODADA é só o teto de segurança por ativação (o restante espera a próxima).
         const GAB_BLOCO = 6;
         const GAB_LIMITE_RODADA = 30;
-        const GAB_CAMPOS = ['numero', 'classe', 'concluso', 'materia', 'especie', 'meta2', 'etapa', 'modo', 'rigor', 'esforco', 'biblio', 'juris', 'notas'];
+        const GAB_CAMPOS = ['numero', 'classe', 'concluso', 'materia', 'especie', 'meta2', 'etapa', 'modo', 'rigor', 'esforco', 'biblio', 'juris', 'notas', 'voltar', 'voltarNota'];
+        // 20/11/2026 (pedido do juiz): na revisão das minutas prontas, marca as que ele precisa retomar.
+        // voltar: '' | 'corrigir' (ele mesmo ajusta o texto) | 'refazer' (o Claude refaz, com voltarNota como orientação);
+        // voltarEm: quando marcou. Uma marca "refazer" se dá por atendida quando o executor conclui depois dela.
+        const GAB_VOLTAR = {
+            corrigir: { curto: '✎ voltar: corrigir', cls: 'warn', rotulo: 'Voltar para corrigir' },
+            refazer: { curto: '↻ voltar: refazer', cls: 'crit', rotulo: 'Refazer' }
+        };
         const GAB_RE_CNJ_TEXTO = /\b(\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4})(?:\s*\/\s*(\d{1,4}))?/g;
 
         let gabProcessos = {};
@@ -8357,11 +8364,11 @@
             const v = localStorage.getItem('gab-vista');
             if (v === 'kanban' || v === 'lista') gab.vista = v;
             const s = JSON.parse(localStorage.getItem('gab-filtros') || '{}');
-            for (const k of ['meta', 'atraso', 'erro', 'lancar']) gab.f[k] = !!s[k];
+            for (const k of ['meta', 'voltar', 'atraso', 'erro', 'lancar']) gab.f[k] = !!s[k];
             gab.f.materia = typeof s.materia === 'string' ? s.materia : '';
         } catch (e) { /* sem armazenamento local: usa o padrão */ }
 
-        function gabFiltrosVazios() { return { meta: false, oral: false, atraso: false, erro: false, lancar: false, materia: '', col: '' }; }
+        function gabFiltrosVazios() { return { meta: false, oral: false, voltar: false, atraso: false, erro: false, lancar: false, materia: '', col: '' }; }
         function gabSalvaPreferencias() {
             try {
                 const { col, ...resto } = gab.f;
@@ -8371,7 +8378,7 @@
         }
         function gabVazio() {
             return { numero: '', classe: '', concluso: hojeLocal(), materia: 'civel', especie: 'sentenca', meta2: false, etapa: 'fila',
-                modo: 'minuta', rigor: 'rigoroso', esforco: 3, biblio: true, juris: true, notas: '' };
+                modo: 'minuta', rigor: 'rigoroso', esforco: 3, biblio: true, juris: true, notas: '', voltar: '', voltarNota: '' };
         }
 
         // ---------- dados ----------
@@ -8443,6 +8450,14 @@
             return d !== null && d > GAB_DIAS_PARADA ? d : null;
         }
         const gabNaEsteira = () => gabDocs().filter(p => !gabArquivado(p));
+        // marca de revisão ainda pendente: some quando a minuta é revisada, assinada ou lançada,
+        // e a de "refazer" quando o executor entrega a minuta nova
+        function gabVoltar(p) {
+            if (!p || !GAB_VOLTAR[p.voltar] || gabColunaDe(p) !== 'minuta' || p.etapa === 'revisada') return '';
+            if (p.voltar === 'refazer' && p.voltarEm && p.exec?.concluidoEm && p.exec.concluidoEm > p.voltarEm) return '';
+            return p.voltar;
+        }
+        const gabRefeita = (p) => !!p && p.voltar === 'refazer' && gabColunaDe(p) === 'minuta' && p.etapa !== 'revisada' && !gabVoltar(p);
         const gabEmAtraso = (p) => ((gabDiasDesde(p.concluso) ?? 0) > 60 && p.etapa !== 'assinada') || !!gabDiasParada(p);
         const gabComErro = (p) => p.execStatus === 'erro' || !!p.prod?.erro;
         // R85 (10/11/2026): o executor não minuta ato que depende do conteúdo de prova oral de audiência;
@@ -8453,13 +8468,14 @@
             const f = gab.f;
             if (f.meta && !p.meta2) return false;
             if (f.oral && !gabOuvirMidia(p)) return false;
+            if (f.voltar && !gabVoltar(p) && !gabRefeita(p)) return false;
             if (f.atraso && !gabEmAtraso(p)) return false;
             if (f.erro && !gabComErro(p)) return false;
             if (f.lancar && gabColunaDe(p) !== 'assinar') return false;
             if (f.materia && p.materia !== f.materia) return false;
             if (f.col && gabColunaDe(p) !== f.col) return false;
             const q = gab.busca.trim().toLowerCase();
-            if (q && !`${p.numero} ${p.classe} ${p.notas} ${GAB_MATERIAS[p.materia] || ''}`.toLowerCase().includes(q)) return false;
+            if (q && !`${p.numero} ${p.classe} ${p.notas} ${p.voltarNota || ''} ${GAB_MATERIAS[p.materia] || ''}`.toLowerCase().includes(q)) return false;
             return true;
         }
         const gabOrdemPadrao = (a, b) => (Number(!!b.meta2) - Number(!!a.meta2)) || ((gabDiasDesde(b.concluso) ?? 0) - (gabDiasDesde(a.concluso) ?? 0));
@@ -8929,6 +8945,7 @@
             const partes = [
                 chip('Meta 2', f.meta, n(p => p.meta2), "gabChip('meta')"),
                 chip('🎙️ Ouvir mídia', f.oral, n(gabOuvirMidia), "gabChip('oral')", 'Atos que dependem da prova oral de audiência e não foram minutados (R85)'),
+                chip('↩ Voltar a elas', f.voltar, n(p => gabVoltar(p) || gabRefeita(p)), "gabChip('voltar')", 'Minutas que você marcou para corrigir ou refazer, e as já refeitas pelo Claude esperando nova revisão'),
                 chip('Atrasados', f.atraso, n(gabEmAtraso), "gabChip('atraso')", `Conclusos há mais de 60 dias ou minutas prontas há mais de ${GAB_DIAS_PARADA} dias sem revisão (parada há X dias)`),
                 chip('Com erro', f.erro, n(gabComErro), "gabChip('erro')"),
                 chip('Falta lançar', f.lancar, n(p => gabColunaDe(p) === 'assinar'), "gabChip('lancar')")
@@ -8961,9 +8978,9 @@
                     p.origem?.tipo === 'pasta' ? gabPill('feita fora do painel') : gabPill('✓ autos', 'ok'),
                     ex.ficha || (p.origem?.tipo !== 'pasta' && ex.resumo) ? gabPill('✓ FIRAC+', 'ok') : '',
                     conferir ? gabPill(`${conferir} [CONFERIR]`, 'warn') : '',
-                    p.etapa === 'revisada' ? gabPill('✓ revisada', 'ok') : gabPill('a revisar', 'meta'),
+                    p.etapa === 'revisada' ? gabPill('✓ revisada', 'ok') : gabVoltar(p) ? gabPill(GAB_VOLTAR[p.voltar].curto, GAB_VOLTAR[p.voltar].cls, p.voltarNota || '') : gabRefeita(p) ? gabPill('↻ refeita · revisar de novo', 'meta', p.voltarNota ? 'Você pediu: ' + p.voltarNota : '') : gabPill('a revisar', 'meta'),
                     parada ? gabPill(`parada há ${parada} dias`, 'crit', `Minuta pronta há ${parada} dias sem revisão: revise ou arquive`) : ''
-                ].join('')}</div>`;
+                ].join('')}</div>${gabVoltar(p) && p.voltarNota ? `<div class="text-xs text-gray-700 bg-amber-50 border-l-2 border-amber-400 rounded px-2 py-1 line-clamp-2">${escapeHtml(p.voltarNota)}</div>` : ''}`;
             }
             return '';
         }
@@ -8979,7 +8996,7 @@
         }
         function gabCardHTML(p) {
             const c = gabColunaDe(p), sel = gab.sel.has(p.id), id = escapeAttr(p.id);
-            return `<div class="bg-white border ${sel ? 'border-cyan-600 ring-2 ring-cyan-200' : 'border-gray-200'} ${c === 'execucao' ? 'border-l-4 border-l-blue-500' : ''} ${gabOuvirMidia(p) ? 'border-l-4 border-l-amber-500' : ''} rounded-lg p-3 shadow-sm hover:shadow cursor-pointer space-y-1.5"
+            return `<div class="bg-white border ${sel ? 'border-cyan-600 ring-2 ring-cyan-200' : 'border-gray-200'} ${c === 'execucao' ? 'border-l-4 border-l-blue-500' : ''} ${gabOuvirMidia(p) ? 'border-l-4 border-l-amber-500' : ''} ${gabVoltar(p) === 'corrigir' ? 'border-l-4 border-l-amber-500' : gabVoltar(p) === 'refazer' ? 'border-l-4 border-l-red-500' : ''} rounded-lg p-3 shadow-sm hover:shadow cursor-pointer space-y-1.5"
                     role="button" tabindex="0" data-gab-id="${escapeHtml(p.id)}" aria-label="Processo ${escapeHtml(p.numero || 'sem número')}"
                     onclick="gabClicaCartao('${id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); gabClicaCartao('${id}'); }">
                 <div class="flex items-start justify-between gap-2">
@@ -9040,7 +9057,7 @@
                             <td class="py-2 px-3" onclick="event.stopPropagation()"><input type="checkbox" ${gab.sel.has(p.id) ? 'checked' : ''} onchange="gabAlternaSel('${id}', this.checked)" aria-label="Selecionar ${escapeHtml(p.numero || '')}"></td>
                             <td class="py-2 pr-3"><div class="font-mono whitespace-nowrap">${escapeHtml(p.numero || 'sem número')} ${p.meta2 ? gabPill('Meta 2', 'meta') : ''}</div><div class="text-xs text-gray-500">${escapeHtml(p.classe || '')}</div></td>
                             <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(p.atoGerado || GAB_ESPECIES[p.especie]?.curto || p.especie || '')}</td>
-                            <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(GAB_COLUNAS.find(x => x.id === c)?.nome || '')} ${p.execStatus === 'erro' ? gabPill('erro', 'crit') : ''}${gabDiasParada(p) ? gabPill('parada', 'crit') : ''}${p.exec?.aviso === 'captcha' && p.execStatus === 'fila' ? gabPill('captcha', 'warn') : ''}${p.exec?.aviso === 'login' && p.execStatus === 'fila' ? gabPill('login e-SAJ', 'warn') : ''}</td>
+                            <td class="py-2 pr-3 whitespace-nowrap">${escapeHtml(GAB_COLUNAS.find(x => x.id === c)?.nome || '')} ${p.execStatus === 'erro' ? gabPill('erro', 'crit') : ''}${gabDiasParada(p) ? gabPill('parada', 'crit') : ''}${gabVoltar(p) ? gabPill(GAB_VOLTAR[p.voltar].curto, GAB_VOLTAR[p.voltar].cls, p.voltarNota || '') : gabRefeita(p) ? gabPill('refeita', 'meta') : ''}${p.exec?.aviso === 'captcha' && p.execStatus === 'fila' ? gabPill('captcha', 'warn') : ''}${p.exec?.aviso === 'login' && p.execStatus === 'fila' ? gabPill('login e-SAJ', 'warn') : ''}</td>
                             <td class="py-2 pr-3 text-right">${['fila', 'execucao', 'minuta'].includes(c) && d != null ? gabPillDias(d, p.etapa) : `<span class="text-gray-400">${d ?? '—'}</span>`}</td>
                             <td class="py-2 pr-3 min-w-48">${gabSisHTML(p) || '<span class="text-gray-400">—</span>'}</td>
                             <td class="py-2 pr-3 whitespace-nowrap text-gray-500">${escapeHtml(gabDataHora(p.atualizadoEm))}</td>
@@ -9284,6 +9301,7 @@
                 ${marca('meta2', 'Processo da Meta 2 do CNJ')}
                 <div><span class="block text-sm font-medium text-gray-700 mb-1">Etapa</span>${seg('etapa', GAB_ETAPAS.map(x => [x.id, x.nome]))}
                     <p class="text-xs text-gray-500 mt-1">Mudar para “Assinada” lança a minuta no sistema, como “Assinar e lançar” (o tipo do ato vem da aba Sistema).</p></div>
+                ${gabBlocoVoltar(novo)}
                 <div class="flex flex-wrap gap-4">
                     <div><span class="block text-sm font-medium text-gray-700 mb-1">Modo</span>${seg('modo', [['minuta', 'Minuta'], ['chat', 'Chat']])}</div>
                     <div><span class="block text-sm font-medium text-gray-700 mb-1">Rigor</span>${seg('rigor', [['rigoroso', 'Rigoroso'], ['livre', 'Livre']])}</div>
@@ -9295,6 +9313,58 @@
                 ${novo ? `<div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
                     <button onclick="gabExecutar(false)" data-gravacao="gab-executar" class="px-3 py-1.5 rounded-md text-sm border border-cyan-700 text-cyan-800 hover:bg-cyan-50">Salvar e pôr na fila</button>
                     <button onclick="gabExecutar(true)" data-gravacao="gab-executar" class="px-3 py-1.5 rounded-md text-sm bg-cyan-700 text-white hover:bg-cyan-800">Pôr na fila e ativar</button></div>` : ''}`;
+        }
+
+        // revisão da minuta pronta (20/11/2026): marcar para voltar depois, corrigindo ou mandando refazer
+        function gabBlocoVoltar(novo) {
+            const p = novo ? null : gabDoc(gab.aberto);
+            if (!p || gabColunaDe(p) !== 'minuta' || !gabTemMinuta(p)) return '';
+            const f = gab.form, v = f.voltar || '';
+            const opc = [['', 'Sem marca'], ['corrigir', 'Voltar para corrigir'], ['refazer', 'Refazer']];
+            const refeita = gabRefeita(p) && v === 'refazer';
+            return `<div class="border border-amber-300 bg-amber-50 rounded-lg p-3 space-y-2">
+                <span class="block text-sm font-medium text-gray-800">Revisão da minuta</span>
+                <div class="inline-flex rounded-md border border-gray-300 overflow-hidden" role="group">${opc.map(([k, rot]) =>
+                    `<button type="button" aria-pressed="${v === k}" onclick="gabCampo('voltar', '${k}', true)" class="px-2.5 py-1 text-sm ${v === k ? (k === 'refazer' ? 'bg-red-600 text-white' : k ? 'bg-amber-600 text-white' : 'bg-cyan-700 text-white') : 'bg-white text-gray-700 hover:bg-gray-100'}">${rot}</button>`).join('')}</div>
+                ${v ? `<div><label for="gab-f-voltar" class="block text-xs text-gray-700 mb-1">${v === 'refazer' ? 'O que o Claude deve mudar (vai como orientação ao refazer)' : 'O que falta corrigir (anotação sua)'}</label>
+                    <textarea id="gab-f-voltar" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" oninput="gabCampo('voltarNota', this.value)">${escapeHtml(f.voltarNota || '')}</textarea></div>` : ''}
+                ${refeita ? `<p class="text-xs text-green-800">O Claude já entregou a minuta refeita${p.exec?.concluidoEm ? ' em ' + escapeHtml(gabDataHora(p.exec.concluidoEm)) : ''}. Revise de novo; marque “Revisada” ou outra marca.</p>` : ''}
+                <p class="text-xs text-gray-600">${v === 'refazer'
+                    ? '“Salvar” só marca. “Refazer agora” põe na fila com esta orientação; o executor só roda quando você o ativa.'
+                    : 'A marca aparece no card e no filtro “Voltar a elas”, e some quando você muda a etapa para “Revisada” ou “Assinada”.'}</p>
+                ${v === 'refazer' && !refeita && p.execStatus !== 'fila' && p.execStatus !== 'executando' ? `<div class="flex flex-wrap gap-2">
+                    <button onclick="gabRefazer(false)" data-gravacao="gab-executar" class="px-3 py-1.5 rounded-md text-sm border border-red-600 text-red-700 hover:bg-red-50">Refazer: pôr na fila</button>
+                    <button onclick="gabRefazer(true)" data-gravacao="gab-executar" class="px-3 py-1.5 rounded-md text-sm bg-red-600 text-white hover:bg-red-700">Refazer agora</button></div>` : ''}
+            </div>`;
+        }
+        // comando de refazer: o texto do gabComando (que o executor lê) com a orientação do juiz acrescentada
+        function gabComandoRefazer(p) {
+            const base = gabComando({ ...p, etapa: 'firac' });
+            const nota = String(p.voltarNota || '').trim();
+            return base + '\n\nO juiz devolveu a minuta anterior para ser refeita' + (p.exec?.arquivo ? ` (${p.exec.arquivo})` : '') + '. Refaça a minuta a partir dos autos, seguindo as observações dele' + (nota ? ':\n' + nota : '.');
+        }
+        async function gabRefazer(imediato) {
+            if (!currentUser?.isJuiz || !database) return;
+            if (!String(gab.form?.voltarNota || '').trim()) { showNotification('Escreva o que o Claude deve mudar antes de mandar refazer.', 'warning'); document.getElementById('gab-f-voltar')?.focus(); return; }
+            if (!iniciarGravacao('gab-executar')) return;
+            try {
+                gab.form.voltar = 'refazer';
+                const id = await gabGravarForm();
+                if (!id) return;
+                const atual = gabDoc(id) || {};
+                const pedido = gabPedidoExec({ ...atual, ...gab.form });
+                pedido.exec.comando = gabComandoRefazer({ ...atual, ...gab.form });
+                const agora = new Date().toISOString();
+                await gabRef(id).update({ ...pedido, voltarEm: agora, minutaAnterior: atual.exec?.arquivo || atual.minutaAnterior || '', atualizadoEm: agora });
+                let ativou = false;
+                if (imediato) ativou = await gabPedirExecutor();
+                showNotification(imediato ? (ativou ? 'Na fila para refazer · o executor começa em até 5 minutos.' : 'Na fila para refazer · já havia um pedido ao executor.') : 'Na fila para refazer · aperte “Ativar o executor” quando quiser.', 'success');
+                gabFechar();
+            } catch (e) {
+                avisarFalhaGravacao(e, 'Não foi possível pôr na fila para refazer');
+            } finally {
+                encerrarGravacao('gab-executar');
+            }
         }
 
         function gabGavetaExec(p) {
@@ -9392,6 +9462,12 @@
             for (const k of GAB_CAMPOS) dados[k] = f[k] ?? base[k];
             dados.esforco = Number(dados.esforco) || 3;
             dados.atualizadoEm = new Date().toISOString();
+            // marca de revisão: some ao revisar ou assinar; guarda quando foi posta (ou trocada)
+            if (dados.etapa === 'revisada' || dados.etapa === 'assinada') { dados.voltar = ''; dados.voltarNota = ''; }
+            if (!GAB_VOLTAR[dados.voltar]) { dados.voltar = ''; dados.voltarNota = ''; }
+            const antesV = idAtual ? gabDoc(idAtual) : null;
+            if (dados.voltar && (dados.voltar !== antesV?.voltar || !antesV?.voltarEm)) dados.voltarEm = dados.atualizadoEm;
+            dados.voltarNota = String(dados.voltarNota || '').slice(0, 2000);
             if (idAtual) { await gabRef(idAtual).update(dados); return idAtual; }
             const ref = database.ref('gabinete/processos').push();
             await ref.set({ ...dados, exemplo: false, criadoEm: dados.atualizadoEm, execStatus: '' });

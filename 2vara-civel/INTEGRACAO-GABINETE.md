@@ -160,6 +160,7 @@ horas são ISO 8601 (`toISOString()`), exceto `concluso` (AAAA-MM-DD).
 | `prod` | aba / executor | `{status, tipo, categorias, solicitadoEm, enviadaEm, lancadaEm, lancadoPor, minutaId, erro}` |
 | `lancarStatus` | aba / executor | `ok`, `pendente`, `duplicidade` |
 | `arquivado`, `arquivadoEm` | aba | `true`/`false` sobrepõe a regra automática do Arquivo |
+| `voltar`, `voltarNota`, `voltarEm` | aba | (20/11/2026) marca da revisão do juiz na minuta pronta: `""`, `"corrigir"` (ele mesmo ajusta) ou `"refazer"` (o Claude refaz); `voltarNota` = o que mudar; some ao marcar a etapa `revisada` ou `assinada`, e a de `refazer` se dá por atendida quando `exec.concluidoEm` passa de `voltarEm`. O executor não precisa ler: no refazer, a orientação vai no fim do `exec.comando` |
 | `criadoEm`, `atualizadoEm` | aba / executor | ISO |
 
 Regras que a aba aplica (as mesmas do Painel):
@@ -252,3 +253,7 @@ acontecem dentro do sistema.
   da esteira; no lote, "Assinar e lançar" inclui os de "Falta lançar"; e a aba avisa (faixa
   vermelha) quando há card assinado sem registro no sistema, porque ele não conta na
   produtividade.
+- 20/11/2026: na revisão das minutas prontas, o juiz marca as que vai retomar ("Voltar para
+  corrigir" ou "Refazer", com nota). A marca aparece no card (borda e selo), na lista e no filtro
+  "Voltar a elas". "Refazer agora" põe o processo na fila com a nota no fim do comando (o
+  executor só roda quando o juiz ativa) e guarda o caminho da minuta antiga em `minutaAnterior`.
