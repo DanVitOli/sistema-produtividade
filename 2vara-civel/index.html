@@ -8527,6 +8527,22 @@
         function gabPedidoExec(p, loteId) {
             return { execStatus: 'fila', exec: { pedidoEm: new Date().toISOString(), comando: gabComando(p), loteId: loteId || '', iniciadoEm: '', concluidoEm: '', resumo: '', arquivo: '', erro: '' } };
         }
+        // 23/11/2026 (orientação do juiz): processo que já constava do painel e volta num lote é baixado de novo
+        // e reanalisado do zero. O executor lê a última linha do comando e o campo exec.reanalise.
+        const GAB_LINHA_REANALISE = 'Reanálise pedida pelo juiz: baixe os autos de novo no e-SAJ, mesmo que já tenham sido baixados antes, e refaça a ficha FIRAC+ e a minuta do zero, sem partir da minuta anterior.';
+        function gabPedidoReanalise(p, loteId) {
+            const ped = gabPedidoExec({ ...p, etapa: 'fila' }, loteId);
+            ped.exec.comando += '\n\n' + GAB_LINHA_REANALISE;
+            ped.exec.reanalise = true;
+            return ped;
+        }
+        // card que pode ser reaproveitado na reanálise: sem minuta no sistema, sem lançamento e fora de execução.
+        // Os demais (lançados, aprovados para revisão, no Arquivo) ficam como estão e a reanálise abre um card novo.
+        function gabReaproveitavel(p) {
+            return !!p && !gabArquivado(p) && !['lancada', 'assinar'].includes(gabColunaDe(p)) && !p.prod?.status && !gabMinutaNoSistema(p);
+        }
+        // card "vivo" do mesmo número (para a checagem de duplicidade): lançados e arquivados não contam
+        const gabCardVivo = (p) => !!p && !gabArquivado(p) && gabColunaDe(p) !== 'lancada';
 
         // ---------- tipo do ato, categorias e situação no sistema ----------
         function gabTipoPadrao(especie) {
@@ -9126,7 +9142,8 @@
             let ok = 0, ultimoErro = null;
             try {
                 for (const p of lista) {
-                    try { await gabRef(p.id).update({ ...gabPedidoExec(p, loteId), atualizadoEm: new Date().toISOString() }); ok++; }
+                    const extra = gabReaproveitavel(p) ? { etapa: 'fila', atoGerado: '', voltar: '', voltarNota: '', voltarEm: '', minutaAnterior: p.exec?.arquivo || p.minutaAnterior || '' } : {};
+                    try { await gabRef(p.id).update({ ...gabPedidoReanalise(p, loteId), ...extra, atualizadoEm: new Date().toISOString() }); ok++; }
                     catch (e) { ultimoErro = e; }
                 }
                 let ativou = false;
@@ -9478,7 +9495,7 @@
             }
             f.numero = r.formatado;
             const idAtual = gab.aberto === 'novo' ? null : gab.aberto;
-            const dup = gabDocs().find(d => d.id !== idAtual && normalizarNumeroCNJ(d.numero) === normalizarNumeroCNJ(f.numero));
+            const dup = gabDocs().find(d => d.id !== idAtual && gabCardVivo(d) && normalizarNumeroCNJ(d.numero) === normalizarNumeroCNJ(f.numero));
             if (dup) { showNotification(`Esse processo já está no painel${gabArquivado(dup) ? ' (no Arquivo)' : ''}.`, 'warning'); return null; }
             const base = gabVazio(), dados = {};
             for (const k of GAB_CAMPOS) dados[k] = f[k] ?? base[k];
@@ -9761,14 +9778,18 @@
                 const chave = normalizarNumeroCNJ(numero);
                 if (vistos.has(chave)) continue;
                 vistos.add(chave);
-                const ja = gabDocs().some(p => normalizarNumeroCNJ(p.numero) === chave);
-                gab.loteItens.push({ numero, problema: !r.ok ? r.motivo : ja ? 'já está no painel' : '' });
+                const mesmos = gabDocs().filter(p => normalizarNumeroCNJ(p.numero) === chave);
+                const rodando = mesmos.find(p => p.execStatus === 'executando');
+                const reusa = rodando ? null : mesmos.find(gabReaproveitavel);
+                const nota = !mesmos.length ? '' : reusa ? 'já no painel: baixa de novo e reanalisa' : 'já lançado antes: card novo, baixa de novo e reanalisa';
+                gab.loteItens.push({ numero, problema: !r.ok ? r.motivo : rodando ? 'em execução agora: fica de fora' : '', reusa: reusa ? reusa.id : '', reanalise: !!mesmos.length, nota });
             }
             const validos = gab.loteItens.filter(i => !i.problema);
             const previa = document.getElementById('gab-lote-previa');
-            if (previa) previa.innerHTML = gab.loteItens.map(i => `<li class="flex justify-between gap-2 text-sm"><span class="font-mono">${escapeHtml(i.numero)}</span><span class="${i.problema ? 'text-red-600' : 'text-green-700'}">${escapeHtml(i.problema || 'ok')}</span></li>`).join('');
+            if (previa) previa.innerHTML = gab.loteItens.map(i => `<li class="flex justify-between gap-2 text-sm"><span class="font-mono">${escapeHtml(i.numero)}</span><span class="${i.problema ? 'text-red-600' : i.reanalise ? 'text-amber-700' : 'text-green-700'}">${escapeHtml(i.problema || i.nota || 'ok')}</span></li>`).join('');
             const resumo = document.getElementById('gab-lote-resumo');
-            if (resumo) resumo.textContent = gab.loteItens.length ? `${gabPlural(gab.loteItens.length, 'número encontrado', 'números encontrados')} · ${validos.length} ${validos.length === 1 ? 'será adicionado' : 'serão adicionados'}` : 'Nenhum número encontrado ainda.';
+            const nRe = validos.filter(i => i.reanalise).length;
+            if (resumo) resumo.textContent = gab.loteItens.length ? `${gabPlural(gab.loteItens.length, 'número encontrado', 'números encontrados')} · ${validos.length} ${validos.length === 1 ? 'vai' : 'vão'} para o lote${nRe ? ` (${nRe} já ${nRe === 1 ? 'constava' : 'constavam'} do painel: ${nRe === 1 ? 'será baixado e reanalisado' : 'serão baixados e reanalisados'} do zero)` : ''}` : 'Nenhum número encontrado ainda.';
             const aviso = document.getElementById('gab-lote-aviso');
             if (aviso) aviso.textContent = validos.length > GAB_LIMITE_RODADA ? `Lotes grandes demoram: o Claude baixa os autos um a um, e cada ativação processa até ${GAB_LIMITE_RODADA}; o resto espera você ativar de novo.` : '';
             const btn = document.getElementById('gab-lote-salvar');
@@ -9834,9 +9855,22 @@
             try {
                 for (const item of validos) {
                     const p = { ...base, numero: item.numero };
-                    const dados = { ...p, origem: { tipo: 'lote', pedidoBalcaoId: '' }, exemplo: false, criadoEm: agora, atualizadoEm: agora, execStatus: '' };
-                    if (l.executar) Object.assign(dados, gabPedidoExec(p, loteId));
-                    try { await database.ref('gabinete/processos').push().set(dados); ok++; } catch (e) { ultimoErro = e; break; }
+                    const pedido = item.reanalise ? gabPedidoReanalise(p, loteId) : gabPedidoExec(p, loteId);
+                    try {
+                        if (item.reusa) {
+                            // card já existente e sem minuta no sistema: volta à fila com as opções do lote e a ordem de reanálise
+                            const antes = gabDoc(item.reusa) || {};
+                            const upd = { ...p, etapa: 'fila', atoGerado: '', voltar: '', voltarNota: '', voltarEm: '', arquivado: null, atualizadoEm: agora,
+                                minutaAnterior: antes.exec?.arquivo || antes.minutaAnterior || '', lancarStatus: '' };
+                            if (l.executar) Object.assign(upd, pedido); else upd.execStatus = '';
+                            await gabRef(item.reusa).update(upd);
+                        } else {
+                            const dados = { ...p, origem: { tipo: 'lote', pedidoBalcaoId: '' }, exemplo: false, criadoEm: agora, atualizadoEm: agora, execStatus: '' };
+                            if (l.executar) Object.assign(dados, pedido);
+                            await database.ref('gabinete/processos').push().set(dados);
+                        }
+                        ok++;
+                    } catch (e) { ultimoErro = e; break; }
                 }
                 if (l.executar && ok && l.agora) { try { ativou = await gabPedirExecutor(); } catch (e) { ultimoErro = ultimoErro || e; } }
             } finally {

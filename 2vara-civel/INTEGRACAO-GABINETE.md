@@ -257,3 +257,4 @@ acontecem dentro do sistema.
   corrigir" ou "Refazer", com nota). A marca aparece no card (borda e selo), na lista e no filtro
   "Voltar a elas". "Refazer agora" põe o processo na fila com a nota no fim do comando (o
   executor só roda quando o juiz ativa) e guarda o caminho da minuta antiga em `minutaAnterior`.
+- 23/11/2026: processo que já constava do painel e volta num "Lote de processos" (ou é reposto na fila pela seleção em lote) é baixado de novo e reanalisado do zero. O pedido leva `exec.reanalise: true` e, no fim do `exec.comando`, a linha "Reanálise pedida pelo juiz: …". O card existente é reaproveitado quando não tem minuta no sistema nem lançamento (volta à etapa `fila`, com `minutaAnterior` apontando a minuta velha); se já foi lançado, aprovado para revisão ou arquivado, a reanálise abre um card novo e o antigo fica como está. Card lançado ou arquivado não bloqueia mais o cadastro do mesmo número.
